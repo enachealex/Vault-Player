@@ -65,6 +65,13 @@ public class CastService : IDisposable
         _discoverer.Start();
     }
 
+    /// <summary>
+    /// Search again on demand. A TV that was asleep a moment ago answers as
+    /// soon as it wakes, and making the user reopen the player to trigger a
+    /// fresh scan is a poor way to discover that.
+    /// </summary>
+    public void Rescan() => _ = RefreshDlnaAsync();
+
     /// <summary>SSDP scan for DLNA renderers; safe to call repeatedly (e.g. on menu open).</summary>
     public async Task RefreshDlnaAsync()
     {

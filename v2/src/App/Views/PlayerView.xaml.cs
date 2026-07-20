@@ -1062,7 +1062,24 @@ public partial class PlayerView : UserControl, IDisposable
 
         if (AppServices.Cast.Devices.Count == 0)
         {
-            menu.Items.Add(new MenuItem { Header = "Searching for devices…", IsEnabled = false });
+            // "Searching…" forever is what an empty list looks like, and it
+            // suggests the app is broken. By far the usual cause is a TV in
+            // standby: LG sets stop answering discovery and refuse their own
+            // control ports until the screen is actually on.
+            menu.Items.Add(new Separator());
+            menu.Items.Add(new MenuItem { Header = "No devices found", IsEnabled = false });
+            menu.Items.Add(new MenuItem
+            {
+                Header = "Turn the TV on, then search again",
+                IsEnabled = false,
+            });
+            var again = new MenuItem { Header = "Search again" };
+            again.Click += (_, _) =>
+            {
+                AppServices.Cast.Rescan();
+                if (_castMenu is not null) FillCastMenu(_castMenu);
+            };
+            menu.Items.Add(again);
         }
         else
         {
