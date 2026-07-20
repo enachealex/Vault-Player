@@ -38,6 +38,8 @@ public partial class LibraryView : UserControl, IDisposable
         SortBox.SelectedIndex = 0;
         _ready = true;
 
+        RefreshPartyBanner();
+
         var last = AppServices.Settings.LastFolder;
         if (last is not null && Directory.Exists(last)) LoadFolder(last);
         else LoadShortcutsOnly(); // falls through to the empty state if there are none
@@ -216,6 +218,43 @@ public partial class LibraryView : UserControl, IDisposable
     }
 
     // ---- Navigation --------------------------------------------------------
+
+    // ---- Active party banner -----------------------------------------------
+
+    private void RefreshPartyBanner()
+    {
+        var party = AppServices.CurrentParty;
+        if (party is null)
+        {
+            PartyBanner.Visibility = Visibility.Collapsed;
+            return;
+        }
+        PartyBannerText.Text = party.IsHost
+            ? $"You're hosting room {party.RoomCode} — it stays open while you browse"
+            : $"You're in {party.HostName}'s party, room {party.RoomCode}";
+        PartyBanner.Visibility = Visibility.Visible;
+    }
+
+    private void ReturnToParty_Click(object sender, RoutedEventArgs e)
+    {
+        var party = AppServices.CurrentParty;
+        var movie = AppServices.CurrentPartyMovie;
+        if (party is null || movie is null) return;
+        MainWindow.Instance.Navigate(new PlayerView(movie, null, party));
+    }
+
+    private void LeaveParty_Click(object sender, RoutedEventArgs e)
+    {
+        var party = AppServices.CurrentParty;
+        if (party is null) return;
+        var message = party.IsHost
+            ? "End the party? Everyone watching with you will be disconnected."
+            : "Leave the party?";
+        if (MessageBox.Show(message, "Watch Party", MessageBoxButton.YesNo, MessageBoxImage.Question)
+            != MessageBoxResult.Yes) return;
+        AppServices.LeaveParty();
+        RefreshPartyBanner();
+    }
 
     private void HomeBtn_Click(object sender, RoutedEventArgs e) =>
         MainWindow.Instance.Navigate(new HomeView());

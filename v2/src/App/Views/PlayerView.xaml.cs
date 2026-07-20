@@ -142,6 +142,9 @@ public partial class PlayerView : UserControl, IDisposable
         {
             ChatBtn.Visibility = Visibility.Visible;
             ChatList.ItemsSource = _chatLines;
+            // Remember what to reopen if the user wanders back to the library.
+            AppServices.CurrentParty ??= _party;
+            AppServices.CurrentPartyMovie = _movie;
 
             // The paused card shows who is in the room, so the roster has to be
             // tracked here as well as in the lobby.
@@ -156,6 +159,8 @@ public partial class PlayerView : UserControl, IDisposable
             _party.ChatReceived += (who, text) => AddChatLine($"{who}: {text}");
             _party.Closed += reason =>
             {
+                // The room is genuinely gone, so the app is no longer in a party.
+                if (ReferenceEquals(AppServices.CurrentParty, _party)) AppServices.CurrentParty = null;
                 MessageBox.Show(reason, "Watch Party", MessageBoxButton.OK, MessageBoxImage.Information);
                 MainWindow.Instance.Navigate(new HomeView());
             };
@@ -1199,7 +1204,10 @@ public partial class PlayerView : UserControl, IDisposable
         MainWindow.Instance.PreviewKeyDown -= OnKeyDown;
         if (_overlayWindow is not null) _overlayWindow.PreviewKeyDown -= OnKeyDown;
         AppServices.Cast.Devices.CollectionChanged -= OnCastDevicesChanged;
-        _party?.Dispose();
+        // Deliberately NOT disposing _party. Navigation disposes this view, so
+        // tearing the session down here ended the room and dropped every guest
+        // simply because the host went back to the library. The party is owned
+        // by AppServices and only AppServices.LeaveParty may end it.
         if (_fullscreen) ExitFullscreen();
 
         // Persist final resume position.

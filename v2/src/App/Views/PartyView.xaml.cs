@@ -273,6 +273,7 @@ public partial class PartyView : UserControl, IDisposable
             _session = await PartySession.HostExternalAsync(
                 item.Name, item.Service ?? "your service", item.Path,
                 DisplayName, AppServices.Settings.RendezvousServer);
+            AppServices.CurrentParty = _session;
             _session.RosterChanged += OnRoster;
             _session.Closed += OnClosed;
             _session.CountdownStarted += OnCountdown;
@@ -319,6 +320,7 @@ public partial class PartyView : UserControl, IDisposable
             }
 
             _session = await PartySession.HostAsync(movie, DisplayName, AppServices.Settings.RendezvousServer);
+            AppServices.CurrentParty = _session;
             _session.RosterChanged += OnRoster;
             _session.ReadyChanged += OnReady;
             _session.Closed += OnClosed;
@@ -513,6 +515,7 @@ public partial class PartyView : UserControl, IDisposable
         try
         {
             _session = await PartySession.JoinAsync(address, code, DisplayName);
+            AppServices.CurrentParty = _session;
             AppServices.Settings.LastPartyAddress = address;
             AppServices.Settings.Save();
             _session.Closed += OnClosed;
@@ -619,6 +622,7 @@ public partial class PartyView : UserControl, IDisposable
 
     private void OnClosed(string reason)
     {
+        if (ReferenceEquals(AppServices.CurrentParty, _session)) AppServices.CurrentParty = null;
         if (_handedOff) return;
         MessageBox.Show(reason, "Watch Party", MessageBoxButton.OK, MessageBoxImage.Information);
         MainWindow.Instance.Navigate(new HomeView());
@@ -626,7 +630,10 @@ public partial class PartyView : UserControl, IDisposable
 
     public void Dispose()
     {
-        // Only tear the session down if it was NOT handed to the player.
-        if (!_handedOff) _session?.Dispose();
+        // Only tear the session down if it never became the app's active party
+        // -- i.e. the user backed out of the lobby before anything started.
+        // Once it is the current party it belongs to AppServices, which keeps it
+        // alive across navigation.
+        if (!_handedOff && !ReferenceEquals(_session, AppServices.CurrentParty)) _session?.Dispose();
     }
 }

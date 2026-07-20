@@ -6,11 +6,36 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
+        <!-- A party keeps running while you browse, so it needs to be visible
+             and endable from here rather than silently alive in the background. -->
+        <Border x:Name="PartyBanner" Grid.Row="0" Visibility="Collapsed"
+                Background="{StaticResource AccentSoftBrush}"
+                BorderBrush="{StaticResource AccentBrush}" BorderThickness="0,0,0,1"
+                Padding="24,10">
+            <Grid>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="&#xE7F4;" FontFamily="Segoe MDL2 Assets" FontSize="13"
+                               VerticalAlignment="Center" Foreground="{StaticResource AccentBrush}" />
+                    <TextBlock x:Name="PartyBannerText" Text="" FontSize="13" Margin="10,0,0,0"
+                               VerticalAlignment="Center" Foreground="{StaticResource TextBrush}" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Style="{StaticResource PrimaryButton}" Content="Return to party"
+                            FontSize="12.5" Padding="14,6" Click="ReturnToParty_Click"
+                            AutomationProperties.Name="Return to party" />
+                    <Button Style="{StaticResource GhostButton}" Content="Leave party"
+                            FontSize="12.5" Padding="12,6" Margin="8,0,0,0" Click="LeaveParty_Click"
+                            AutomationProperties.Name="Leave party" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
         <!-- Header -->
-        <Grid Grid.Row="0" Margin="24,18,24,10">
+        <Grid Grid.Row="1" Margin="24,18,24,10">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
@@ -45,7 +70,7 @@
         </Grid>
 
         <!-- Search + sort -->
-        <Grid x:Name="Toolbar" Grid.Row="1" Margin="24,0,24,12" Visibility="Collapsed">
+        <Grid x:Name="Toolbar" Grid.Row="2" Margin="24,0,24,12" Visibility="Collapsed">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
@@ -100,7 +125,7 @@
         </Grid>
 
         <!-- Content -->
-        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" Padding="24,0,10,0">
+        <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto" Padding="24,0,10,0">
             <StackPanel>
 
                 <!-- Continue watching -->
