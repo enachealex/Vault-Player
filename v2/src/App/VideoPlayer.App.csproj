@@ -9,6 +9,16 @@
     <!-- Sets the icon on the .exe itself, which is what Explorer and the
          taskbar fall back to. The window also sets it explicitly below. -->
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
+
+    <!-- Shown in Explorer's file properties, Task Manager and the signature. -->
+    <Product>Vault Movies</Product>
+    <AssemblyTitle>Vault Movies</AssemblyTitle>
+    <Company>Jump Vault LLC</Company>
+    <Authors>Jump Vault LLC</Authors>
+    <Copyright>Copyright © Jump Vault LLC</Copyright>
+    <Version>2.3.0</Version>
+    <FileVersion>2.3.0.0</FileVersion>
+    <AssemblyVersion>2.3.0.0</AssemblyVersion>
   </PropertyGroup>
 
   <ItemGroup>

@@ -41,6 +41,44 @@ public static class ThumbnailService
         return null;
     }
 
+    /// <summary>
+    /// A small frame at a given point in a film, for the timeline hover preview.
+    /// Returns the cached file path, or null if it could not be produced.
+    ///
+    /// Timestamps are bucketed to five seconds: hovering sweeps across hundreds
+    /// of positions a second and extracting a distinct frame for each would
+    /// spawn ffmpeg faster than it can exit. Five seconds is finer than anyone
+    /// can aim at on a scrub bar anyway.
+    /// </summary>
+    public static async Task<string?> ExtractFrameAsync(string videoPath, double atSeconds, CancellationToken ct)
+    {
+        var ffmpeg = FindFfmpeg();
+        if (ffmpeg is null || !File.Exists(videoPath)) return null;
+
+        var bucket = Math.Max(0, Math.Round(atSeconds / 5.0) * 5.0);
+        var key = $"{videoPath}|scrub|{bucket}";
+        var hash = Convert.ToHexString(System.Security.Cryptography.SHA1.HashData(
+            System.Text.Encoding.UTF8.GetBytes(key)));
+        var cached = Path.Combine(CacheDir, hash + ".jpg");
+
+        Directory.CreateDirectory(CacheDir);
+        if (File.Exists(cached) && new FileInfo(cached).Length > 0) return cached;
+
+        // Share the same gate as poster generation so a fast scrub cannot
+        // saturate the machine with ffmpeg processes.
+        await Gate.WaitAsync(ct);
+        try
+        {
+            if (File.Exists(cached) && new FileInfo(cached).Length > 0) return cached;
+            var ok = await RunFfmpegAsync(ffmpeg, videoPath, cached, bucket, ct, width: 240);
+            return ok ? cached : null;
+        }
+        finally
+        {
+            Gate.Release();
+        }
+    }
+
     public static async Task EnsureThumbsAsync(IEnumerable<MovieItem> items, CancellationToken ct)
     {
         var ffmpeg = FindFfmpeg();
@@ -99,13 +137,14 @@ public static class ThumbnailService
         await RunFfmpegAsync(ffmpeg, item.Path, outPath, 5, ct);
     }
 
-    private static async Task<bool> RunFfmpegAsync(string ffmpeg, string input, string output, double atSeconds, CancellationToken ct)
+    private static async Task<bool> RunFfmpegAsync(string ffmpeg, string input, string output, double atSeconds,
+        CancellationToken ct, int width = 460)
     {
         var ss = atSeconds.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
         var psi = new ProcessStartInfo
         {
             FileName = ffmpeg,
-            Arguments = $"-hide_banner -loglevel error -ss {ss} -i \"{input}\" -frames:v 1 -vf \"scale=460:-2\" -q:v 4 -y \"{output}\"",
+            Arguments = $"-hide_banner -loglevel error -ss {ss} -i \"{input}\" -frames:v 1 -vf \"scale={width}:-2\" -q:v 4 -y \"{output}\"",
             UseShellExecute = false,
             CreateNoWindow = true,
         };

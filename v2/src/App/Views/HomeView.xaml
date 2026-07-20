@@ -10,7 +10,7 @@
                            HorizontalAlignment="Center" VerticalAlignment="Center" />
             </Border>
 
-            <TextBlock Text="Video Player" FontSize="34" FontWeight="Bold"
+            <TextBlock Text="Vault Movies" FontSize="34" FontWeight="Bold"
                        FontFamily="{StaticResource DisplayFont}"
                        Foreground="{StaticResource TextBrush}" HorizontalAlignment="Center" Margin="0,18,0,4" />
             <TextBlock Text="Your movies, solo or with friends" FontSize="15"

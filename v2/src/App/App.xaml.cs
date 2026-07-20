@@ -24,7 +24,7 @@ public partial class App : Application
             LogCrash("UI thread", e.Exception);
             MessageBox.Show(
                 $"Something went wrong, but the app is still running.\n\n{e.Exception.Message}",
-                "Video Player", MessageBoxButton.OK, MessageBoxImage.Warning);
+                "Vault Movies", MessageBoxButton.OK, MessageBoxImage.Warning);
             e.Handled = true;
         };
         AppDomain.CurrentDomain.UnhandledException += (_, e) =>
@@ -155,7 +155,7 @@ public partial class App : Application
         catch (Exception ex)
         {
             MessageBox.Show($"Couldn't open that file.\n\n{ex.Message}",
-                "Vault Player", MessageBoxButton.OK, MessageBoxImage.Warning);
+                "Vault Movies", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 

@@ -40,7 +40,7 @@ public static class FileAssociations
             var appKeyName = Path.GetFileName(exe); // e.g. VideoPlayer.App.exe
             using var app = Registry.CurrentUser.CreateSubKey(
                 $@"Software\Classes\Applications\{appKeyName}");
-            app.SetValue("FriendlyAppName", "Vault Player");
+            app.SetValue("FriendlyAppName", "Vault Movies");
 
             using (var command = app.CreateSubKey(@"shell\open\command"))
                 command.SetValue("", $"\"{exe}\" \"%1\"");

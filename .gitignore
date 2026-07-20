@@ -54,3 +54,6 @@ v2/tools/
 # Installer output (v2)
 v2/releases/
 v2/publish/
+
+# Code-signing key -- never commit
+v2/certs/

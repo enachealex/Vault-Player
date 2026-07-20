@@ -113,8 +113,11 @@ public partial class PlayerView : UserControl, IDisposable
             onCommit: _ =>
             {
                 ScrubPopup.IsOpen = false;
+                ScrubThumbBorder.Visibility = Visibility.Collapsed;
                 ApplySeek();
             });
+        Seek.MouseMove += Seek_MouseMove;
+        Seek.MouseLeave += Seek_MouseLeave;
         // No SliderDragBehavior here: it measures with ActualWidth, so it cannot
         // drive a vertical slider. IsMoveToPointEnabled in the XAML gives the
         // click-to-position behaviour instead.
@@ -273,15 +276,110 @@ public partial class PlayerView : UserControl, IDisposable
     private Helpers.SliderDragHandle? _seekDrag;
     private Window? _overlayWindow;
 
+    private DateTime _lastLiveSeek = DateTime.MinValue;
+
+    /// <summary>Minimum gap between live seeks while dragging. Below roughly this,
+    /// libVLC spends longer seeking than showing frames and the drag feels worse.</summary>
+    private static readonly TimeSpan LiveSeekInterval = TimeSpan.FromMilliseconds(90);
+
     private void ShowScrubPreview(double value)
     {
         if (Seek.ActualWidth <= 0) return;
         var fraction = value / Seek.Maximum;
         var durationMs = DlnaActive ? _dlnaDur.TotalMilliseconds : _player?.Length ?? 0;
-        ScrubText.Text = Fmt((long)(durationMs * fraction));
-        ScrubPopup.HorizontalOffset = fraction * Seek.ActualWidth - 30;
-        ScrubPopup.VerticalOffset = -36;
+        var targetMs = (long)(durationMs * fraction);
+
+        ScrubText.Text = Fmt(targetMs);
+        ShowScrubPopupAt(fraction);
+
+        // Move the picture with the handle so you can see where you are landing.
+        // Throttled, because a drag fires far faster than libVLC can seek and
+        // queuing every pixel makes it lurch rather than glide.
+        if (!PartyGuest && !DlnaActive && _player is not null && durationMs > 0)
+        {
+            var now = DateTime.UtcNow;
+            if (now - _lastLiveSeek >= LiveSeekInterval)
+            {
+                _lastLiveSeek = now;
+                try { _player.Time = targetMs; } catch { /* torn down mid-drag */ }
+            }
+        }
+    }
+
+    private void ShowScrubPopupAt(double fraction)
+    {
+        var width = ScrubThumbBorder.Visibility == Visibility.Visible ? 106 : 30;
+        ScrubPopup.HorizontalOffset = fraction * Seek.ActualWidth - width;
+        ScrubPopup.VerticalOffset = ScrubThumbBorder.Visibility == Visibility.Visible ? -140 : -36;
         ScrubPopup.IsOpen = true;
+    }
+
+    // ---- Timeline hover preview --------------------------------------------
+
+    private CancellationTokenSource? _hoverCts;
+    private double _hoverBucket = -1;
+
+    private void Seek_MouseMove(object sender, MouseEventArgs e)
+    {
+        if (_seekDrag?.IsDragging == true) return;   // dragging has its own preview
+        if (Seek.ActualWidth <= 0) return;
+
+        var fraction = Math.Clamp(e.GetPosition(Seek).X / Seek.ActualWidth, 0, 1);
+        var durationMs = DlnaActive ? _dlnaDur.TotalMilliseconds : _player?.Length ?? 0;
+        if (durationMs <= 0) return;
+
+        var seconds = durationMs / 1000.0 * fraction;
+        ScrubText.Text = Fmt((long)(durationMs * fraction));
+        ShowScrubPopupAt(fraction);
+        _ = RequestHoverFrameAsync(seconds, fraction);
+    }
+
+    private void Seek_MouseLeave(object sender, MouseEventArgs e)
+    {
+        if (_seekDrag?.IsDragging == true) return;
+        _hoverCts?.Cancel();
+        ScrubPopup.IsOpen = false;
+        ScrubThumbBorder.Visibility = Visibility.Collapsed;
+        _hoverBucket = -1;
+    }
+
+    /// <summary>
+    /// Pull a frame for the hovered position. Only local files: a party guest's
+    /// source is an HTTP relay that ffmpeg cannot seek cheaply, and asking it to
+    /// would compete with the playback stream for the host's upload.
+    /// </summary>
+    private async Task RequestHoverFrameAsync(double seconds, double fraction)
+    {
+        if (IsRemoteSource || _movie.IsShortcut) return;
+
+        var bucket = Math.Round(seconds / 5.0) * 5.0;
+        if (Math.Abs(bucket - _hoverBucket) < 0.01) return;  // same frame as last time
+        _hoverBucket = bucket;
+
+        _hoverCts?.Cancel();
+        var cts = new CancellationTokenSource();
+        _hoverCts = cts;
+        try
+        {
+            var frame = await ThumbnailService.ExtractFrameAsync(_movie.Path, bucket, cts.Token);
+            if (cts.IsCancellationRequested || frame is null) return;
+
+            var image = new System.Windows.Media.Imaging.BitmapImage();
+            image.BeginInit();
+            // OnLoad so the cached jpg is not left open by the UI.
+            image.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+            image.UriSource = new Uri(frame);
+            image.EndInit();
+            image.Freeze();
+
+            ScrubThumb.Source = image;
+            ScrubThumbBorder.Visibility = Visibility.Visible;
+            ShowScrubPopupAt(fraction);
+        }
+        catch
+        {
+            // No preview is fine; the timestamp alone is still useful.
+        }
     }
 
     private void OnCastDevicesChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)

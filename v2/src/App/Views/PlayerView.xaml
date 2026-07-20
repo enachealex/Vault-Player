@@ -206,9 +206,19 @@
                            FontFamily="Consolas" FontSize="13" Foreground="{StaticResource TextMutedBrush}" Text="0:00" />
                 <Popup x:Name="ScrubPopup" PlacementTarget="{Binding ElementName=Seek}" Placement="Relative"
                        AllowsTransparency="True" IsHitTestVisible="False">
-                    <Border Background="#E60E0604" CornerRadius="10" Padding="10,5">
-                        <TextBlock x:Name="ScrubText" Foreground="White" FontFamily="Consolas" FontSize="12.5"
-                                   FontWeight="Bold" />
+                    <Border Background="#E60E0604" CornerRadius="10" Padding="6"
+                            BorderBrush="{StaticResource LineBrush}" BorderThickness="1">
+                        <StackPanel>
+                            <!-- Frame preview. Collapsed until one is ready, so the
+                                 popup stays a plain timestamp for remote streams
+                                 and while ffmpeg is still working. -->
+                            <Border x:Name="ScrubThumbBorder" Visibility="Collapsed" CornerRadius="6"
+                                    ClipToBounds="True" Margin="0,0,0,5">
+                                <Image x:Name="ScrubThumb" Width="200" Stretch="Uniform" />
+                            </Border>
+                            <TextBlock x:Name="ScrubText" Foreground="White" FontFamily="Consolas" FontSize="12.5"
+                                       FontWeight="Bold" HorizontalAlignment="Center" />
+                        </StackPanel>
                     </Border>
                 </Popup>
             </Grid>

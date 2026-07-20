@@ -24,7 +24,10 @@
 #>
 param(
     [string]$Version = "2.0.0",
-    [string]$OutDir = "$PSScriptRoot\..\releases"
+    [string]$OutDir = "$PSScriptRoot\..\releases",
+    # Supply to sign the output with certs\vault-movies-signing.pfx.
+    # Create that first with scripts\new-signing-cert.ps1.
+    [string]$PfxPassword
 )
 
 $ErrorActionPreference = "Stop"
@@ -50,10 +53,27 @@ vpk pack `
     --packVersion $Version `
     --packDir $staging `
     --mainExe VideoPlayer.App.exe `
-    --packTitle "Video Player" `
-    --packAuthors "Jump Vault" `
+    --packTitle "Vault Movies" `
+    --packAuthors "Jump Vault LLC" `
     -o $OutDir
 if ($LASTEXITCODE -ne 0) { throw "vpk pack failed" }
+
+if ($PfxPassword) {
+    $pfx = Join-Path $PSScriptRoot "..\certs\vault-movies-signing.pfx"
+    if (-not (Test-Path $pfx)) { throw "No certificate at $pfx -- run scripts\new-signing-cert.ps1 first." }
+
+    Write-Host "Signing the installer..." -ForegroundColor Cyan
+    $secure = ConvertTo-SecureString -String $PfxPassword -Force -AsPlainText
+    $cert = Get-PfxCertificate -FilePath $pfx -Password $secure
+    $setup = Join-Path $OutDir "VideoPlayer-win-Setup.exe"
+
+    # A timestamp keeps the signature valid after the certificate expires;
+    # without one, everything signed becomes untrusted on expiry day.
+    $result = Set-AuthenticodeSignature -FilePath $setup -Certificate $cert `
+        -HashAlgorithm SHA256 -TimestampServer "http://timestamp.digicert.com"
+    Write-Host ("  $($result.Status): $($result.StatusMessage)") -ForegroundColor Gray
+    if ($result.Status -notin @('Valid', 'UnknownError')) { throw "signing failed: $($result.Status)" }
+}
 
 Write-Host "`nDone. Artifacts in $OutDir :" -ForegroundColor Green
 Get-ChildItem $OutDir -File | ForEach-Object {

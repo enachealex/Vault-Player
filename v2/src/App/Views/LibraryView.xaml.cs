@@ -280,7 +280,7 @@ public partial class LibraryView : UserControl, IDisposable
             if (!StreamingServices.Launch(movie.Path))
                 MessageBox.Show(Window.GetWindow(this),
                     $"Couldn't open the link for “{movie.Name}”.",
-                    "Video Player", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    "Vault Movies", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
