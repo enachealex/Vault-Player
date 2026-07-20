@@ -191,6 +191,15 @@ public partial class PlayerView : UserControl, IDisposable
                 PlayBtn.Visibility = Visibility.Collapsed;
                 Back10Btn.Visibility = Visibility.Collapsed;
                 Fwd10Btn.Visibility = Visibility.Collapsed;
+
+                // The timeline becomes a read-out, not a control. It already
+                // refused to seek, but the handle still moved under the mouse
+                // and snapped back -- which reads as broken rather than
+                // deliberate. No hit-testing also means no hover preview, which
+                // a guest could not have used anyway: their source is a relay
+                // stream ffmpeg cannot seek.
+                Seek.IsHitTestVisible = false;
+                Seek.Focusable = false;
                 SharedScreenBadge.Visibility = Visibility.Visible;
                 SharedScreenText.Text = $"Watching {_party!.HostName}'s screen";
             }
@@ -1162,7 +1171,11 @@ public partial class PlayerView : UserControl, IDisposable
         if (durMs > 0 && _seekDrag?.IsDragging != true)
             Seek.Value = Math.Clamp(_player.Time / (double)durMs, 0, 1) * Seek.Maximum;
         TimeText.Text = Fmt(_player.Time);
-        DurationText.Text = Fmt(durMs);
+        // Guests get time remaining rather than total length: they cannot seek,
+        // so "how much is left" is the only part of the duration that helps them.
+        DurationText.Text = PartyGuest && durMs > 0
+            ? "-" + Fmt(Math.Max(0, durMs - _player.Time))
+            : Fmt(durMs);
 
         InfoText.Text = PartyGuest ? "watch party" : ResolveTrackInfo();
 
