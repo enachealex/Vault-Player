@@ -9,6 +9,11 @@ COPY src/Rendezvous/ Rendezvous/
 RUN dotnet publish Rendezvous/VideoPlayer.Rendezvous.csproj -c Release -o /app
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
+# curl is only here for the container healthcheck — the runtime image ships
+# with neither curl nor wget, so without it the check can never pass.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends curl \
+ && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=build /app .
 ENV PORT=5555

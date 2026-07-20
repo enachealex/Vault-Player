@@ -83,9 +83,21 @@ app.MapMethods("/stream/{room}", new[] { "GET", "HEAD" }, async (string room, Ht
         await body.CopyToAsync(ctx.Response.Body, ctx.RequestAborted);
         pull.Done.TrySetResult();
     }
+    catch (OperationCanceledException)
+    {
+        // The guest stopped reading — closed the app, seeked elsewhere, or the
+        // host took too long. Routine, not a failure.
+        pull.Done.TrySetCanceled();
+        ctx.Abort();
+    }
     catch (Exception ex)
     {
         pull.Done.TrySetException(ex);
+        // Content-Length went out with the headers, so returning normally here
+        // makes Kestrel throw "Response Content-Length mismatch" and log an
+        // unhandled exception. Dropping the connection is the honest signal:
+        // the guest sees a broken transfer and re-requests the range.
+        ctx.Abort();
     }
     finally
     {
