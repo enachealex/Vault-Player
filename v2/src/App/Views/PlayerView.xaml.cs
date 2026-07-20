@@ -102,7 +102,7 @@ public partial class PlayerView : UserControl, IDisposable
         UpdateVolumeUi();
         PrevBtn.IsEnabled = NextBtn.IsEnabled = _playlist.Count > 1;
 
-        _uiTimer.Tick += (_, _) => { UpdateUi(); UpdateIdleState(); };
+        _uiTimer.Tick += (_, _) => { UpdateUi(); UpdateIdleState(); UpdateVolumePopupState(); };
         _uiTimer.Start();
 
         // Owned click/drag on both sliders: press anywhere jumps there, drags
@@ -115,9 +115,9 @@ public partial class PlayerView : UserControl, IDisposable
                 ScrubPopup.IsOpen = false;
                 ApplySeek();
             });
-        Helpers.SliderDragBehavior.Attach(VolumeSlider,
-            onPreview: null, // ValueChanged applies live below
-            onCommit: _ => { });
+        // No SliderDragBehavior here: it measures with ActualWidth, so it cannot
+        // drive a vertical slider. IsMoveToPointEnabled in the XAML gives the
+        // click-to-position behaviour instead.
         VolumeSlider.ValueChanged += VolumeSlider_ValueChanged;
 
         // Keyboard shortcuts must work no matter which window has focus —
@@ -304,8 +304,7 @@ public partial class PlayerView : UserControl, IDisposable
 
         var s = AppServices.Settings;
         _player.SetRate(PartyGuest ? 1f : (float)s.Rate);
-        _player.Volume = s.Volume;
-        _player.Mute = s.Muted;
+        ApplyAudio();
         if (!IsRemoteSource) AddSidecarSubtitles();
     }
 
@@ -601,13 +600,34 @@ public partial class PlayerView : UserControl, IDisposable
     private void UpdateRateUi() =>
         RateText.Text = $"{AppServices.Settings.Rate}×";
 
+    // ---- Volume ------------------------------------------------------------
+    //
+    // Mute is implemented as volume 0, not libVLC's Mute property.
+    // libvlc_audio_set_mute is advisory: it is silently dropped when no audio
+    // output exists yet -- which is exactly the moment just after Play -- and
+    // libVLC can change the state underneath us. That produced both "shows
+    // muted but audible" and the reverse. Volume is deterministic, so
+    // Settings.Muted is the single source of truth and the player is only ever
+    // told a number.
+
+    private int DesiredVolume => AppServices.Settings.Muted ? 0 : AppServices.Settings.Volume;
+
+    /// <summary>Push the intended audio state onto the player.</summary>
+    private void ApplyAudio()
+    {
+        if (_player is null) return;
+        try { _player.Volume = DesiredVolume; }
+        catch { /* player torn down mid-call */ }
+    }
+
     private void MuteBtn_Click(object sender, RoutedEventArgs e)
     {
         var s = AppServices.Settings;
         s.Muted = !s.Muted;
         s.Save();
-        if (_player is not null) _player.Mute = s.Muted;
+        ApplyAudio();
         UpdateVolumeUi();
+        ShowVolumePopup();
     }
 
     private void VolumeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -615,20 +635,60 @@ public partial class PlayerView : UserControl, IDisposable
         if (_initializing) return;
         var s = AppServices.Settings;
         s.Volume = (int)VolumeSlider.Value;
-        if (s.Muted && s.Volume > 0)
-        {
-            s.Muted = false;
-            if (_player is not null) _player.Mute = false;
-        }
+        // Dragging the slider up is an unmistakable request to hear something.
+        if (s.Muted && s.Volume > 0) s.Muted = false;
         s.Save();
-        if (_player is not null) _player.Volume = s.Volume;
+        ApplyAudio();
         UpdateVolumeUi();
+    }
+
+    // ---- Volume popup ------------------------------------------------------
+
+    private static readonly TimeSpan VolumeIdleBeforeHiding = TimeSpan.FromSeconds(1.5);
+    private DateTime? _volumeAwaySince;
+
+    private void VolumeBtn_Click(object sender, RoutedEventArgs e)
+    {
+        if (VolumePopup.IsOpen) VolumePopup.IsOpen = false;
+        else ShowVolumePopup();
+    }
+
+    private void ShowVolumePopup()
+    {
+        VolumePopup.IsOpen = true;
+        _volumeAwaySince = DateTime.UtcNow; // closes on its own if nobody comes near
+    }
+
+    /// <summary>
+    /// Close the volume popup 1.5s after the pointer leaves it. Polled from the
+    /// UI tick rather than driven by MouseEnter/MouseLeave: the popup is its own
+    /// window, and if it opens without the pointer ever entering, a Leave event
+    /// can never arrive and it would hang around forever.
+    /// </summary>
+    private void UpdateVolumePopupState()
+    {
+        if (!VolumePopup.IsOpen) { _volumeAwaySince = null; return; }
+
+        var pointerOnIt = VolumeBtn.IsMouseOver
+                          || VolumePopupBody.IsMouseOver
+                          || VolumeSlider.IsMouseCaptureWithin; // mid-drag counts
+        if (pointerOnIt)
+        {
+            _volumeAwaySince = null;
+            return;
+        }
+
+        _volumeAwaySince ??= DateTime.UtcNow;
+        if (DateTime.UtcNow - _volumeAwaySince > VolumeIdleBeforeHiding) VolumePopup.IsOpen = false;
     }
 
     private void UpdateVolumeUi()
     {
         var s = AppServices.Settings;
-        MuteGlyph.Text = s.Muted || s.Volume == 0 ? "\uE74F" : s.Volume < 50 ? "\uE993" : "\uE767";
+        var glyph = s.Muted || s.Volume == 0 ? "\uE74F" : s.Volume < 50 ? "\uE993" : "\uE767";
+        MuteGlyph.Text = glyph;
+        MuteToggleGlyph.Text = glyph;
+        VolumeReadout.Text = s.Muted ? "Muted" : s.Volume.ToString();
     }
 
     // ---- Fullscreen --------------------------------------------------------
@@ -703,6 +763,43 @@ public partial class PlayerView : UserControl, IDisposable
     private static readonly TimeSpan IdleBeforeHiding = TimeSpan.FromSeconds(3);
 
     private void NoteActivity() => _lastActivity = DateTime.UtcNow;
+
+    private string _trackInfo = "";
+    private bool _trackInfoResolved;
+
+    /// <summary>
+    /// Codec/channel label for the status line, worked out once per film.
+    ///
+    /// This used to read <c>_player.Media?.Tracks</c> on every UI tick. Each
+    /// call hands back a fresh wrapper holding a native reference, and nothing
+    /// released them — twice a second for a two-hour film is thousands of
+    /// leaked handles, eventually freed by the GC's finalizer thread. Releasing
+    /// libVLC objects off the dispatcher thread is exactly what produces the
+    /// 0xc0000005 access violations inside libvlc.dll, so the wrapper is now
+    /// disposed deterministically, here, on the UI thread.
+    /// </summary>
+    private string ResolveTrackInfo()
+    {
+        if (_trackInfoResolved || _player is null) return _trackInfo;
+        try
+        {
+            using var media = _player.Media;
+            if (media is null) return "";           // not parsed yet; try again next tick
+            var audio = media.Tracks.FirstOrDefault(t => t.TrackType == TrackType.Audio);
+            if (audio is { } a)
+            {
+                _trackInfo = $"{FourCc(a.Codec)} {a.Data.Audio.Channels}ch";
+                _trackInfoResolved = true;
+            }
+        }
+        catch
+        {
+            // Tracks can be unavailable mid-transition; a missing label is not
+            // worth risking anything for.
+            _trackInfoResolved = true;
+        }
+        return _trackInfo;
+    }
 
     private bool IsPointerOverThisView(System.Drawing.Point screenPoint)
     {
@@ -964,8 +1061,12 @@ public partial class PlayerView : UserControl, IDisposable
         TimeText.Text = Fmt(_player.Time);
         DurationText.Text = Fmt(durMs);
 
-        var audio = _player.Media?.Tracks.FirstOrDefault(t => t.TrackType == TrackType.Audio);
-        InfoText.Text = PartyGuest ? "watch party" : audio is { } a ? $"{FourCc(a.Codec)} {a.Data.Audio.Channels}ch" : "";
+        InfoText.Text = PartyGuest ? "watch party" : ResolveTrackInfo();
+
+        // Volume is set before the audio output exists, so libVLC sometimes
+        // never applies it. Re-assert whenever it has drifted from what the UI
+        // says -- this is what stops the player and the mute icon disagreeing.
+        if (_player.Volume != DesiredVolume) ApplyAudio();
 
         // Watched-through once we're 90% in (people rarely sit through credits).
         if (durMs > 0 && _player.Time >= durMs * 0.9) CountWatchOnce();

@@ -12,6 +12,45 @@ public partial class App : Application
         // Must run before anything else touches the app: this handles the
         // install/update/uninstall hooks and can exit the process outright.
         VelopackApp.Build().Run();
+
+        // A film stopping dead with no explanation is the worst outcome, so
+        // record what happened and keep going where we safely can.
+        //
+        // NOTE: this catches managed exceptions only. Access violations inside
+        // libvlc.dll terminate the process outright and never reach here — for
+        // those, a crash dump is the only evidence (see docs/crashes.md).
+        DispatcherUnhandledException += (_, e) =>
+        {
+            LogCrash("UI thread", e.Exception);
+            MessageBox.Show(
+                $"Something went wrong, but the app is still running.\n\n{e.Exception.Message}",
+                "Video Player", MessageBoxButton.OK, MessageBoxImage.Warning);
+            e.Handled = true;
+        };
+        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+            LogCrash("background thread", e.ExceptionObject as Exception);
+        System.Threading.Tasks.TaskScheduler.UnobservedTaskException += (_, e) =>
+        {
+            LogCrash("task", e.Exception);
+            e.SetObserved();
+        };
+    }
+
+    private static void LogCrash(string where, Exception? ex)
+    {
+        try
+        {
+            var path = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "VideoPlayerV2", "crash.log");
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.AppendAllText(path,
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}  [{where}]{Environment.NewLine}{ex}{Environment.NewLine}{Environment.NewLine}");
+        }
+        catch
+        {
+            // Nothing useful to do if even logging fails.
+        }
     }
 
     protected override void OnStartup(StartupEventArgs e)

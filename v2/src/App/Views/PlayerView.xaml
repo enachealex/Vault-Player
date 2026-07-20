@@ -266,12 +266,36 @@
                             Click="RateBtn_Click" AutomationProperties.Name="Playback speed">
                         <TextBlock x:Name="RateText" Text="1×" FontSize="12" FontWeight="Bold" />
                     </Button>
-                    <Button x:Name="MuteBtn" Style="{StaticResource GhostButton}" Padding="10,8" Margin="2,0"
-                            Click="MuteBtn_Click" AutomationProperties.Name="Mute">
+                    <Button x:Name="VolumeBtn" Style="{StaticResource GhostButton}" Padding="10,8" Margin="2,0,8,0"
+                            Click="VolumeBtn_Click" AutomationProperties.Name="Volume">
                         <TextBlock x:Name="MuteGlyph" Text="&#xE767;" FontFamily="Segoe MDL2 Assets" FontSize="14" />
                     </Button>
-                    <Slider x:Name="VolumeSlider" Width="90" Maximum="100" VerticalAlignment="Center" Margin="2,0,8,0"
-                            AutomationProperties.Name="Volume" />
+                    <!-- StaysOpen=False closes it on any click elsewhere. -->
+                    <Popup x:Name="VolumePopup" PlacementTarget="{Binding ElementName=VolumeBtn}"
+                           Placement="Top" VerticalOffset="-6" StaysOpen="False"
+                           AllowsTransparency="True" PopupAnimation="Fade">
+                        <Border x:Name="VolumePopupBody" Background="{StaticResource SurfaceAltBrush}"
+                                CornerRadius="10" Padding="10,12"
+                                BorderBrush="{StaticResource LineBrush}" BorderThickness="1">
+                            <StackPanel>
+                                <TextBlock x:Name="VolumeReadout" Text="100" FontSize="11.5"
+                                           HorizontalAlignment="Center" Margin="0,0,0,8"
+                                           Foreground="{StaticResource TextMutedBrush}" />
+                                <!-- IsMoveToPointEnabled gives click-to-position; the custom
+                                     drag helper used elsewhere is horizontal-only. -->
+                                <Slider x:Name="VolumeSlider" Orientation="Vertical" Height="120"
+                                        Maximum="100" IsMoveToPointEnabled="True"
+                                        HorizontalAlignment="Center"
+                                        AutomationProperties.Name="Volume level" />
+                                <Button x:Name="MuteBtn" Style="{StaticResource GhostButton}"
+                                        Padding="8,5" Margin="0,10,0,0" HorizontalAlignment="Center"
+                                        Click="MuteBtn_Click" AutomationProperties.Name="Mute">
+                                    <TextBlock x:Name="MuteToggleGlyph" Text="&#xE74F;"
+                                               FontFamily="Segoe MDL2 Assets" FontSize="12" />
+                                </Button>
+                            </StackPanel>
+                        </Border>
+                    </Popup>
                     <Button x:Name="FullscreenBtn" Style="{StaticResource GhostButton}" Padding="10,8" Margin="2,0"
                             Click="FullscreenBtn_Click" AutomationProperties.Name="Fullscreen">
                         <TextBlock x:Name="FullscreenGlyph" Text="&#xE740;" FontFamily="Segoe MDL2 Assets" FontSize="14" />
