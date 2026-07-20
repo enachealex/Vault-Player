@@ -1,0 +1,29 @@
+# TLS in front of the Watch Party relay.
+#
+# Caddy obtains and renews a Let's Encrypt certificate on its own; the only
+# requirement is that ports 80 and 443 reach this machine from the internet.
+# Port 80 is used solely for the ACME challenge and to redirect to HTTPS.
+#
+# The domain comes from PARTY_DOMAIN in deploy/.env so this file stays generic
+# (and so a public repository carries no one's hostname).
+
+{$PARTY_DOMAIN} {
+	# WebSockets need no special handling here: reverse_proxy passes Upgrade
+	# through automatically. Media responses are streamed rather than buffered,
+	# which matters because a single response can be several gigabytes.
+	reverse_proxy rendezvous:5555 {
+		# A party sits idle between byte-range pulls; without a generous write
+		# timeout Caddy would cut long transfers on a slow guest connection.
+		transport http {
+			read_timeout 0
+			write_timeout 0
+		}
+	}
+
+	encode zstd gzip
+
+	log {
+		output stdout
+		format console
+	}
+}

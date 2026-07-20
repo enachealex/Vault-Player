@@ -8,6 +8,24 @@
 # Update:    git pull && docker compose -f deploy/docker-compose.yml up -d --build
 
 services:
+  # TLS terminator. Only started when PARTY_DOMAIN is set in deploy/.env --
+  # on a LAN-only setup the relay is reached directly on 5555 instead.
+  caddy:
+    image: caddy:2-alpine
+    container_name: vault-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"     # ACME challenge + redirect to HTTPS
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data      # holds the certificates -- must persist
+      - caddy_config:/config
+    environment:
+      - PARTY_DOMAIN=${PARTY_DOMAIN:?set PARTY_DOMAIN in deploy/.env}
+    depends_on:
+      - rendezvous
+
   rendezvous:
     build:
       context: ..
@@ -32,3 +50,9 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+volumes:
+  # Certificates live here. Losing this volume means re-issuing, and Let's
+  # Encrypt rate-limits that, so do not prune it casually.
+  caddy_data:
+  caddy_config:
