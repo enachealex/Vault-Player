@@ -6,7 +6,15 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <!-- Sets the icon on the .exe itself, which is what Explorer and the
+         taskbar fall back to. The window also sets it explicitly below. -->
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Also embedded, so Window.Icon can reference it via a pack URI. -->
+    <Resource Include="Assets\app.ico" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="LibVLCSharp.WPF" Version="3.10.0" />

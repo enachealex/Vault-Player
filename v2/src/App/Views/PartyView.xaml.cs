@@ -164,6 +164,31 @@ public partial class PartyView : UserControl, IDisposable
 
     private void CancelEntry_Click(object sender, RoutedEventArgs e) => RefreshSavedNames();
 
+    /// <summary>Copy the room code, with a brief tick so the click clearly registered.</summary>
+    private void CopyCode_Click(object sender, RoutedEventArgs e)
+    {
+        var code = LobbyCode.Text.Trim();
+        if (code.Length == 0) return;
+        try
+        {
+            Clipboard.SetText(code);
+            CopyCodeGlyph.Text = char.ConvertFromUtf32(0xE73E); // tick
+            CopyCodeLabel.Text = "Copied";
+            var revert = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+            revert.Tick += (_, _) =>
+            {
+                revert.Stop();
+                CopyCodeGlyph.Text = char.ConvertFromUtf32(0xE8C8);
+                CopyCodeLabel.Text = "Copy";
+            };
+            revert.Start();
+        }
+        catch
+        {
+            // Another process can hold the clipboard open. Not worth an error dialog.
+        }
+    }
+
     private void HomeBtn_Click(object sender, RoutedEventArgs e) =>
         MainWindow.Instance.Navigate(new HomeView());
 

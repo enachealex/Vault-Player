@@ -121,8 +121,21 @@
         <StackPanel x:Name="LobbyPanel" Visibility="Collapsed" VerticalAlignment="Center" HorizontalAlignment="Center">
             <TextBlock x:Name="LobbyMovie" FontSize="15" Foreground="{StaticResource TextMutedBrush}"
                        HorizontalAlignment="Center" />
-            <TextBlock x:Name="LobbyCode" FontSize="42" FontWeight="Bold" FontFamily="Consolas"
-                       Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" Margin="0,10,0,4" />
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,4">
+                <TextBlock x:Name="LobbyCode" FontSize="42" FontWeight="Bold" FontFamily="Consolas"
+                           VerticalAlignment="Center"
+                           Foreground="{StaticResource AccentBrush}" />
+                <Button x:Name="CopyCodeBtn" Style="{StaticResource GhostButton}" Padding="12,8"
+                        Margin="14,0,0,0" VerticalAlignment="Center" Click="CopyCode_Click"
+                        ToolTip="Copy the room code so you can send it to someone"
+                        AutomationProperties.Name="Copy code">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock x:Name="CopyCodeGlyph" Text="&#xE8C8;" FontFamily="Segoe MDL2 Assets"
+                                   FontSize="13" VerticalAlignment="Center" Margin="0,0,8,0" />
+                        <TextBlock x:Name="CopyCodeLabel" Text="Copy" FontSize="13" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
             <TextBlock x:Name="LobbyAddress" FontSize="13" Foreground="{StaticResource TextMutedBrush}"
                        HorizontalAlignment="Center" Margin="0,0,0,16" />
             <Border Background="{StaticResource SurfaceBrush}" CornerRadius="10" Padding="16,10" MinWidth="280">

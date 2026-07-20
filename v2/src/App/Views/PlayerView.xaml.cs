@@ -55,6 +55,7 @@ public partial class PlayerView : UserControl, IDisposable
     private bool? _lastSeenHostPlaying;
     private bool PartyHost => _party is { IsHost: true };
     private readonly System.Collections.ObjectModel.ObservableCollection<string> _chatLines = new();
+    private readonly System.Collections.ObjectModel.ObservableCollection<string> _partyRoster = new();
 
     public PlayerView(MovieItem movie, IReadOnlyList<MovieItem>? playlist = null, PartySession? party = null)
     {
@@ -141,6 +142,17 @@ public partial class PlayerView : UserControl, IDisposable
         {
             ChatBtn.Visibility = Visibility.Visible;
             ChatList.ItemsSource = _chatLines;
+
+            // The paused card shows who is in the room, so the roster has to be
+            // tracked here as well as in the lobby.
+            PausedRoster.ItemsSource = _partyRoster;
+            PausedTitle.Text = _movie.Name;
+            PausedCode.Text = _party.RoomCode;
+            _party.RosterChanged += members => Dispatcher.Invoke(() =>
+            {
+                _partyRoster.Clear();
+                foreach (var member in members) _partyRoster.Add(member);
+            });
             _party.ChatReceived += (who, text) => AddChatLine($"{who}: {text}");
             _party.Closed += reason =>
             {
@@ -640,7 +652,10 @@ public partial class PlayerView : UserControl, IDisposable
         if (GetCursorPos(out var now) && (now.X != _lastCursor.X || now.Y != _lastCursor.Y))
         {
             _lastCursor = now;
-            NoteActivity();
+            // Only movement over this window counts. Otherwise working in
+            // another app -- or on a second monitor -- would keep the controls
+            // sitting over the film indefinitely.
+            if (IsPointerOverThisView(now)) NoteActivity();
         }
 
         var idle = DateTime.UtcNow - _lastActivity;
@@ -651,13 +666,58 @@ public partial class PlayerView : UserControl, IDisposable
                      || ControlBar.IsMouseOver;   // don't vanish under the pointer
 
         ControlBar.Visibility = keepUp ? Visibility.Visible : Visibility.Collapsed;
+        // The top bar goes with it. Leaving it behind draws the eye to the one
+        // strip of furniture still sitting over the film.
+        if (!_fullscreen) TopBar.Visibility = keepUp ? Visibility.Visible : Visibility.Collapsed;
         Cursor = keepUp ? null : Cursors.None;
+
+        // Pausing a party brings the lobby back.
+        PausedPartyCard.Visibility = _party is not null && _player is not null && !_player.IsPlaying
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+    }
+
+    private void CopyRoomCode_Click(object sender, RoutedEventArgs e)
+    {
+        if (_party is null) return;
+        try
+        {
+            Clipboard.SetText(_party.RoomCode);
+            PausedCopyGlyph.Text = char.ConvertFromUtf32(0xE73E); // tick
+            var revert = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+            revert.Tick += (_, _) =>
+            {
+                revert.Stop();
+                PausedCopyGlyph.Text = char.ConvertFromUtf32(0xE8C8);
+            };
+            revert.Start();
+        }
+        catch
+        {
+            // Another process can hold the clipboard open; not worth interrupting
+            // a film over.
+        }
     }
 
     /// <summary>Three seconds is the convention: long enough to aim at a button.</summary>
     private static readonly TimeSpan IdleBeforeHiding = TimeSpan.FromSeconds(3);
 
     private void NoteActivity() => _lastActivity = DateTime.UtcNow;
+
+    private bool IsPointerOverThisView(System.Drawing.Point screenPoint)
+    {
+        try
+        {
+            if (!IsLoaded || ActualWidth <= 0) return false;
+            var local = PointFromScreen(new Point(screenPoint.X, screenPoint.Y));
+            return local.X >= 0 && local.Y >= 0 && local.X < ActualWidth && local.Y < ActualHeight;
+        }
+        catch
+        {
+            // PointFromScreen throws if the visual is not connected to a source.
+            return false;
+        }
+    }
 
     private void FullscreenBtn_Click(object sender, RoutedEventArgs e) => ToggleFullscreen();
 
