@@ -4,6 +4,16 @@
 #
 #   sudo bash move-docker-to-hdd.sh
 #
+# THIS IS ONLY HALF THE JOB on Docker 23+ with the containerd snapshotter.
+# Docker's data root holds container state and metadata; the image layers live
+# under containerd's own root instead. Check which applies to you:
+#
+#     docker info --format '{{.Driver}}'
+#
+# "overlayfs" means the containerd snapshotter, and you also need
+# move-containerd-to-hdd.sh -- that is where the bulk of the space actually is.
+# "overlay2" is the older layout, where this script alone is enough.
+#
 # What it does, and why each part matters:
 #
 #   * Stops Docker, so nothing writes while the data is copied. Every container
