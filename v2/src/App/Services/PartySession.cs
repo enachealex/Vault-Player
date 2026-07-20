@@ -276,22 +276,28 @@ public sealed class PartySession : IDisposable
     {
         if (_hostFilePath is null) { Log($"pull {reqId}: ignored, no host file"); return; }
         var url = $"{_pushBase}/upload/{reqId}";
+        using var content = new FileRangeContent(_hostFilePath, start, end);
         try
         {
-            Log($"pull {reqId}: pushing bytes {start}-{end} to {url}");
-            using var content = new FileRangeContent(_hostFilePath, start, end);
             using var resp = await _pushClient.PostAsync(url, content);
-            Log($"pull {reqId}: upload returned {(int)resp.StatusCode}");
+            Log($"pull {reqId}: sent {content.BytesSent:N0} of {end - start + 1:N0} bytes, HTTP {(int)resp.StatusCode}");
+        }
+        catch when (content.BytesSent > 0)
+        {
+            // libVLC asks for a range running to the end of the file, takes the
+            // few megabytes it wants, then hangs up and seeks elsewhere. A push
+            // dying part-way is the normal shape of playback, not a fault --
+            // provided bytes actually moved.
+            Log($"pull {reqId}: guest stopped reading after {content.BytesSent:N0} bytes (routine)");
         }
         catch (Exception ex)
         {
-            // Guest may simply have seeked or left, which is routine — but it
-            // could equally be a broken relay, and we cannot tell them apart
-            // from here, so record it either way.
+            // Nothing transferred at all. This is the case worth alarming
+            // about: the relay is broken and the guest is watching black.
             var detail = ex.Message;
             for (var inner = ex.InnerException; inner is not null; inner = inner.InnerException)
                 detail += $" <- {inner.GetType().Name}: {inner.Message}";
-            Log($"pull {reqId}: upload FAILED to {url} -- {ex.GetType().Name}: {detail}");
+            Log($"pull {reqId}: FAILED with 0 bytes sent to {url} -- {ex.GetType().Name}: {detail}");
         }
     }
 
@@ -512,6 +518,10 @@ public sealed class PartySession : IDisposable
             _end = end;
         }
 
+        /// <summary>Bytes handed to the network, so callers can tell a stalled
+        /// transfer from one the guest simply stopped reading.</summary>
+        public long BytesSent { get; private set; }
+
         protected override async Task SerializeToStreamAsync(Stream stream, TransportContext? context)
         {
             using var fs = new FileStream(_path, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 16, useAsync: true);
@@ -523,6 +533,7 @@ public sealed class PartySession : IDisposable
                 var read = await fs.ReadAsync(buffer.AsMemory(0, (int)Math.Min(buffer.Length, remaining)));
                 if (read <= 0) break;
                 await stream.WriteAsync(buffer.AsMemory(0, read));
+                BytesSent += read;
                 remaining -= read;
             }
         }
