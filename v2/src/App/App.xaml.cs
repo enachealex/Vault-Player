@@ -79,14 +79,52 @@ public partial class App : Application
         // any background probing can race its lazy construction.
         _ = Services.AppServices.LibVlc;
 
-        _ = StartAsync();
+        // Offer ourselves under "Open with". Re-run every launch because a
+        // Velopack update changes the executable path.
+        Services.FileAssociations.Register();
+
+        // Launched with a film (Open with, drag onto the exe, or a shell
+        // association)? Go straight to it rather than the home screen.
+        var opened = Array.Find(e.Args, Services.FileAssociations.IsPlayableFile);
+
+        _ = StartAsync(opened);
+    }
+
+    /// <summary>Play a file handed to us by the shell, with its folder as the playlist.</summary>
+    private static void OpenFile(string path)
+    {
+        try
+        {
+            var folder = Path.GetDirectoryName(path);
+            var playlist = folder is not null && Directory.Exists(folder)
+                ? Services.MovieLibrary.Scan(folder)
+                : new System.Collections.Generic.List<Models.MovieItem>();
+
+            // Prefer the scanned entry so Next/Previous walk the folder.
+            var movie = playlist.Find(m => string.Equals(m.Path, path, StringComparison.OrdinalIgnoreCase))
+                        ?? new Models.MovieItem
+                        {
+                            Name = Path.GetFileNameWithoutExtension(path),
+                            Path = path,
+                            SizeBytes = new FileInfo(path).Length,
+                        };
+
+            // Qualified: inside an Application subclass, "MainWindow" alone
+            // binds to WPF's own property rather than our shell window.
+            VideoPlayer.App.MainWindow.Instance.Navigate(new Views.PlayerView(movie, playlist));
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Couldn't open that file.\n\n{ex.Message}",
+                "Vault Player", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 
     /// <summary>
     /// Show the loading screen, let it run the update check, then open the app.
     /// If the user accepts an update the process restarts and never gets here.
     /// </summary>
-    private static async System.Threading.Tasks.Task StartAsync()
+    private static async System.Threading.Tasks.Task StartAsync(string? fileToOpen)
     {
         var splash = new Views.SplashWindow();
         splash.Show();
@@ -98,6 +136,7 @@ public partial class App : Application
         {
             new MainWindow().Show();
             splash.Close();
+            if (fileToOpen is not null) OpenFile(fileToOpen);
         }
     }
 }

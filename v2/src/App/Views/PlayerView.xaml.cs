@@ -621,7 +621,7 @@ public partial class PlayerView : UserControl, IDisposable
 
     // ---- Fullscreen --------------------------------------------------------
 
-    // ---- Auto-hiding controls in fullscreen --------------------------------
+    // ---- Auto-hiding the playback controls when idle ------------------------
     //
     // Mouse position is POLLED rather than taken from WPF's MouseMove. libVLC
     // renders into its own child window covering the video, so WPF never sees
@@ -642,8 +642,6 @@ public partial class PlayerView : UserControl, IDisposable
             _lastCursor = now;
             NoteActivity();
         }
-
-        if (!_fullscreen) return;
 
         var idle = DateTime.UtcNow - _lastActivity;
         // Paused means the viewer stopped on purpose and is probably reaching
