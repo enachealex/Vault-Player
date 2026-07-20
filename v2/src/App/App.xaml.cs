@@ -79,6 +79,25 @@ public partial class App : Application
         // any background probing can race its lazy construction.
         _ = Services.AppServices.LibVlc;
 
-        new MainWindow().Show();
+        _ = StartAsync();
+    }
+
+    /// <summary>
+    /// Show the loading screen, let it run the update check, then open the app.
+    /// If the user accepts an update the process restarts and never gets here.
+    /// </summary>
+    private static async System.Threading.Tasks.Task StartAsync()
+    {
+        var splash = new Views.SplashWindow();
+        splash.Show();
+        try
+        {
+            await splash.RunAsync();
+        }
+        finally
+        {
+            new MainWindow().Show();
+            splash.Close();
+        }
     }
 }

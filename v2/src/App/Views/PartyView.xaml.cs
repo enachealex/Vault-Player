@@ -23,20 +23,74 @@ public partial class PartyView : UserControl, IDisposable
     private readonly ObservableCollection<string> _roster = new();
     private bool _handedOff;
 
+    /// <summary>Name being edited, so saving replaces it instead of adding a duplicate.</summary>
+    private string? _editingName;
+
     public PartyView()
     {
         InitializeComponent();
         RosterList.ItemsSource = _roster;
+        NameCards.ItemsSource = _savedNames;
         // No accounts — just a name for this party. Remembered once chosen, but
         // never silently taken from the Windows account.
-        NameBox.Text = AppServices.Settings.DisplayName ?? "";
-        UpdateNameState();
-        Loaded += (_, _) => NameBox.Focus();
+        RefreshSavedNames();
     }
+
+    private readonly ObservableCollection<string> _savedNames = new();
 
     private string DisplayName => NameBox.Text.Trim();
 
     private bool HasName => DisplayName.Length >= 2;
+
+    /// <summary>
+    /// Show the saved-name cards when there are any, otherwise go straight to
+    /// the text box. First run should never be a list of nothing.
+    /// </summary>
+    private void RefreshSavedNames()
+    {
+        var s = AppServices.Settings;
+        // Anyone upgrading already has a name but no list — seed it from theirs
+        // so they get a card instead of an empty box.
+        if (s.SavedNames.Count == 0 && s.DisplayName is { Length: >= 2 } previous)
+        {
+            s.SavedNames.Add(previous);
+            s.Save();
+        }
+
+        _savedNames.Clear();
+        foreach (var n in s.SavedNames) _savedNames.Add(n);
+
+        if (_savedNames.Count > 0)
+        {
+            SavedNamesPanel.Visibility = Visibility.Visible;
+            NameEntryPanel.Visibility = Visibility.Collapsed;
+            NameBox.Text = "";           // nothing chosen yet
+            UpdateNameState();
+        }
+        else
+        {
+            ShowNameEntry(null);
+        }
+    }
+
+    /// <summary>Text box mode. Pass a name to edit it, or null to add a new one.</summary>
+    private void ShowNameEntry(string? editing)
+    {
+        _editingName = editing;
+        SavedNamesPanel.Visibility = Visibility.Collapsed;
+        NameEntryPanel.Visibility = Visibility.Visible;
+        NameEntryHeading.Text = editing is null ? "PICK A USERNAME" : "EDIT USERNAME";
+        NameBox.Text = editing ?? "";
+        // A rename needs somewhere to commit to; a brand-new name is committed
+        // by hosting or joining with it.
+        SaveEntryBtn.Visibility = editing is null ? Visibility.Collapsed : Visibility.Visible;
+        // Only offer a way back if there's something to go back to.
+        CancelEntryBtn.Visibility = AppServices.Settings.SavedNames.Count > 0
+            ? Visibility.Visible : Visibility.Collapsed;
+        UpdateNameState();
+        NameBox.Focus();
+        NameBox.CaretIndex = NameBox.Text.Length;
+    }
 
     private void NameBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e) =>
         UpdateNameState();
@@ -51,11 +105,64 @@ public partial class PartyView : UserControl, IDisposable
                 : "A little longer, please (at least 2 characters).";
     }
 
+    /// <summary>Persist the active name, most recent first, and drop any duplicate.</summary>
     private void SaveName()
     {
-        AppServices.Settings.DisplayName = DisplayName;
-        AppServices.Settings.Save();
+        var s = AppServices.Settings;
+        var name = DisplayName;
+        if (name.Length < 2) return;
+
+        if (_editingName is not null) s.SavedNames.Remove(_editingName);
+        s.SavedNames.RemoveAll(n => string.Equals(n, name, StringComparison.CurrentCultureIgnoreCase));
+        s.SavedNames.Insert(0, name);
+        if (s.SavedNames.Count > 8) s.SavedNames.RemoveRange(8, s.SavedNames.Count - 8);
+
+        s.DisplayName = name;
+        _editingName = null;
+        s.Save();
     }
+
+    // ---- Saved name cards --------------------------------------------------
+
+    private void SelectName_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as Button)?.Tag is not string name) return;
+        NameBox.Text = name;   // becomes the active name for this session
+        SaveName();            // re-saving bumps it to the top of the list
+        RefreshSavedNames();
+        NameBox.Text = name;
+        UpdateNameState();
+    }
+
+    private void EditName_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as Button)?.Tag is string name) ShowNameEntry(name);
+    }
+
+    private void RemoveName_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as Button)?.Tag is not string name) return;
+        var s = AppServices.Settings;
+        s.SavedNames.Remove(name);
+        if (string.Equals(s.DisplayName, name, StringComparison.CurrentCultureIgnoreCase))
+            s.DisplayName = null;
+        s.Save();
+        RefreshSavedNames();
+    }
+
+    private void NewName_Click(object sender, RoutedEventArgs e) => ShowNameEntry(null);
+
+    private void SaveEntry_Click(object sender, RoutedEventArgs e)
+    {
+        if (!HasName) return;
+        var name = DisplayName;
+        SaveName();            // replaces the name being edited
+        RefreshSavedNames();
+        NameBox.Text = name;   // keep it active so Host/Join stay available
+        UpdateNameState();
+    }
+
+    private void CancelEntry_Click(object sender, RoutedEventArgs e) => RefreshSavedNames();
 
     private void HomeBtn_Click(object sender, RoutedEventArgs e) =>
         MainWindow.Instance.Navigate(new HomeView());

@@ -58,7 +58,10 @@ public class Settings
     public List<StreamingShortcut> Shortcuts { get; set; } = new();
 
     // Watch Party.
+    /// <summary>Most recently used nickname.</summary>
     public string? DisplayName { get; set; }
+    /// <summary>Nicknames offered as cards next time, most recent first.</summary>
+    public List<string> SavedNames { get; set; } = new();
     public string? LastPartyAddress { get; set; }
     /// <summary>Deployed rendezvous to host through (e.g. "party.example.com"); null = run one locally.</summary>
     public string? RendezvousServer { get; set; }

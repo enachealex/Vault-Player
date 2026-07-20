@@ -1,0 +1,48 @@
+<Window x:Class="VideoPlayer.App.Views.SplashWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Vault Player"
+        Width="440" Height="300"
+        WindowStyle="None" ResizeMode="NoResize" AllowsTransparency="True"
+        Background="Transparent" ShowInTaskbar="False"
+        WindowStartupLocation="CenterScreen"
+        FontFamily="{StaticResource BodyFont}">
+    <Border Background="{StaticResource BgBrush}" CornerRadius="16"
+            BorderBrush="{StaticResource LineBrush}" BorderThickness="1">
+        <Grid Margin="32,28">
+            <StackPanel VerticalAlignment="Center">
+                <Border Width="60" Height="60" CornerRadius="18" HorizontalAlignment="Center"
+                        Background="{StaticResource AccentBrush}">
+                    <TextBlock Text="&#xE768;" FontFamily="Segoe MDL2 Assets" FontSize="26"
+                               Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <TextBlock Text="Vault Player" FontSize="24" FontWeight="Bold"
+                           FontFamily="{StaticResource DisplayFont}"
+                           Foreground="{StaticResource TextBrush}"
+                           HorizontalAlignment="Center" Margin="0,16,0,0" />
+
+                <TextBlock x:Name="StatusText" Text="Starting…" FontSize="12.5"
+                           Foreground="{StaticResource TextMutedBrush}"
+                           HorizontalAlignment="Center" TextAlignment="Center"
+                           TextWrapping="Wrap" Margin="0,10,0,0" />
+
+                <ProgressBar x:Name="Progress" Height="3" Margin="0,18,0,0"
+                             Background="{StaticResource SurfaceAltBrush}"
+                             Foreground="{StaticResource AccentBrush}"
+                             BorderThickness="0" IsIndeterminate="True" />
+
+                <!-- Only ever shown when an update actually exists. -->
+                <StackPanel x:Name="UpdatePrompt" Visibility="Collapsed" Margin="0,20,0,0">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Button x:Name="UpdateBtn" Style="{StaticResource PrimaryButton}" Padding="18,9"
+                                Content="Update now" Click="Update_Click"
+                                AutomationProperties.Name="Update now" />
+                        <Button x:Name="SkipBtn" Style="{StaticResource GhostButton}" Padding="16,9" Margin="10,0,0,0"
+                                Content="Not now" Click="Skip_Click"
+                                AutomationProperties.Name="Not now" />
+                    </StackPanel>
+                </StackPanel>
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>
