@@ -26,11 +26,25 @@ public partial class PartyView : UserControl, IDisposable
     /// <summary>Name being edited, so saving replaces it instead of adding a duplicate.</summary>
     private string? _editingName;
 
-    public PartyView()
+    public PartyView() : this(null) { }
+
+    /// <summary>
+    /// <paramref name="pendingHost"/> is a film chosen from the library picker.
+    /// Picking navigates away and back, so the choice returns through here.
+    /// </summary>
+    public PartyView(MovieItem? pendingHost)
     {
         InitializeComponent();
         RosterList.ItemsSource = _roster;
         NameCards.ItemsSource = _savedNames;
+
+        if (pendingHost is not null)
+        {
+            // The name was saved before we navigated to the picker.
+            NameBox.Text = AppServices.Settings.DisplayName ?? "";
+            Loaded += async (_, _) => await BeginHostingAsync(pendingHost);
+            return;
+        }
         // No accounts — just a name for this party. Remembered once chosen, but
         // never silently taken from the Windows account.
         RefreshSavedNames();
@@ -205,58 +219,30 @@ public partial class PartyView : UserControl, IDisposable
             return;
         }
 
-        BuildPickList();
-        ChoosePanel.Visibility = Visibility.Collapsed;
-        PickPanel.Visibility = Visibility.Visible;
+        // Choose from the real library rather than a list of file names, so
+        // hosting looks like watching alone: posters, continue watching,
+        // search and filters.
+        MainWindow.Instance.Navigate(new LibraryView(picked =>
+            MainWindow.Instance.Navigate(new PartyView(picked))));
     }
 
-    /// <summary>Local films first, then streaming titles. Also used when swapping mid-lobby.</summary>
-    private void BuildPickList()
+    /// <summary>Host the chosen film, or swap the running party over to it.</summary>
+    private async Task BeginHostingAsync(MovieItem movie)
     {
-        var folder = AppServices.Settings.LastFolder;
-        if (folder is null || !Directory.Exists(folder)) return;
-
-        PickList.Children.Clear();
-        foreach (var movie in MovieLibrary.Scan(folder))
+        // A party already running means this came from "Change film".
+        if (AppServices.CurrentParty is { IsHost: true } existing)
         {
-            var btn = new Button
-            {
-                Style = (Style)FindResource("GhostButton"),
-                Content = movie.Name,
-                HorizontalContentAlignment = HorizontalAlignment.Left,
-                Margin = new Thickness(0, 3, 0, 3),
-                Padding = new Thickness(14, 9, 14, 9),
-                Tag = movie,
-            };
-            System.Windows.Automation.AutomationProperties.SetName(btn, "Host " + movie.Name);
-            btn.Click += PickMovie_Click;
-            PickList.Children.Add(btn);
+            _session = existing;
+            _switching = true;
         }
-
-        // Streaming titles can be hosted too — the room syncs the start cue
-        // rather than the video, since we can't relay DRM-protected content.
-        foreach (var item in StreamingServices.AsMovieItems(AppServices.Settings.Shortcuts))
-        {
-            var btn = new Button
-            {
-                Style = (Style)FindResource("GhostButton"),
-                Content = $"{item.Name}   ·   {item.Service} (synced start only)",
-                HorizontalContentAlignment = HorizontalAlignment.Left,
-                Margin = new Thickness(0, 3, 0, 3),
-                Padding = new Thickness(14, 9, 14, 9),
-                Tag = item,
-            };
-            System.Windows.Automation.AutomationProperties.SetName(btn, "Host " + item.Name);
-            btn.Click += PickShortcut_Click;
-            PickList.Children.Add(btn);
-        }
+        if (movie.IsShortcut) await HostShortcutAsync(movie);
+        else await HostLocalAsync(movie);
     }
 
-    private async void PickShortcut_Click(object sender, RoutedEventArgs e)
+    private async Task HostShortcutAsync(MovieItem item)
     {
-        if ((sender as Button)?.Tag is not MovieItem item) return;
         _movie = item;
-        PickPanel.Visibility = Visibility.Collapsed;
+        ChoosePanel.Visibility = Visibility.Collapsed;
         LobbyMovie.Text = "Preparing…";
         LobbyPanel.Visibility = Visibility.Visible;
         try
@@ -296,11 +282,10 @@ public partial class PartyView : UserControl, IDisposable
         }
     }
 
-    private async void PickMovie_Click(object sender, RoutedEventArgs e)
+    private async Task HostLocalAsync(MovieItem movie)
     {
-        if ((sender as Button)?.Tag is not MovieItem movie) return;
         _movie = movie;
-        PickPanel.Visibility = Visibility.Collapsed;
+        ChoosePanel.Visibility = Visibility.Collapsed;
         LobbyMovie.Text = "Preparing…";
         LobbyPanel.Visibility = Visibility.Visible;
         try
@@ -476,10 +461,10 @@ public partial class PartyView : UserControl, IDisposable
     private void ChangeFilmBtn_Click(object sender, RoutedEventArgs e)
     {
         if (_session is null) return;
-        _switching = true;
-        BuildPickList();
-        LobbyPanel.Visibility = Visibility.Collapsed;
-        PickPanel.Visibility = Visibility.Visible;
+        // Same picker as hosting. The running session is found again through
+        // AppServices.CurrentParty when the choice comes back.
+        MainWindow.Instance.Navigate(new LibraryView(picked =>
+            MainWindow.Instance.Navigate(new PartyView(picked))));
     }
 
     private void CountdownDismiss_Click(object sender, RoutedEventArgs e)

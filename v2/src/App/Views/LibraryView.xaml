@@ -34,6 +34,21 @@
             </Grid>
         </Border>
 
+        <!-- Shown only when choosing a film to host, so it is obvious that
+             clicking a poster starts a party rather than playing it here. -->
+        <Border x:Name="PickModeBanner" Grid.Row="0" Visibility="Collapsed"
+                Background="{StaticResource AccentSoftBrush}"
+                BorderBrush="{StaticResource AccentBrush}" BorderThickness="0,0,0,1"
+                Padding="24,10">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="&#xE716;" FontFamily="Segoe MDL2 Assets" FontSize="13"
+                           VerticalAlignment="Center" Foreground="{StaticResource AccentBrush}" />
+                <TextBlock Text="Pick a film to host — everyone in the party watches this"
+                           FontSize="13" Margin="10,0,0,0" VerticalAlignment="Center"
+                           Foreground="{StaticResource TextBrush}" />
+            </StackPanel>
+        </Border>
+
         <!-- Header -->
         <Grid Grid.Row="1" Margin="24,18,24,10">
             <Grid.ColumnDefinitions>

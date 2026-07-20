@@ -70,18 +70,55 @@ public class Settings
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "VideoPlayerV2", "settings.json");
 
+    private static string BackupPath => FilePath + ".bak";
+
+    /// <summary>
+    /// Load settings, falling back to the previous good copy before ever
+    /// falling back to defaults.
+    ///
+    /// This used to return fresh defaults whenever the file failed to parse,
+    /// and the next Save would then write those defaults straight over the
+    /// user's data. Combined with a non-atomic write (see Save), an update
+    /// restarting the app mid-write was enough to lose saved names, resume
+    /// positions and watch counts permanently.
+    /// </summary>
     public static Settings Load()
     {
+        if (TryRead(FilePath, out var settings)) return settings!;
+
+        // The main file is missing or unreadable. Keep whatever is there for
+        // inspection rather than letting the next Save overwrite it.
+        if (File.Exists(FilePath))
+        {
+            try { File.Move(FilePath, FilePath + ".corrupt", overwrite: true); } catch { }
+        }
+
+        if (TryRead(BackupPath, out var backup))
+        {
+            // Write the recovered state straight back. Otherwise it exists only
+            // in the backup until something happens to trigger a save, and a
+            // crash before that would lose it after all.
+            backup!.Save();
+            return backup;
+        }
+        return new Settings();
+    }
+
+    private static bool TryRead(string path, out Settings? settings)
+    {
+        settings = null;
         try
         {
-            if (File.Exists(FilePath))
-                return JsonSerializer.Deserialize<Settings>(File.ReadAllText(FilePath)) ?? new Settings();
+            if (!File.Exists(path)) return false;
+            var text = File.ReadAllText(path);
+            if (string.IsNullOrWhiteSpace(text)) return false;   // truncated write
+            settings = JsonSerializer.Deserialize<Settings>(text);
+            return settings is not null;
         }
         catch
         {
-            // Corrupt settings should never block startup.
+            return false;
         }
-        return new Settings();
     }
 
     public void Save()
@@ -95,7 +132,16 @@ public class Settings
                     ResumePositions.Remove(key);
             }
             Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-            File.WriteAllText(FilePath, JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true }));
+            var json = JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true });
+
+            // Write somewhere else first, then swap it in. A direct write leaves
+            // a half-written file if the process dies mid-save -- which is
+            // exactly what an update does when it restarts the app. File.Replace
+            // also keeps the previous copy, which Load falls back to.
+            var temp = FilePath + ".tmp";
+            File.WriteAllText(temp, json);
+            if (File.Exists(FilePath)) File.Replace(temp, FilePath, BackupPath, ignoreMetadataErrors: true);
+            else File.Move(temp, FilePath);
         }
         catch
         {

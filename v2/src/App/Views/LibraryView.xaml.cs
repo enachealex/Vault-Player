@@ -31,14 +31,36 @@ public partial class LibraryView : UserControl, IDisposable
     private SortMode _sort = SortMode.NameAsc;
     private bool _ready;
 
-    public LibraryView()
+    /// <summary>
+    /// When set, picking a film hands it back here instead of playing it. Used
+    /// by Watch Party so choosing what to host is the same browsing experience
+    /// as watching alone — posters, continue watching, search and filters —
+    /// rather than a bare list of file names.
+    /// </summary>
+    private readonly Action<MovieItem>? _onPick;
+
+    public LibraryView() : this(null) { }
+
+    public LibraryView(Action<MovieItem>? onPick)
     {
         InitializeComponent();
+        _onPick = onPick;
         SortBox.ItemsSource = Sorts.Select(s => s.Label).ToList();
         SortBox.SelectedIndex = 0;
         _ready = true;
 
-        RefreshPartyBanner();
+        if (_onPick is not null)
+        {
+            PickModeBanner.Visibility = Visibility.Visible;
+            // Streaming shortcuts can be hosted too, but nothing else here
+            // applies while choosing: the party banner would be about the very
+            // session being set up.
+            PartyBanner.Visibility = Visibility.Collapsed;
+        }
+        else
+        {
+            RefreshPartyBanner();
+        }
 
         var last = AppServices.Settings.LastFolder;
         if (last is not null && Directory.Exists(last)) LoadFolder(last);
@@ -274,6 +296,13 @@ public partial class LibraryView : UserControl, IDisposable
     private void MovieCard_Click(object sender, RoutedEventArgs e)
     {
         if ((sender as Button)?.Tag is not MovieItem movie) return;
+
+        // Choosing something to host: hand it back rather than playing it.
+        if (_onPick is not null)
+        {
+            _onPick(movie);
+            return;
+        }
 
         if (movie.IsShortcut)
         {
