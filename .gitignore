@@ -50,3 +50,7 @@ release/
 
 # Bundled ffmpeg/ffprobe binaries — large, and fetched by scripts/
 v2/tools/
+
+# Installer output (v2)
+v2/releases/
+v2/publish/

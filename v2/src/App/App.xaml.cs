@@ -1,11 +1,19 @@
 using System;
 using System.IO;
 using System.Windows;
+using Velopack;
 
 namespace VideoPlayer.App;
 
 public partial class App : Application
 {
+    public App()
+    {
+        // Must run before anything else touches the app: this handles the
+        // install/update/uninstall hooks and can exit the process outright.
+        VelopackApp.Build().Run();
+    }
+
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);

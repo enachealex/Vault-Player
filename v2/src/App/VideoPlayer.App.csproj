@@ -10,12 +10,37 @@
 
   <ItemGroup>
     <PackageReference Include="LibVLCSharp.WPF" Version="3.10.0" />
+    <PackageReference Include="Velopack" Version="1.2.0" />
     <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.23.1" />
   </ItemGroup>
 
   <ItemGroup>
     <!-- Bundled ffmpeg (thumbnails now; outbound streaming later). -->
     <None Include="..\..\tools\ffmpeg.exe" Link="ffmpeg.exe" CopyToOutputDirectory="PreserveNewest" Condition="Exists('..\..\tools\ffmpeg.exe')" />
+  </ItemGroup>
+
+  <!-- VideoLAN.LibVLC.Windows ships a copy target that assigns one Link value
+       to all ~1200 native files. That works for build but `dotnet publish`
+       rejects it (MSB3094: 1 destination for 1274 sources), so we disable the
+       package's copy and do it ourselves. Bonus: x64 only, which drops the
+       unused x86 and arm64 runtimes (~178 MB). -->
+  <PropertyGroup>
+    <VlcWindowsX64Enabled>false</VlcWindowsX64Enabled>
+    <VlcWindowsX86Enabled>false</VlcWindowsX86Enabled>
+    <VlcWindowsArm64Enabled>false</VlcWindowsArm64Enabled>
+    <VlcX64Dir>$(NuGetPackageRoot)videolan.libvlc.windows\3.0.23.1\build\x64\</VlcX64Dir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- LinkBase, not Link: it preserves each file's relative path (plugins\,
+         hrtfs\, lua\) per item. A Link with %(RecursiveDir) collapses to a
+         single destination during publish, which is the MSB3094 above.
+         The C/C++ headers and import libs are build-time only. -->
+    <None Include="$(VlcX64Dir)**\*"
+          Exclude="$(VlcX64Dir)include\**\*;$(VlcX64Dir)*.lib"
+          LinkBase="libvlc\win-x64"
+          CopyToOutputDirectory="PreserveNewest"
+          Condition="Exists('$(VlcX64Dir)')" />
   </ItemGroup>
 
   <ItemGroup>
