@@ -1,103 +1,86 @@
-# Video Player
+# Vault Player
 
-A cross-platform video player built with **Expo / React Native**. One codebase runs as:
+A Windows video player for watching your own films — alone, cast to a TV, or
+together with friends over the internet.
 
-- a **desktop app** (Windows / macOS / Linux) via an Electron shell,
-- a **web app** in any Chromium browser,
-- a **mobile app** on iOS / Android.
+Built with .NET 10 / WPF and libVLC, so it plays what you actually have: MKV,
+HEVC, DTS and AC-3 all decode natively with hardware acceleration and no
+transcoding step.
 
 ## Features
 
-- **Open a folder, see only its videos** — on desktop/web the native folder picker lists just the playable video files inside (nothing is uploaded; everything stays on your device). On mobile you add videos through the system picker.
-- **Plays MKV / AVI and surround audio instantly (desktop)** — the desktop app bundles ffmpeg. Files Chromium can't play natively (MKVs with AC-3/DTS audio, AVI/WMV containers) play as a **live stream**: ffmpeg starts at the requested position, copies the video untouched and re-encodes only the audio to AAC on the fly, so playback begins within seconds — no upfront conversion of the whole file. Seeking restarts the stream at the target time.
-- **Thumbnail previews** — each video shows a poster frame grabbed from the file; posters are cached (IndexedDB) so they appear instantly next time, including for recents.
-- **Searchable & sortable library** — filter the folder by name and sort by folder order or name (A–Z / Z–A).
-- **Subtitles** — sidecar `.srt` / `.vtt` files are auto-detected and matched by name (`movie.srt`, `movie.en.srt`, …). Toggle/switch tracks with the **CC** button; cues render as an overlay and are parsed in-app so they work on web and native.
-- **Recent / Continue watching** — every video remembers where you left off and resumes from there.
-- **High-quality playback** — video plays at native resolution using the platform's hardware-accelerated player (`expo-video` → HTML5 `<video>` on desktop/web). Audio plays uncompressed at full volume; videos autoplay with sound on desktop.
-- **Four end-of-video modes**, switchable any time:
-  - **Autoplay** — play the next video automatically
-  - **Loop list** — repeat the whole folder
-  - **Loop one** — repeat the current video
-  - **Play once** — stop after the current video
-- **Intuitive controls** — scrubbable timeline, ±10s skip, previous/next, volume, playback speed (0.5×–2×), subtitles, fullscreen, plus keyboard shortcuts on desktop.
+- **Your folder, your films.** Point it at a folder and it lists the videos,
+  with poster frames pulled from each file and cached.
+- **Continue watching.** Every film remembers where you stopped, and the
+  library shows how much is left.
+- **Search, sort and filter.** Sort by name or length, or filter down to what
+  you've actually watched — most watched, or most recent.
+- **Chapters you define.** Mark points in a film and jump straight to them.
+- **Cast to a TV.** Discovers DLNA renderers on your network (smart TVs,
+  consoles, streaming sticks) and plays to them.
+- **Watch Party.** Watch the same film, in sync, with friends.
+- **Subtitles and audio tracks**, including sidecar `.srt` files.
 
-### Keyboard shortcuts (desktop / web)
+## Watch Party
 
-| Key | Action | Key | Action |
-| --- | --- | --- | --- |
-| `Space` / `K` | Play / pause | `M` | Mute |
-| `←` / `→` | Seek ∓5s | `↑` / `↓` | Volume ±10% |
-| `J` / `L` | Seek ∓10s | `F` | Fullscreen |
-| `N` / `P` | Next / previous | `Esc` | Back to library |
+One person hosts. Their copy of the film is streamed to everyone else, and the
+host controls playback — guests see "Watching *host*'s screen" and follow along,
+with the group staying synced to the second. Guests can ask the host to pause,
+and there's a chat channel alongside the video.
 
-## Getting started
+Joining takes a room code and a nickname. There are no accounts.
 
-```bash
-npm install
+**Streaming services.** Titles on Prime Video, Netflix and similar are
+DRM-protected and cannot be played or relayed by this app. You can still add
+them to your library as shortcuts, and Watch Party can run a synchronised
+countdown so everyone presses play together in the service's own app.
+
+### Running it over the internet
+
+On a local network nothing extra is needed — the app runs its own rendezvous.
+
+To watch with people elsewhere, deploy `src/Rendezvous` (Dockerfile included)
+somewhere with a public address, and set that address in the app. The server
+only relays: it holds no accounts and stores no media. Connections from both
+host and guests are outbound, so it works behind NAT without port forwarding.
+
+Bandwidth note: the host uploads a full copy of the film to **each** guest
+simultaneously. The lobby tells you what that adds up to before you start.
+
+## Install
+
+Download the latest `VideoPlayer-win-Setup.exe` from
+[Releases](https://github.com/enachealex/Vault-Player/releases).
+
+The app checks for updates when it starts and offers to install them.
+
+## Building from source
+
+Requires the .NET 10 SDK.
+
+```powershell
+dotnet build v2/VideoPlayer.slnx -c Release
 ```
 
-### Run in the browser (fastest dev loop)
+To produce an installer:
 
-```bash
-npm run web
+```powershell
+v2\scripts\pack.ps1 -Version 2.0.1
 ```
 
-### Run as the desktop app
+> The publish step deliberately stages through a temporary directory. The .NET
+> SDK builds publish destinations with a single-quoted MSBuild transform, so any
+> apostrophe in the checkout path collapses every destination into one and the
+> build fails with `MSB3094`. Staging elsewhere avoids it.
 
-Development (hot reload — start the web server first, then Electron points at it):
-
-```bash
-npm run web          # terminal 1: Expo web dev server on :8081
-npm run electron:dev # terminal 2: Electron window loading the dev server
-```
-
-Production preview (builds the web bundle, then runs Electron against it):
-
-```bash
-npm run electron:preview
-```
-
-### Run on a phone
-
-```bash
-npm run android   # or: npm run ios
-```
-
-## Building installers
-
-```bash
-npm run dist:win     # Windows  -> release/*.exe (NSIS installer)
-npm run dist:mac     # macOS    -> release/*.dmg
-npm run dist:linux   # Linux    -> release/*.AppImage
-```
-
-Output lands in `release/`.
-
-## How it fits together
+## Layout
 
 ```
-App.tsx                     Root: navigation + recents/settings state
-src/screens/
-  LibraryScreen.tsx         Recents, folder contents, search + sort, thumbnails
-  PlayerScreen.tsx          expo-video player + custom controls + mode + subtitles
-src/services/
-  videoFolder.web.ts        Folder picking + subtitle detection; routes through the
-                            desktop bridge in Electron, FS Access API in browsers
-  videoFolder.native.ts     Video picking via expo-document-picker (mobile)
-  thumbnails.web.ts         Canvas frame-grab posters, cached in IndexedDB
-  thumbnails.native.ts      Posters via expo-video-thumbnails
-src/subtitles.ts            SRT / VTT parser (in-app cue rendering)
-src/storage.ts              Recents + settings (AsyncStorage / localStorage)
-scripts/make-icons.js       Generates the app icon set (run: npm run icons)
-electron/main.js            Desktop shell; local server (static build + Range-
-                            capable media streaming), native folder dialog IPC
-electron/media.js           ffprobe/ffmpeg pipeline: direct-play detection and
-                            audio conversion for MKV/AC-3/DTS, cached per file
-electron/preload.js         contextBridge exposing the desktop bridge
+v2/src/App          the WPF application
+v2/src/Protocol     shared Watch Party message types
+v2/src/Rendezvous   the relay server (ASP.NET Core, Dockerfile included)
+v2/scripts          packaging
 ```
 
-> **Why localhost instead of `file://` on desktop?** Chromium disables the
-> File System Access API on `file://` origins, so the Electron shell serves the
-> exported build from a local HTTP server. Folder-picking then works identically
-> to the browser.
+An earlier version built with Expo / React Native and Electron lives in the
+repository root (`src/`, `electron/`). It is superseded by `v2/`.
