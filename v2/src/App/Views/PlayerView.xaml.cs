@@ -50,6 +50,8 @@ public partial class PlayerView : UserControl, IDisposable
     // Watch Party session (null when watching solo). Host or guest.
     private readonly PartySession? _party;
     private bool PartyGuest => _party is { IsHost: false };
+    /// <summary>Last host play/pause state a guest saw, so we only toast on change.</summary>
+    private bool? _lastSeenHostPlaying;
     private bool PartyHost => _party is { IsHost: true };
     private readonly System.Collections.ObjectModel.ObservableCollection<string> _chatLines = new();
 
@@ -60,7 +62,10 @@ public partial class PlayerView : UserControl, IDisposable
         _party = party;
         _playlist = playlist ?? new[] { movie };
         _index = Math.Max(0, ((List<MovieItem>)_playlist.ToList()).FindIndex(m => m.Path == movie.Path));
-        TitleText.Text = party is null ? movie.Name : $"{movie.Name} — Watch Party {party.RoomCode}";
+        // Guests get the room identity from the shared-screen badge instead.
+        TitleText.Text = party is null || party is { IsHost: false }
+            ? movie.Name
+            : $"{movie.Name} — Watch Party {party.RoomCode}";
         Loaded += OnLoaded;
     }
 
@@ -155,11 +160,18 @@ public partial class PlayerView : UserControl, IDisposable
             }
             if (PartyGuest)
             {
-                // The host drives: no autoplay chaining, no casting, host clock rules.
-                AutoplayBtn.IsEnabled = false;
-                CastBtn.IsEnabled = false;
-                RateBtn.IsEnabled = false;
-                PrevBtn.IsEnabled = NextBtn.IsEnabled = false;
+                // You're watching someone else's screen: hide what you can't do
+                // rather than showing a row of dead buttons. Volume, subtitles
+                // and fullscreen stay — those are yours, like your own TV.
+                AutoplayBtn.Visibility = Visibility.Collapsed;
+                CastBtn.Visibility = Visibility.Collapsed;
+                RateBtn.Visibility = Visibility.Collapsed;
+                PrevBtn.Visibility = NextBtn.Visibility = Visibility.Collapsed;
+                PlayBtn.Visibility = Visibility.Collapsed;
+                Back10Btn.Visibility = Visibility.Collapsed;
+                Fwd10Btn.Visibility = Visibility.Collapsed;
+                SharedScreenBadge.Visibility = Visibility.Visible;
+                SharedScreenText.Text = $"Watching {_party!.HostName}'s screen";
             }
         }
     }
@@ -879,7 +891,14 @@ public partial class PlayerView : UserControl, IDisposable
         var expected = _party.BeaconPositionMs +
                        (_party.BeaconPlaying ? now - _party.BeaconAtUnixMs : 0);
 
-        // Follow play/pause state.
+        // Follow play/pause state, and say who did it — otherwise the film just
+        // stops and the guest has no idea whether it's the host or their network.
+        if (_lastSeenHostPlaying is { } was && was != _party.BeaconPlaying)
+            ShowToast(_party.BeaconPlaying
+                ? $"{_party.HostName} resumed"
+                : $"{_party.HostName} paused", null, null);
+        _lastSeenHostPlaying = _party.BeaconPlaying;
+
         if (_party.BeaconPlaying && !_player.IsPlaying) _player.Play();
         else if (!_party.BeaconPlaying && _player.IsPlaying) _player.Pause();
 

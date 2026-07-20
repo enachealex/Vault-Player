@@ -196,6 +196,7 @@ app.Map("/ws", async context =>
         Room = joined.Code,
         MovieTitle = joined.MovieTitle,
         Service = joined.Service,
+        Name = joined.HostName, // so guests can say whose screen they're watching
         DurationMs = joined.DurationMs,
         Started = joined.Started,
         PositionMs = joined.LastState?.PositionMs,

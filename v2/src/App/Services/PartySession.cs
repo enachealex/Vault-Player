@@ -34,6 +34,8 @@ public sealed class PartySession : IDisposable
     public bool IsHost { get; private set; }
     public string RoomCode { get; private set; } = "";
     public string DisplayName { get; private set; } = "";
+    /// <summary>Whose screen the guest is watching. Equals DisplayName on the host.</summary>
+    public string HostName { get; private set; } = "";
 
     /// <summary>Address guests should enter to reach the party server.</summary>
     public string ShareAddress { get; private set; } = "";
@@ -251,6 +253,7 @@ public sealed class PartySession : IDisposable
         // Guests pull the movie from the rendezvous itself — one address, any NAT.
         session.MediaUrl = $"http://{address}:{RendezvousPort}/stream/{session.RoomCode}";
         session.MovieTitle = welcome.MovieTitle;
+        session.HostName = welcome.Name ?? "the host";
         // A service name means the host is watching something DRM-protected:
         // there's no stream to pull, only the synchronised start cue.
         session.IsExternal = welcome.Service is not null;

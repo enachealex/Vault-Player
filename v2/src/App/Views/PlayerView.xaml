@@ -26,9 +26,23 @@
                     <TextBlock Text="Library" />
                 </StackPanel>
             </Button>
-            <TextBlock x:Name="TitleText" Grid.Column="1" VerticalAlignment="Center" Margin="8,0,16,0"
-                       FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}"
-                       TextTrimming="CharacterEllipsis" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,16,0">
+                <TextBlock x:Name="TitleText" VerticalAlignment="Center"
+                           FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}"
+                           TextTrimming="CharacterEllipsis" />
+                <!-- Guests only: makes it obvious you're a passenger, not the driver. -->
+                <Border x:Name="SharedScreenBadge" Visibility="Collapsed" Margin="12,0,0,0"
+                        Background="{StaticResource AccentSoftBrush}" CornerRadius="9" Padding="10,4"
+                        BorderBrush="{StaticResource AccentBrush}" BorderThickness="1">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE7F4;" FontFamily="Segoe MDL2 Assets" FontSize="11"
+                                   VerticalAlignment="Center" Foreground="{StaticResource AccentBrush}" />
+                        <TextBlock x:Name="SharedScreenText" Text="" FontSize="11.5" Margin="7,0,0,0"
+                                   FontWeight="SemiBold" VerticalAlignment="Center"
+                                   Foreground="{StaticResource AccentBrush}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
             <Button x:Name="AutoplayBtn" Grid.Column="2" Style="{StaticResource GhostButton}"
                     Click="AutoplayBtn_Click" AutomationProperties.Name="Autoplay"
                     Margin="0,10,8,10" Padding="12,8">
@@ -140,7 +154,7 @@
                             Click="PrevBtn_Click" AutomationProperties.Name="Previous">
                         <TextBlock Text="&#xE892;" FontFamily="Segoe MDL2 Assets" FontSize="14" />
                     </Button>
-                    <Button Style="{StaticResource GhostButton}" Padding="10,8" Margin="2,0"
+                    <Button x:Name="Back10Btn" Style="{StaticResource GhostButton}" Padding="10,8" Margin="2,0"
                             Click="Back10_Click" AutomationProperties.Name="Back 10 seconds">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="&#xEB9E;" FontFamily="Segoe MDL2 Assets" FontSize="13" Margin="0,0,5,0"
@@ -152,7 +166,7 @@
                             Click="PlayBtn_Click" AutomationProperties.Name="Play or pause">
                         <TextBlock x:Name="PlayGlyph" Text="&#xE769;" FontFamily="Segoe MDL2 Assets" FontSize="14" />
                     </Button>
-                    <Button Style="{StaticResource GhostButton}" Padding="10,8" Margin="2,0"
+                    <Button x:Name="Fwd10Btn" Style="{StaticResource GhostButton}" Padding="10,8" Margin="2,0"
                             Click="Fwd10_Click" AutomationProperties.Name="Forward 10 seconds">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="+10sec" FontSize="12" VerticalAlignment="Center" Margin="0,0,5,0" />
