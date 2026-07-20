@@ -444,6 +444,40 @@ public partial class PartyView : UserControl, IDisposable
     {
         _roster.Clear();
         foreach (var member in members) _roster.Add(member);
+        UpdateBandwidthNote(Math.Max(0, members.Length - 1)); // exclude the host
+    }
+
+    /// <summary>
+    /// The host uploads a full copy of the film to every guest simultaneously,
+    /// so the requirement scales linearly. Typical home upstream is well under
+    /// what a 4K remux needs for even one guest — worth saying before the film
+    /// starts buffering rather than after.
+    /// </summary>
+    private void UpdateBandwidthNote(int guests)
+    {
+        if (_session is null || _session.IsExternal || _movie is null
+            || _movie.DurationMs is not > 0 || _movie.SizeBytes <= 0 || guests <= 0)
+        {
+            BandwidthNote.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        var mbps = _movie.SizeBytes * 8.0 / (_movie.DurationMs.Value / 1000.0) / 1_000_000.0;
+        var needed = mbps * guests;
+
+        BandwidthNote.Text =
+            $"This film averages {mbps:0.#} Mbps, so {guests} guest{(guests == 1 ? "" : "s")} "
+            + $"need{(guests == 1 ? "s" : "")} about {needed:0.#} Mbps of upload from you.";
+        if (needed > 25)
+        {
+            BandwidthNote.Text += " That's more than most home connections upload — expect buffering.";
+            BandwidthNote.Foreground = (System.Windows.Media.Brush)FindResource("AccentBrush");
+        }
+        else
+        {
+            BandwidthNote.Foreground = (System.Windows.Media.Brush)FindResource("TextMutedBrush");
+        }
+        BandwidthNote.Visibility = Visibility.Visible;
     }
 
     private void OnReady(int ready, int total)
