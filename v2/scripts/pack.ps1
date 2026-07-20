@@ -55,6 +55,10 @@ vpk pack `
     --mainExe VideoPlayer.App.exe `
     --packTitle "Vault Movies" `
     --packAuthors "Jump Vault LLC" `
+    --icon "$PSScriptRoot\..\src\App\Assets\app.ico" `
+    --splashImage "$PSScriptRoot\..\src\App\Assets\install-splash.png" `
+    --splashProgressColor "#C8442A" `
+    --shortcuts "Desktop,StartMenuRoot" `
     -o $OutDir
 if ($LASTEXITCODE -ne 0) { throw "vpk pack failed" }
 
