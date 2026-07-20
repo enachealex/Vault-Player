@@ -1,22 +1,88 @@
 {
-  "name": "scaffold",
+  "name": "video-player",
   "version": "1.0.0",
   "main": "index.ts",
   "dependencies": {
+    "@expo/metro-runtime": "~57.0.3",
+    "@expo/vector-icons": "^15.0.2",
+    "@react-native-async-storage/async-storage": "2.2.0",
     "expo": "~57.0.4",
+    "expo-document-picker": "~57.0.0",
+    "expo-media-library": "~57.0.1",
+    "expo-navigation-bar": "~57.0.1",
     "expo-status-bar": "~57.0.0",
+    "expo-video": "~57.0.0",
+    "expo-video-thumbnails": "~57.0.0",
+    "ffmpeg-static": "^5.3.0",
+    "ffprobe-static": "^3.1.0",
     "react": "19.2.3",
-    "react-native": "0.86.0"
+    "react-dom": "19.2.3",
+    "react-native": "0.86.0",
+    "react-native-web": "^0.21.2"
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
+    "cross-env": "^10.1.0",
+    "electron": "^43.1.0",
+    "electron-builder": "^26.15.3",
+    "sharp": "^0.35.3",
     "typescript": "~6.0.3"
   },
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "icons": "node scripts/make-icons.js",
+    "export:web": "expo export -p web",
+    "electron:dev": "cross-env ELECTRON_DEV=1 electron electron/main.js",
+    "electron:preview": "npm run export:web && electron electron/main.js",
+    "dist:win": "npm run export:web && electron-builder --win",
+    "dist:mac": "npm run export:web && electron-builder --mac",
+    "dist:linux": "npm run export:web && electron-builder --linux"
   },
-  "private": true
+  "private": true,
+  "build": {
+    "appId": "com.videoplayer.app",
+    "productName": "Video Player",
+    "extraMetadata": {
+      "main": "electron/main.js"
+    },
+    "files": [
+      "electron/**/*",
+      "dist/**/*",
+      "package.json",
+      "!node_modules/**/*",
+      "node_modules/ffmpeg-static/**",
+      "node_modules/ffprobe-static/**",
+      "!node_modules/ffprobe-static/bin/darwin/**",
+      "!node_modules/ffprobe-static/bin/linux/**",
+      "!node_modules/ffprobe-static/bin/win32/ia32/**"
+    ],
+    "asarUnpack": [
+      "node_modules/ffmpeg-static/**",
+      "node_modules/ffprobe-static/**"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.png"
+    },
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.video",
+      "icon": "assets/icon.png"
+    },
+    "linux": {
+      "target": "AppImage",
+      "category": "AudioVideo",
+      "icon": "assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
 }

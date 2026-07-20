@@ -39,3 +39,14 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Electron build output
+release/
+
+# .NET (v2 desktop app)
+[Bb]in/
+[Oo]bj/
+*.user
+
+# Bundled ffmpeg/ffprobe binaries — large, and fetched by scripts/
+v2/tools/
