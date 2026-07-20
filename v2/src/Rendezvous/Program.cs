@@ -18,6 +18,23 @@ using VideoPlayer.Protocol;
 var builder = WebApplication.CreateBuilder(args);
 var port = Environment.GetEnvironmentVariable("PORT") ?? "5555";
 builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+
+// Kestrel's defaults assume ordinary web traffic and are all wrong here: this
+// server exists to shuttle entire films between machines.
+builder.WebHost.ConfigureKestrel(options =>
+{
+    // The default cap is 30 MB. A host pushing a 2.65 GB film hit it and had
+    // the connection reset mid-upload, which surfaced as a guest staring at a
+    // black screen with a perfectly healthy-looking party around it.
+    options.Limits.MaxRequestBodySize = null;
+
+    // Minimum data-rate enforcement (240 bytes/s) aborts transfers it judges
+    // too slow. A party idles between byte-range pulls and guests can be on
+    // poor connections, both of which look like a stall to Kestrel.
+    options.Limits.MinRequestBodyDataRate = null;
+    options.Limits.MinResponseDataRate = null;
+});
+
 var app = builder.Build();
 app.UseWebSockets();
 

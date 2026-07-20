@@ -250,18 +250,48 @@ public sealed class PartySession : IDisposable
             MediaUrl = url,
         });
 
-    /// <summary>Serve a requested byte range to the rendezvous (for a guest).</summary>
-    private async Task PushRangeAsync(string reqId, long start, long end)
+    /// <summary>
+    /// Append a line to %APPDATA%\VideoPlayerV2\party.log. The media relay
+    /// spans three machines, so when it breaks there is nothing on screen to
+    /// explain it — the guest just sees black. Best-effort and never throws.
+    /// </summary>
+    internal static void Log(string line)
     {
-        if (_hostFilePath is null) return;
         try
         {
-            using var content = new FileRangeContent(_hostFilePath, start, end);
-            using var resp = await _pushClient.PostAsync($"{_pushBase}/upload/{reqId}", content);
+            var path = System.IO.Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "VideoPlayerV2", "party.log");
+            System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path)!);
+            System.IO.File.AppendAllText(path, $"{DateTime.Now:HH:mm:ss.fff}  {line}{Environment.NewLine}");
         }
         catch
         {
-            // Guest seeked/left; the range is abandoned. Normal.
+            // Diagnostics must never break playback.
+        }
+    }
+
+    /// <summary>Serve a requested byte range to the rendezvous (for a guest).</summary>
+    private async Task PushRangeAsync(string reqId, long start, long end)
+    {
+        if (_hostFilePath is null) { Log($"pull {reqId}: ignored, no host file"); return; }
+        var url = $"{_pushBase}/upload/{reqId}";
+        try
+        {
+            Log($"pull {reqId}: pushing bytes {start}-{end} to {url}");
+            using var content = new FileRangeContent(_hostFilePath, start, end);
+            using var resp = await _pushClient.PostAsync(url, content);
+            Log($"pull {reqId}: upload returned {(int)resp.StatusCode}");
+        }
+        catch (Exception ex)
+        {
+            // Guest may simply have seeked or left, which is routine — but it
+            // could equally be a broken relay, and we cannot tell them apart
+            // from here, so record it either way.
+            var detail = ex.Message;
+            for (var inner = ex.InnerException; inner is not null; inner = inner.InnerException)
+                detail += $" <- {inner.GetType().Name}: {inner.Message}";
+            Log($"pull {reqId}: upload FAILED to {url} -- {ex.GetType().Name}: {detail}");
         }
     }
 
