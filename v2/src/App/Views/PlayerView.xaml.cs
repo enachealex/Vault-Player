@@ -37,6 +37,8 @@ public partial class PlayerView : UserControl, IDisposable
 
     // Fullscreen state
     private bool _fullscreen;
+    /// <summary>Set while a fullscreen switch is still settling; blocks re-entry.</summary>
+    private bool _fullscreenBusy;
 
     private WindowState _prevWindowState;
 
@@ -938,6 +940,16 @@ public partial class PlayerView : UserControl, IDisposable
 
     private void ToggleFullscreen()
     {
+        // A fullscreen switch restyles the window, and libVLC is rebuilding its
+        // video output against that same handle. Letting a second switch start
+        // before the first has settled runs those two things concurrently, which
+        // is the shape of a use-after-free in native code. Mashing F or
+        // double-clicking quickly is enough to do it.
+        if (_fullscreenBusy) return;
+        _fullscreenBusy = true;
+        Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle,
+            new Action(() => _fullscreenBusy = false));
+
         var window = MainWindow.Instance;
         if (!_fullscreen)
         {
