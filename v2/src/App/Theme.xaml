@@ -24,6 +24,14 @@
     <!-- Deepest tone, for wells the surfaces sit on (thumbnails, overlays). -->
     <SolidColorBrush x:Key="BgDeepBrush" Color="#0E0604" />
 
+    <!-- Window chrome. The title bar is a neutral grey that sits apart from the
+         warm content below, the way most desktop apps separate chrome from
+         canvas; the border is true black so the window reads as a crisp
+         rectangle against any wallpaper. -->
+    <SolidColorBrush x:Key="TitleBarBrush" Color="#2D2B2C" />
+    <SolidColorBrush x:Key="TitleBarLineBrush" Color="#3D3A3B" />
+    <SolidColorBrush x:Key="WindowBorderBrush" Color="#000000" />
+
     <!-- Brand fonts, embedded (see the .csproj). The trailing "#Family" is the
          font's internal family name, not the file name. BodyFont is set once on
          MainWindow and inherits everywhere; DisplayFont is opt-in for headings,
@@ -263,12 +271,14 @@
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
                     <ControlTemplate.Triggers>
+                        <!-- Greys, to sit on the grey title bar rather than the
+                             warm surfaces used everywhere else. -->
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource SurfaceAltBrush}" />
+                            <Setter TargetName="Bd" Property="Background" Value="#3D3A3B" />
                             <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource LineBrush}" />
+                            <Setter TargetName="Bd" Property="Background" Value="#4A4748" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

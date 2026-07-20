@@ -20,7 +20,8 @@
                             UseAeroCaptionButtons="False" />
     </shell:WindowChrome.WindowChrome>
 
-    <Border x:Name="RootBorder" Background="{StaticResource BgBrush}">
+    <Border x:Name="RootBorder" Background="{StaticResource BgBrush}"
+            BorderBrush="{StaticResource WindowBorderBrush}" BorderThickness="1">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
@@ -28,8 +29,8 @@
             </Grid.RowDefinitions>
 
             <Border x:Name="TitleBar" Grid.Row="0" Height="38"
-                    Background="{StaticResource BgBrush}"
-                    BorderBrush="{StaticResource LineBrush}" BorderThickness="0,0,0,1">
+                    Background="{StaticResource TitleBarBrush}"
+                    BorderBrush="{StaticResource TitleBarLineBrush}" BorderThickness="0,0,0,1">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
