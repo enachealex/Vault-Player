@@ -1,0 +1,160 @@
+<UserControl x:Class="VideoPlayer.App.Views.PartyView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid>
+        <Button Style="{StaticResource GhostButton}" Click="HomeBtn_Click" AutomationProperties.Name="Home"
+                HorizontalAlignment="Left" VerticalAlignment="Top" Margin="24,18,0,0" Padding="12,8">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="&#xE72B;" FontFamily="Segoe MDL2 Assets" FontSize="14"
+                           VerticalAlignment="Center" Margin="0,0,8,0" />
+                <TextBlock Text="Home" />
+            </StackPanel>
+        </Button>
+
+        <!-- Mode chooser -->
+        <StackPanel x:Name="ChoosePanel" VerticalAlignment="Center" HorizontalAlignment="Center">
+            <TextBlock Text="&#xE716;" FontFamily="Segoe MDL2 Assets" FontSize="44"
+                       Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" />
+            <TextBlock Text="Watch Party" FontSize="26" FontWeight="Bold"
+                       FontFamily="{StaticResource DisplayFont}"
+                       Foreground="{StaticResource TextBrush}" HorizontalAlignment="Center" Margin="0,16,0,6" />
+            <TextBlock Text="Host a movie for friends, or join someone's session."
+                       FontSize="13" Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Center" Margin="0,0,0,26" />
+
+            <!-- Display name: required, no accounts — just what friends will see. -->
+            <TextBlock Text="PICK A USERNAME" FontSize="11" FontWeight="Bold"
+                       Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Center" Margin="0,0,0,8" />
+            <TextBox x:Name="NameBox" Width="260" Padding="12,9" FontSize="15" MaxLength="20"
+                     HorizontalContentAlignment="Center" HorizontalAlignment="Center"
+                     Background="{StaticResource SurfaceBrush}" Foreground="{StaticResource TextBrush}"
+                     BorderBrush="{StaticResource LineBrush}" TextChanged="NameBox_TextChanged"
+                     AutomationProperties.Name="Display name" />
+            <TextBlock x:Name="NameHint" Text="This is the name everyone in the party sees."
+                       FontSize="11.5" Foreground="{StaticResource TextMutedBrush}"
+                       HorizontalAlignment="Center" Margin="0,7,0,0" />
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,22,0,0">
+                <Button x:Name="HostBtn" Style="{StaticResource PrimaryButton}" Margin="0,0,12,0" Click="HostBtn_Click"
+                        Content="Host a session" AutomationProperties.Name="Host a session" />
+                <Button x:Name="JoinBtn" Style="{StaticResource GhostButton}" Click="JoinBtn_Click"
+                        Content="Join with room code" AutomationProperties.Name="Join with room code" />
+            </StackPanel>
+        </StackPanel>
+
+        <!-- Host: pick a movie -->
+        <Grid x:Name="PickPanel" Visibility="Collapsed" Margin="0,70,0,20">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <TextBlock Grid.Row="0" Text="Pick the movie to host" FontSize="19" FontWeight="SemiBold"
+                       Foreground="{StaticResource TextBrush}" HorizontalAlignment="Center" Margin="0,0,0,14" />
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" MaxWidth="560">
+                <StackPanel x:Name="PickList" />
+            </ScrollViewer>
+        </Grid>
+
+        <!-- Host: lobby -->
+        <StackPanel x:Name="LobbyPanel" Visibility="Collapsed" VerticalAlignment="Center" HorizontalAlignment="Center">
+            <TextBlock x:Name="LobbyMovie" FontSize="15" Foreground="{StaticResource TextMutedBrush}"
+                       HorizontalAlignment="Center" />
+            <TextBlock x:Name="LobbyCode" FontSize="42" FontWeight="Bold" FontFamily="Consolas"
+                       Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" Margin="0,10,0,4" />
+            <TextBlock x:Name="LobbyAddress" FontSize="13" Foreground="{StaticResource TextMutedBrush}"
+                       HorizontalAlignment="Center" Margin="0,0,0,16" />
+            <Border Background="{StaticResource SurfaceBrush}" CornerRadius="10" Padding="16,10" MinWidth="280">
+                <StackPanel>
+                    <TextBlock Text="IN THE ROOM" FontSize="11" Foreground="{StaticResource TextMutedBrush}"
+                               Margin="0,0,0,6" />
+                    <ItemsControl x:Name="RosterList">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding}" FontSize="13.5" Foreground="{StaticResource TextBrush}"
+                                           Margin="0,2" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+            <TextBlock x:Name="ReadyText" Text="" FontSize="12.5" Foreground="{StaticResource TextMutedBrush}"
+                       HorizontalAlignment="Center" Margin="0,14,0,0" />
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,0">
+                <Button x:Name="StartBtn" Style="{StaticResource PrimaryButton}" Padding="20,10"
+                        Content="Start watching" Click="StartBtn_Click" AutomationProperties.Name="Start watching" />
+                <Button x:Name="ChangeFilmBtn" Style="{StaticResource GhostButton}" Padding="16,10" Margin="10,0,0,0"
+                        Content="Change film" Click="ChangeFilmBtn_Click"
+                        ToolTip="Pick something else — your friends keep the same room code"
+                        AutomationProperties.Name="Change film" />
+            </StackPanel>
+            <!-- Streaming rooms only: the app can't drive someone else's Prime
+                 player, so the host broadcasts a cue everyone acts on. -->
+            <StackPanel x:Name="HostCuePanel" Orientation="Horizontal" HorizontalAlignment="Center"
+                        Margin="0,10,0,0" Visibility="Collapsed">
+                <Button x:Name="CuePauseBtn" Style="{StaticResource GhostButton}" Padding="16,9"
+                        Content="Pause everyone" Click="CuePause_Click"
+                        AutomationProperties.Name="Pause everyone" />
+                <Button x:Name="CueResumeBtn" Style="{StaticResource GhostButton}" Padding="16,9" Margin="10,0,0,0"
+                        Content="Resume everyone" Click="CueResume_Click"
+                        AutomationProperties.Name="Resume everyone" />
+            </StackPanel>
+        </StackPanel>
+
+        <!-- Guest: join form -->
+        <StackPanel x:Name="JoinPanel" Visibility="Collapsed" VerticalAlignment="Center" HorizontalAlignment="Center">
+            <TextBlock Text="Join a session" FontSize="19" FontWeight="SemiBold"
+                       Foreground="{StaticResource TextBrush}" HorizontalAlignment="Center" Margin="0,0,0,16" />
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                <TextBlock Text="Party server" Width="110" Foreground="{StaticResource TextMutedBrush}"
+                           VerticalAlignment="Center" FontSize="13" />
+                <TextBox x:Name="HostAddressBox" Width="200" Padding="8,6" FontSize="13"
+                         Background="{StaticResource SurfaceBrush}" Foreground="{StaticResource TextBrush}"
+                         BorderBrush="{StaticResource LineBrush}" AutomationProperties.Name="Host address" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                <TextBlock Text="Room code" Width="110" Foreground="{StaticResource TextMutedBrush}"
+                           VerticalAlignment="Center" FontSize="13" />
+                <TextBox x:Name="CodeBox" Width="200" Padding="8,6" FontSize="14" FontFamily="Consolas"
+                         CharacterCasing="Upper" Background="{StaticResource SurfaceBrush}"
+                         Foreground="{StaticResource TextBrush}" BorderBrush="{StaticResource LineBrush}"
+                         AutomationProperties.Name="Room code entry" />
+            </StackPanel>
+            <TextBlock x:Name="JoinStatus" FontSize="12.5" Foreground="{StaticResource TextMutedBrush}"
+                       HorizontalAlignment="Center" Margin="0,0,0,10" Text="" />
+            <Button x:Name="JoinGoBtn" Style="{StaticResource PrimaryButton}" Padding="20,10" HorizontalAlignment="Center"
+                    Content="Join" Click="JoinGoBtn_Click" AutomationProperties.Name="Join session" />
+        </StackPanel>
+
+        <!-- Synchronised start for a streaming title. Covers everything, because
+             the only thing that matters for these few seconds is the number. -->
+        <!-- Fully opaque: at 94% the panel underneath bled through and the
+             number was competing with the join form for attention. -->
+        <Border x:Name="CountdownOverlay" Visibility="Collapsed"
+                Background="{StaticResource BgDeepBrush}">
+            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                <TextBlock x:Name="CountdownTitle" Text="" FontSize="20" FontWeight="SemiBold"
+                           FontFamily="{StaticResource DisplayFont}"
+                           Foreground="{StaticResource TextBrush}" HorizontalAlignment="Center"
+                           TextAlignment="Center" MaxWidth="620" TextWrapping="Wrap" />
+                <TextBlock x:Name="CountdownService" Text="" FontSize="13.5"
+                           Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Center"
+                           Margin="0,8,0,0" />
+                <TextBlock x:Name="CountdownNumber" Text="5" FontSize="132" FontWeight="Bold"
+                           FontFamily="{StaticResource DisplayFont}"
+                           Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center"
+                           Margin="0,4,0,4" />
+                <TextBlock x:Name="CountdownHint" Text="Get the title open and paused, then press play on zero."
+                           FontSize="13" Foreground="{StaticResource TextMutedBrush}"
+                           HorizontalAlignment="Center" TextAlignment="Center" MaxWidth="460"
+                           TextWrapping="Wrap" />
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,22,0,0">
+                    <Button x:Name="CountdownOpenBtn" Style="{StaticResource GhostButton}" Padding="16,9"
+                            Margin="0,0,10,0" Content="Open the service" Click="CountdownOpen_Click"
+                            AutomationProperties.Name="Open the service" />
+                    <Button x:Name="CountdownDismissBtn" Style="{StaticResource GhostButton}" Padding="16,9"
+                            Content="Dismiss" Click="CountdownDismiss_Click"
+                            AutomationProperties.Name="Dismiss countdown" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

@@ -1,0 +1,5 @@
+bin/
+obj/
+*.user
+selftest-result.json
+tools/

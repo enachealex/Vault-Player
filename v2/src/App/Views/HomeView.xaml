@@ -1,0 +1,51 @@
+<UserControl x:Class="VideoPlayer.App.Views.HomeView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid>
+        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+
+            <Border Width="72" Height="72" CornerRadius="20" Background="{StaticResource AccentBrush}"
+                    HorizontalAlignment="Center">
+                <TextBlock Text="&#xE768;" FontFamily="Segoe MDL2 Assets" FontSize="30" Foreground="White"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+
+            <TextBlock Text="Video Player" FontSize="34" FontWeight="Bold"
+                       FontFamily="{StaticResource DisplayFont}"
+                       Foreground="{StaticResource TextBrush}" HorizontalAlignment="Center" Margin="0,18,0,4" />
+            <TextBlock Text="Your movies, solo or with friends" FontSize="15"
+                       Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Center" Margin="0,0,0,36" />
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                <Button x:Name="SoloBtn" Style="{StaticResource ChoiceCard}" Margin="0,0,20,0"
+                        Click="SoloBtn_Click" AutomationProperties.Name="Watch Solo">
+                    <StackPanel>
+                        <TextBlock Text="&#xE714;" FontFamily="Segoe MDL2 Assets" FontSize="34"
+                                   Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" />
+                        <TextBlock Text="Watch Solo" FontSize="19" FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextBrush}" HorizontalAlignment="Center" Margin="0,14,0,6" />
+                        <TextBlock Text="Browse your folder and play any movie"
+                                   FontSize="12.5" Foreground="{StaticResource TextMutedBrush}"
+                                   TextWrapping="Wrap" TextAlignment="Center" MaxWidth="190" />
+                    </StackPanel>
+                </Button>
+
+                <Button x:Name="PartyBtn" Style="{StaticResource ChoiceCard}"
+                        Click="PartyBtn_Click" AutomationProperties.Name="Watch Party">
+                    <StackPanel>
+                        <TextBlock Text="&#xE716;" FontFamily="Segoe MDL2 Assets" FontSize="34"
+                                   Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" />
+                        <TextBlock Text="Watch Party" FontSize="19" FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextBrush}" HorizontalAlignment="Center" Margin="0,14,0,6" />
+                        <TextBlock Text="Host a session and watch together with friends"
+                                   FontSize="12.5" Foreground="{StaticResource TextMutedBrush}"
+                                   TextWrapping="Wrap" TextAlignment="Center" MaxWidth="190" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+
+            <TextBlock Text="v2 preview" FontSize="11" Foreground="{StaticResource TextMutedBrush}"
+                       HorizontalAlignment="Center" Margin="0,40,0,0" Opacity="0.6" />
+        </StackPanel>
+    </Grid>
+</UserControl>

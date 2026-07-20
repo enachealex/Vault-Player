@@ -1,0 +1,33 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="LibVLCSharp.WPF" Version="3.10.0" />
+    <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.23.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Bundled ffmpeg (thumbnails now; outbound streaming later). -->
+    <None Include="..\..\tools\ffmpeg.exe" Link="ffmpeg.exe" CopyToOutputDirectory="PreserveNewest" Condition="Exists('..\..\tools\ffmpeg.exe')" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Brand fonts, embedded so the app matches the site on any machine.
+         Both are SIL Open Font License 1.1; the OFL.txt files ship alongside
+         them as that licence requires. -->
+    <Resource Include="Assets\Fonts\*.ttf" />
+    <None Include="Assets\Fonts\*OFL.txt" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Protocol\VideoPlayer.Protocol.csproj" />
+  </ItemGroup>
+
+</Project>
