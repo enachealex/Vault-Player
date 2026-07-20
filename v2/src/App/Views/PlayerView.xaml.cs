@@ -37,6 +37,7 @@ public partial class PlayerView : UserControl, IDisposable
 
     // Fullscreen state
     private bool _fullscreen;
+
     private WindowState _prevWindowState;
 
     // DLNA session state (this view owns the session; leaving the player stops it).
@@ -100,7 +101,7 @@ public partial class PlayerView : UserControl, IDisposable
         UpdateVolumeUi();
         PrevBtn.IsEnabled = NextBtn.IsEnabled = _playlist.Count > 1;
 
-        _uiTimer.Tick += (_, _) => UpdateUi();
+        _uiTimer.Tick += (_, _) => { UpdateUi(); UpdateIdleState(); };
         _uiTimer.Start();
 
         // Owned click/drag on both sliders: press anywhere jumps there, drags
@@ -620,6 +621,46 @@ public partial class PlayerView : UserControl, IDisposable
 
     // ---- Fullscreen --------------------------------------------------------
 
+    // ---- Auto-hiding controls in fullscreen --------------------------------
+    //
+    // Mouse position is POLLED rather than taken from WPF's MouseMove. libVLC
+    // renders into its own child window covering the video, so WPF never sees
+    // the pointer over most of the screen in fullscreen -- the events simply
+    // never arrive. Asking Windows where the cursor is sidesteps that entirely.
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool GetCursorPos(out System.Drawing.Point point);
+
+    private System.Drawing.Point _lastCursor;
+    private DateTime _lastActivity = DateTime.UtcNow;
+
+    /// <summary>Called from the UI tick; decides whether the controls belong on screen.</summary>
+    private void UpdateIdleState()
+    {
+        if (GetCursorPos(out var now) && (now.X != _lastCursor.X || now.Y != _lastCursor.Y))
+        {
+            _lastCursor = now;
+            NoteActivity();
+        }
+
+        if (!_fullscreen) return;
+
+        var idle = DateTime.UtcNow - _lastActivity;
+        // Paused means the viewer stopped on purpose and is probably reaching
+        // for a control, so leave them up.
+        var keepUp = idle < IdleBeforeHiding
+                     || _player is null || !_player.IsPlaying
+                     || ControlBar.IsMouseOver;   // don't vanish under the pointer
+
+        ControlBar.Visibility = keepUp ? Visibility.Visible : Visibility.Collapsed;
+        Cursor = keepUp ? null : Cursors.None;
+    }
+
+    /// <summary>Three seconds is the convention: long enough to aim at a button.</summary>
+    private static readonly TimeSpan IdleBeforeHiding = TimeSpan.FromSeconds(3);
+
+    private void NoteActivity() => _lastActivity = DateTime.UtcNow;
+
     private void FullscreenBtn_Click(object sender, RoutedEventArgs e) => ToggleFullscreen();
 
     private void VideoArea_MouseDown(object sender, MouseButtonEventArgs e)
@@ -645,8 +686,10 @@ public partial class PlayerView : UserControl, IDisposable
             window.WindowState = WindowState.Maximized;
             window.Activate();
             TopBar.Visibility = Visibility.Collapsed;
+
             FullscreenGlyph.Text = "\uE73F";
             _fullscreen = true;
+            NoteActivity(); // start the idle countdown from now
         }
         else
         {
@@ -670,6 +713,10 @@ public partial class PlayerView : UserControl, IDisposable
             new Action(() => window.WindowState = restoreTo));
         window.Activate();
         TopBar.Visibility = Visibility.Visible;
+
+        // Leaving fullscreen always restores the controls and the cursor.
+        ControlBar.Visibility = Visibility.Visible;
+        Cursor = null;
         FullscreenGlyph.Text = "\uE740";
         _fullscreen = false;
     }
@@ -680,6 +727,9 @@ public partial class PlayerView : UserControl, IDisposable
     {
         // Never steal keystrokes from text entry (party chat).
         if (Keyboard.FocusedElement is System.Windows.Controls.Primitives.TextBoxBase) return;
+        // Keyboard counts as being present, not just the mouse — otherwise
+        // seeking with the arrow keys happens behind hidden controls.
+        NoteActivity();
         var handled = true;
         switch (e.Key)
         {
