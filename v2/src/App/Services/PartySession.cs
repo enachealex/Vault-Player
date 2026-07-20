@@ -123,27 +123,62 @@ public sealed class PartySession : IDisposable
         return session;
     }
 
+    /// <summary>
+    /// Turns whatever the user typed into a base URL.
+    ///
+    ///     192.168.1.2                -> http://192.168.1.2:5555
+    ///     party.example.com          -> http://party.example.com:5555
+    ///     https://party.example.com  -> https://party.example.com
+    ///
+    /// A bare host keeps the original plain-HTTP behaviour so existing setups
+    /// and LAN parties are unaffected. Writing a scheme is how TLS gets turned
+    /// on, and it carries its own default port — which is why the port is no
+    /// longer glued on unconditionally.
+    /// </summary>
+    public static Uri ResolveBase(string address)
+    {
+        var text = address.Trim();
+        if (text.Contains("://", StringComparison.Ordinal))
+        {
+            var explicitUri = new Uri(text.TrimEnd('/'), UriKind.Absolute);
+            if (explicitUri.Scheme != Uri.UriSchemeHttp && explicitUri.Scheme != Uri.UriSchemeHttps)
+                throw new InvalidOperationException($"Party server must be http or https, not '{explicitUri.Scheme}'.");
+            return explicitUri;
+        }
+        return new Uri($"http://{text}:{RendezvousPort}");
+    }
+
+    /// <summary>WebSocket URL for a path, matching the base's security: https implies wss.</summary>
+    private static Uri SocketUri(Uri baseUri, string pathAndQuery)
+    {
+        var builder = new UriBuilder(new Uri(baseUri, pathAndQuery))
+        {
+            Scheme = baseUri.Scheme == Uri.UriSchemeHttps ? "wss" : "ws",
+        };
+        return builder.Uri;
+    }
+
     private static async Task<PartySession> ConnectHostAsync(string displayName, string? serverAddress)
     {
         var session = new PartySession { IsHost = true, DisplayName = displayName };
 
-        string wsAddress;
+        Uri baseUri;
         if (string.IsNullOrWhiteSpace(serverAddress))
         {
             await EnsureLocalRendezvousAsync();
-            wsAddress = "127.0.0.1";
+            baseUri = ResolveBase("127.0.0.1");
             session.ShareAddress = MediaHttpServer.GetLanAddress().ToString();
         }
         else
         {
-            wsAddress = serverAddress.Trim();
-            session.ShareAddress = wsAddress;
+            baseUri = ResolveBase(serverAddress);
+            session.ShareAddress = serverAddress.Trim();
         }
-        session._pushBase = $"http://{wsAddress}:{RendezvousPort}";
+        session._pushBase = baseUri.ToString().TrimEnd('/');
 
         session._socket = new ClientWebSocket();
         await session._socket.ConnectAsync(
-            new Uri($"ws://{wsAddress}:{RendezvousPort}/ws?role=host&name={Uri.EscapeDataString(displayName)}"),
+            SocketUri(baseUri, $"/ws?role=host&name={Uri.EscapeDataString(displayName)}"),
             Cts(8));
 
         var welcome = await session.ReceiveAsync() ?? throw new InvalidOperationException("Rendezvous did not answer.");
@@ -242,16 +277,17 @@ public sealed class PartySession : IDisposable
             RoomCode = code.Trim().ToUpperInvariant(),
             ShareAddress = address,
         };
+        var baseUri = ResolveBase(address);
         session._socket = new ClientWebSocket();
         await session._socket.ConnectAsync(
-            new Uri($"ws://{address}:{RendezvousPort}/ws?role=guest&room={Uri.EscapeDataString(session.RoomCode)}&name={Uri.EscapeDataString(displayName)}"),
+            SocketUri(baseUri, $"/ws?role=guest&room={Uri.EscapeDataString(session.RoomCode)}&name={Uri.EscapeDataString(displayName)}"),
             Cts(8));
 
         var welcome = await session.ReceiveAsync() ?? throw new InvalidOperationException("No answer from the party.");
         if (welcome.Type == MsgType.Error) throw new InvalidOperationException(welcome.Text ?? "Join failed.");
 
         // Guests pull the movie from the rendezvous itself — one address, any NAT.
-        session.MediaUrl = $"http://{address}:{RendezvousPort}/stream/{session.RoomCode}";
+        session.MediaUrl = new Uri(baseUri, $"/stream/{session.RoomCode}").ToString();
         session.MovieTitle = welcome.MovieTitle;
         session.HostName = welcome.Name ?? "the host";
         // A service name means the host is watching something DRM-protected:
