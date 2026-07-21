@@ -57,6 +57,15 @@ public class Settings
     /// <summary>Streaming titles shown in the library as launch-only cards.</summary>
     public List<StreamingShortcut> Shortcuts { get; set; } = new();
 
+    // ---- Caption styling (text subtitles only; bitmap/PGS can't be restyled) ----
+    /// <summary>Text size as a percentage of the default. 50–250.</summary>
+    public int SubtitleScalePct { get; set; } = 110;
+    /// <summary>Outline weight around each glyph, 0–8. This is the readability knob.</summary>
+    public int SubtitleOutline { get; set; } = 4;
+    public bool SubtitleBold { get; set; } = true;
+    /// <summary>Opacity of the box behind the text, 0 (none) – 255 (solid).</summary>
+    public int SubtitleBackgroundOpacity { get; set; }
+
     // Watch Party.
     /// <summary>Most recently used nickname.</summary>
     public string? DisplayName { get; set; }

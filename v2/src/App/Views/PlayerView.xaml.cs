@@ -414,6 +414,7 @@ public partial class PlayerView : UserControl, IDisposable
             var seconds = (resumeMs / 1000.0).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
             media.AddOption($":start-time={seconds}");
         }
+        CaptionStyle.Apply(media, AppServices.Settings);
         _player.Play(media);
 
         var s = AppServices.Settings;
@@ -663,11 +664,35 @@ public partial class PlayerView : UserControl, IDisposable
     private void SubsBtn_Click(object sender, RoutedEventArgs e)
     {
         if (_player is null || DlnaActive) return;
+        var style = new MenuItem { Header = "Caption style…" };
+        style.Click += (_, _) => OpenCaptionStyle();
         ShowTrackMenu(SubsBtn, _player.SpuDescription, _player.Spu,
-            id => _player.SetSpu(id));
+            id => _player.SetSpu(id), extra: style);
     }
 
-    private static void ShowTrackMenu(Button anchor, TrackDescription[] tracks, int currentId, Action<int> select)
+    private void OpenCaptionStyle()
+    {
+        var dlg = new CaptionStyleWindow(ReapplyCaptionStyle) { Owner = Window.GetWindow(this) };
+        dlg.ShowDialog();
+    }
+
+    /// <summary>
+    /// Re-apply caption settings to the film that's playing. Options live on the
+    /// media, so this reloads at the current spot — cheap, and the only way to
+    /// make a style change visible without waiting for the next film. The chosen
+    /// subtitle track is remembered across the reload.
+    /// </summary>
+    private void ReapplyCaptionStyle()
+    {
+        if (_player is null) return;
+        _restoreSpu = _player.Spu;   // -1 = off; applied once after the reload
+        StartPlayback(Math.Max(0, _player.Time));
+    }
+
+    private int? _restoreSpu;
+
+    private static void ShowTrackMenu(Button anchor, TrackDescription[] tracks, int currentId,
+        Action<int> select, MenuItem? extra = null)
     {
         var menu = new ContextMenu();
         if (tracks.Length == 0)
@@ -680,6 +705,11 @@ public partial class PlayerView : UserControl, IDisposable
             var id = track.Id;
             item.Click += (_, _) => select(id);
             menu.Items.Add(item);
+        }
+        if (extra is not null)
+        {
+            menu.Items.Add(new Separator());
+            menu.Items.Add(extra);
         }
         menu.PlacementTarget = anchor;
         menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Top;
@@ -1194,6 +1224,14 @@ public partial class PlayerView : UserControl, IDisposable
 
         if (_player is null) return;
         PlayGlyph.Text = _player.IsPlaying ? "\uE769" : "\uE768";
+
+        // Re-select the subtitle track that was on before a caption-style reload,
+        // once the tracks exist again. One-shot: clears itself when done.
+        if (_restoreSpu is { } wantSpu && _player.SpuDescription.Length > 0)
+        {
+            if (_player.Spu != wantSpu) _player.SetSpu(wantSpu);
+            _restoreSpu = null;
+        }
         // Effective duration: the element's own length, or the movie's known
         // duration when streaming (a relayed party stream may report length 0).
         var durMs = _player.Length > 0 ? _player.Length : _movie.DurationMs ?? 0;

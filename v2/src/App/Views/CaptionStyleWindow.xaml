@@ -1,0 +1,62 @@
+<Window x:Class="VideoPlayer.App.Views.CaptionStyleWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Caption style"
+        Width="440" SizeToContent="Height" ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource BgBrush}"
+        FontFamily="{StaticResource BodyFont}">
+    <StackPanel Margin="24">
+        <TextBlock Text="Caption style" FontSize="19" FontWeight="Bold"
+                   FontFamily="{StaticResource DisplayFont}"
+                   Foreground="{StaticResource TextBrush}" />
+        <TextBlock Text="Applies to text subtitles. Subtitles that come as images (many Blu-ray rips) can't be restyled."
+                   FontSize="12" Foreground="{StaticResource TextMutedBrush}"
+                   TextWrapping="Wrap" Margin="0,6,0,20" />
+
+        <!-- A live sample so choices are visible without a subtitle on screen. -->
+        <Border Background="Black" CornerRadius="8" Height="90" Margin="0,0,0,20">
+            <Border x:Name="SampleBox" Background="Transparent" CornerRadius="4"
+                    Padding="10,3" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <TextBlock x:Name="SampleText" Text="This is what captions look like"
+                           Foreground="White" FontSize="18" HorizontalAlignment="Center" />
+            </Border>
+        </Border>
+
+        <Grid Margin="0,0,0,14">
+            <TextBlock Text="Text size" FontSize="13" Foreground="{StaticResource TextBrush}"
+                       VerticalAlignment="Center" />
+            <TextBlock x:Name="SizeValue" HorizontalAlignment="Right" FontSize="12"
+                       Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" />
+        </Grid>
+        <Slider x:Name="SizeSlider" Minimum="50" Maximum="250" TickFrequency="10"
+                IsSnapToTickEnabled="True" AutomationProperties.Name="Text size" Margin="0,0,0,18" />
+
+        <Grid Margin="0,0,0,14">
+            <TextBlock Text="Thickness" FontSize="13" Foreground="{StaticResource TextBrush}"
+                       VerticalAlignment="Center" />
+            <TextBlock x:Name="ThicknessValue" HorizontalAlignment="Right" FontSize="12"
+                       Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" />
+        </Grid>
+        <Slider x:Name="ThicknessSlider" Minimum="0" Maximum="8" TickFrequency="1"
+                IsSnapToTickEnabled="True" AutomationProperties.Name="Thickness" Margin="0,0,0,18" />
+
+        <Grid Margin="0,0,0,14">
+            <TextBlock Text="Background" FontSize="13" Foreground="{StaticResource TextBrush}"
+                       VerticalAlignment="Center" />
+            <TextBlock x:Name="BgValue" HorizontalAlignment="Right" FontSize="12"
+                       Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" />
+        </Grid>
+        <Slider x:Name="BgSlider" Minimum="0" Maximum="255" TickFrequency="15"
+                IsSnapToTickEnabled="True" AutomationProperties.Name="Background transparency" Margin="0,0,0,4" />
+        <TextBlock Text="Off is outline only; higher adds a darker box behind the text."
+                   FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="2,0,0,0" />
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,22,0,0">
+            <Button Content="Reset" Style="{StaticResource GhostButton}" Padding="14,7"
+                    Margin="0,0,10,0" Click="Reset_Click" AutomationProperties.Name="Reset" />
+            <Button Content="Done" Style="{StaticResource PrimaryButton}" Padding="18,7"
+                    Click="Done_Click" IsDefault="True" AutomationProperties.Name="Done" />
+        </StackPanel>
+    </StackPanel>
+</Window>
