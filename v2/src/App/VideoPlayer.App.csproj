@@ -16,9 +16,9 @@
     <Company>Jump Vault LLC</Company>
     <Authors>Jump Vault LLC</Authors>
     <Copyright>Copyright © Jump Vault LLC</Copyright>
-    <Version>2.3.0</Version>
-    <FileVersion>2.3.0.0</FileVersion>
-    <AssemblyVersion>2.3.0.0</AssemblyVersion>
+    <Version>2.4.0</Version>
+    <FileVersion>2.4.0.0</FileVersion>
+    <AssemblyVersion>2.4.0.0</AssemblyVersion>
   </PropertyGroup>
 
   <ItemGroup>
