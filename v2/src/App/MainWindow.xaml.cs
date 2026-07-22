@@ -66,6 +66,9 @@ public partial class MainWindow : Window
 
     // ---- Caption buttons ---------------------------------------------------
 
+    private void SettingsBtn_Click(object sender, RoutedEventArgs e) =>
+        new Views.SettingsWindow { Owner = this }.ShowDialog();
+
     private void MinBtn_Click(object sender, RoutedEventArgs e) =>
         WindowState = WindowState.Minimized;
 

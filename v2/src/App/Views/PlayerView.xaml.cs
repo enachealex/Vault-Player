@@ -83,6 +83,8 @@ public partial class PlayerView : UserControl, IDisposable
         _player = new MediaPlayer(AppServices.LibVlc);
         Video.MediaPlayer = _player;
         _player.EndReached += (_, _) => Dispatcher.BeginInvoke(OnEnded);
+        // So a device change from Settings can reach this film while it plays.
+        AppServices.Audio.Attach(_player);
 
         AppServices.Cast.EnsureStarted();
         // DLNA sessions don't survive navigation (the media server lives here).
@@ -420,6 +422,9 @@ public partial class PlayerView : UserControl, IDisposable
         var s = AppServices.Settings;
         _player.SetRate(PartyGuest ? 1f : (float)s.Rate);
         ApplyAudio();
+        // The output device only sticks once the audio output exists, i.e. after
+        // Play — so route it here, not at player creation.
+        AppServices.Audio.ApplyTo(_player);
         if (!IsRemoteSource) AddSidecarSubtitles();
     }
 
@@ -1413,6 +1418,7 @@ public partial class PlayerView : UserControl, IDisposable
         {
             var p = _player;
             _player = null;
+            AppServices.Audio.Detach(p);
             Video.MediaPlayer = null;
             p.Stop();
             p.Dispose();

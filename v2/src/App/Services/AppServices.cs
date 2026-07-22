@@ -18,6 +18,9 @@ public static class AppServices
 
     public static CastService Cast { get; } = new();
 
+    /// <summary>Audio output device selection, applied to every film.</summary>
+    public static AudioService Audio { get; } = new();
+
     /// <summary>Optional account + cross-machine library sync.</summary>
     public static AccountService Account { get; } = new();
 

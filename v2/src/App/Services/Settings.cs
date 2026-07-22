@@ -54,6 +54,13 @@ public class Settings
     /// <summary>PlayOnce | AutoplayNext | LoopOne | LoopAll</summary>
     public string PlaybackMode { get; set; } = "AutoplayNext";
 
+    /// <summary>
+    /// Chosen audio output device (libVLC device identifier), or null for the
+    /// system default. Lets someone route sound to headphones when libVLC picked
+    /// the wrong device.
+    /// </summary>
+    public string? AudioOutputDevice { get; set; }
+
     /// <summary>Resume positions (ms) keyed by file path — the recents store.</summary>
     public Dictionary<string, long> ResumePositions { get; set; } = new();
 
