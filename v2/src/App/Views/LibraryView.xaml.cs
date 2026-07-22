@@ -48,6 +48,7 @@ public partial class LibraryView : UserControl, IDisposable
         SortBox.ItemsSource = Sorts.Select(s => s.Label).ToList();
         SortBox.SelectedIndex = 0;
         _ready = true;
+        AppServices.Account.Changed += OnAccountChanged;
 
         if (_onPick is not null)
         {
@@ -81,6 +82,8 @@ public partial class LibraryView : UserControl, IDisposable
                 if (resume.TryGetValue(movie.Path, out var ms)) movie.ResumeMs = ms;
                 if (counts.TryGetValue(movie.Path, out var c)) movie.WatchCount = c;
             }
+            // Overlay anything synced from another machine (matched by film-key).
+            AppServices.Account.ApplyTo(movies);
 
             // Streaming shortcuts sit in the same list so search and sort just work.
             // They're kept out of `movies` (the local-only list) because the
@@ -377,5 +380,18 @@ public partial class LibraryView : UserControl, IDisposable
         ApplyFilter();
     }
 
-    public void Dispose() => _cts.Cancel();
+    /// <summary>When a background sync updates the library, re-overlay and refresh.</summary>
+    private void OnAccountChanged() => Dispatcher.Invoke(() =>
+    {
+        if (_movies.Count == 0) return;
+        AppServices.Account.ApplyTo(_movies);
+        RefreshContinueRow();
+        ApplyFilter();
+    });
+
+    public void Dispose()
+    {
+        _cts.Cancel();
+        AppServices.Account.Changed -= OnAccountChanged;
+    }
 }

@@ -176,6 +176,9 @@ public partial class App : Application
             new MainWindow().Show();
             splash.Close();
             if (fileToOpen is not null) OpenFile(fileToOpen);
+            // Pull any library changes made on another machine. Fire-and-forget:
+            // signed-out or offline just no-ops, and the app is already usable.
+            _ = Services.AppServices.Account.SyncAsync();
         }
     }
 }

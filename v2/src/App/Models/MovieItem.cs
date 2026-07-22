@@ -30,6 +30,13 @@ public class MovieItem : INotifyPropertyChanged
 
     public bool IsShortcut => Kind == MovieKind.Shortcut;
 
+    /// <summary>
+    /// Cross-machine identity: filename + exact byte size. The same rip in a
+    /// different folder on another PC produces the same key, which is how synced
+    /// progress and watch counts follow the film rather than the path.
+    /// </summary>
+    public string FilmKey => $"{System.IO.Path.GetFileName(Path)}|{SizeBytes}";
+
     public Visibility ShortcutBadgeVisibility =>
         IsShortcut ? Visibility.Visible : Visibility.Collapsed;
 

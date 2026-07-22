@@ -18,6 +18,9 @@ public static class AppServices
 
     public static CastService Cast { get; } = new();
 
+    /// <summary>Optional account + cross-machine library sync.</summary>
+    public static AccountService Account { get; } = new();
+
     /// <summary>
     /// The Watch Party the user is currently in, if any.
     ///

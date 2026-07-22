@@ -1321,10 +1321,19 @@ public partial class PlayerView : UserControl, IDisposable
     private void SaveResume(long positionMs)
     {
         var s = AppServices.Settings;
+        var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         s.ResumePositions[_movie.Path] = positionMs;
-        s.LastWatchedAt[_movie.Path] = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        s.LastWatchedAt[_movie.Path] = now;
         s.Save();
+        // Mirror to the sync store (film-key) and push if signed in.
+        AppServices.Account.NoteLocalChange(_movie, positionMs, _movie.WatchCount, now,
+            ChaptersJsonFor(_movie));
     }
+
+    private static string? ChaptersJsonFor(MovieItem movie) =>
+        AppServices.Settings.CustomChapters.TryGetValue(movie.Path, out var ch) && ch.Count > 0
+            ? System.Text.Json.JsonSerializer.Serialize(ch)
+            : null;
 
     private bool _countedWatch;
 
@@ -1341,6 +1350,9 @@ public partial class PlayerView : UserControl, IDisposable
         s.WatchCounts[_movie.Path] = count + 1;
         _movie.WatchCount = count + 1;
         s.Save();
+        var pos = s.ResumePositions.TryGetValue(_movie.Path, out var r) ? r : 0;
+        AppServices.Account.NoteLocalChange(_movie, pos, count + 1,
+            DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), ChaptersJsonFor(_movie));
     }
 
     private async Task PollDlnaAsync()

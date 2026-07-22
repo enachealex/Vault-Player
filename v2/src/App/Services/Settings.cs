@@ -13,6 +13,18 @@ public class ChapterMark
     public long TimeMs { get; set; }
 }
 
+/// <summary>One film's synced activity, keyed by "filename|size" in SyncedLibrary.</summary>
+public class SyncedItem
+{
+    public string Name { get; set; } = "";
+    public long ResumeMs { get; set; }
+    public int WatchCount { get; set; }
+    public long LastWatchedAt { get; set; }
+    public string? ChaptersJson { get; set; }
+    /// <summary>Unix ms of the last local change; drives last-writer-wins.</summary>
+    public long UpdatedAt { get; set; }
+}
+
 /// <summary>
 /// A title the user owns on a streaming service. We can't play DRM-protected
 /// content, so this is purely a launcher entry that sits in the library beside
@@ -65,6 +77,21 @@ public class Settings
     public bool SubtitleBold { get; set; } = true;
     /// <summary>Opacity of the box behind the text, 0 (none) – 255 (solid).</summary>
     public int SubtitleBackgroundOpacity { get; set; }
+
+    // ---- Account (optional; null = signed out, everything works offline) ----
+    /// <summary>Backend base URL, e.g. https://party.thejumpvault.com. Null = built-in default.</summary>
+    public string? AuthServer { get; set; }
+    public string? AccountEmail { get; set; }
+    public string? AccountName { get; set; }
+    /// <summary>Long-lived refresh token; the only credential kept on disk.</summary>
+    public string? RefreshToken { get; set; }
+
+    /// <summary>
+    /// Library activity keyed by film identity ("filename|size") rather than
+    /// path, so it can sync across machines. Maintained alongside the path-keyed
+    /// stores above; this is the copy that goes to and from the server.
+    /// </summary>
+    public Dictionary<string, SyncedItem> SyncedLibrary { get; set; } = new();
 
     // Watch Party.
     /// <summary>Most recently used nickname.</summary>
