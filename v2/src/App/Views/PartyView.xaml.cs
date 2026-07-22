@@ -45,16 +45,27 @@ public partial class PartyView : UserControl, IDisposable
             Loaded += async (_, _) => await BeginHostingAsync(pendingHost);
             return;
         }
-        // No accounts — just a name for this party. Remembered once chosen, but
-        // never silently taken from the Windows account.
-        RefreshSavedNames();
+        if (AppServices.Account.IsSignedIn) ShowSignedInIdentity();
+        else RefreshSavedNames();  // signed-out fallback: pick a nickname
     }
 
     private readonly ObservableCollection<string> _savedNames = new();
 
-    private string DisplayName => NameBox.Text.Trim();
+    /// <summary>Signed in, the account name is the party identity — no nickname needed.</summary>
+    private void ShowSignedInIdentity()
+    {
+        SignedInPanel.Visibility = Visibility.Visible;
+        SavedNamesPanel.Visibility = Visibility.Collapsed;
+        NameEntryPanel.Visibility = Visibility.Collapsed;
+        SignedInName.Text = AppServices.Account.Name ?? "You";
+        HostBtn.IsEnabled = JoinBtn.IsEnabled = true;
+    }
 
-    private bool HasName => DisplayName.Length >= 2;
+    private string DisplayName => AppServices.Account.IsSignedIn
+        ? AppServices.Account.Name ?? "You"
+        : NameBox.Text.Trim();
+
+    private bool HasName => AppServices.Account.IsSignedIn || DisplayName.Length >= 2;
 
     /// <summary>
     /// Show the saved-name cards when there are any, otherwise go straight to
@@ -122,6 +133,8 @@ public partial class PartyView : UserControl, IDisposable
     /// <summary>Persist the active name, most recent first, and drop any duplicate.</summary>
     private void SaveName()
     {
+        // Signed in, the account name is the identity — there's no nickname to save.
+        if (AppServices.Account.IsSignedIn) return;
         var s = AppServices.Settings;
         var name = DisplayName;
         if (name.Length < 2) return;

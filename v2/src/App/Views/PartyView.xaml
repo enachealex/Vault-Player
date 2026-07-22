@@ -21,6 +21,23 @@
             <TextBlock Text="Host a movie for friends, or join someone's session."
                        FontSize="13" Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Center" Margin="0,0,0,26" />
 
+            <!-- Signed in: the account name is the party identity, so there's no
+                 nickname to pick. Shown instead of the nickname panels below. -->
+            <Border x:Name="SignedInPanel" Visibility="Collapsed"
+                    Background="{StaticResource SurfaceBrush}" CornerRadius="10" Padding="16,12"
+                    BorderBrush="{StaticResource LineBrush}" BorderThickness="1" MinWidth="320">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                    <TextBlock Text="&#xE77B;" FontFamily="Segoe MDL2 Assets" FontSize="15"
+                               Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" />
+                    <StackPanel Margin="12,0,0,0" VerticalAlignment="Center">
+                        <TextBlock x:Name="SignedInName" FontSize="15" FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextBrush}" />
+                        <TextBlock Text="Hosting and joining as your account" FontSize="11.5"
+                                   Foreground="{StaticResource TextMutedBrush}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
             <!-- Saved nicknames. Shown instead of the text box once there's at
                  least one, so returning users pick rather than retype. -->
             <StackPanel x:Name="SavedNamesPanel" Visibility="Collapsed">
