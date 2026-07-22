@@ -62,3 +62,7 @@ v2/certs/
 vault.db
 *.db-shm
 *.db-wal
+
+# Server secrets (JWT + SMTP) -- never commit
+v2/deploy/vault.env
+v2/deploy/.env

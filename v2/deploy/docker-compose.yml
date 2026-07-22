@@ -37,14 +37,20 @@ services:
       - "5555:5555"
     environment:
       - PORT=5555
+      # SQLite for accounts lives on a volume so it survives rebuilds.
+      - VAULT_DB=/data/vault.db
+    # Account secrets (JWT signing key + SMTP credentials) come from
+    # deploy/vault.env, which is gitignored. See deploy/README.md.
+    env_file:
+      - vault.env
+    volumes:
+      - vault_data:/data
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:5555/health || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 10s
-    # The relay holds no accounts and stores no media -- it only forwards
-    # bytes between the host and guests -- so it needs no volumes.
     logging:
       driver: json-file
       options:
@@ -56,3 +62,5 @@ volumes:
   # Encrypt rate-limits that, so do not prune it casually.
   caddy_data:
   caddy_config:
+  # Accounts + synced library. Do not prune -- this is user data.
+  vault_data:
