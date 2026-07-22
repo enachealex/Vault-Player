@@ -12,6 +12,9 @@ namespace VideoPlayer.Rendezvous.Vault;
 public record RegisterReq(string Email, string Password, string DisplayName);
 public record LoginReq(string Email, string Password);
 public record RefreshReq(string RefreshToken);
+public record EmailReq(string Email);
+public record VerifyReq(string Email, string Code);
+public record ResetReq(string Email, string Code, string NewPassword);
 public record AuthResp(string AccessToken, string RefreshToken, long ExpiresAt, string DisplayName, string Email);
 public record LibraryItemDto(string FilmKey, string Name, long ResumeMs, int WatchCount,
     long LastWatchedAt, string? ChaptersJson, long UpdatedAt);
@@ -64,7 +67,7 @@ public static class VaultApi
         var g = app.MapGroup("/api/v1");
 
         g.MapPost("/register", async (RegisterReq r, UserManager<VaultUser> users,
-            VaultDbContext db, VaultTokens tokens) =>
+            VaultDbContext db, EmailSender email) =>
         {
             if (string.IsNullOrWhiteSpace(r.Email) || r.Password.Length < 8)
                 return Results.BadRequest(new { error = "Email required and password must be at least 8 characters." });
@@ -73,14 +76,39 @@ public static class VaultApi
             {
                 UserName = r.Email.Trim(),
                 Email = r.Email.Trim(),
-                EmailConfirmed = true, // friends app, no mail server: no confirmation step
+                EmailConfirmed = false, // confirmed by the emailed code
                 DisplayName = string.IsNullOrWhiteSpace(r.DisplayName) ? r.Email.Split('@')[0] : r.DisplayName.Trim(),
             };
             var created = await users.CreateAsync(user, r.Password);
             if (!created.Succeeded)
                 return Results.BadRequest(new { error = string.Join(" ", created.Errors.Select(e => e.Description)) });
 
-            return Results.Ok(await IssueAsync(user, db, tokens));
+            await email.SendVerifyCodeAsync(user.Email!, await NewCodeAsync(db, user.Email!, "verify"));
+            // No tokens yet — the client goes to the "enter your code" step.
+            return Results.Ok(new { status = "verify", email = user.Email });
+        });
+
+        g.MapPost("/verify", async (VerifyReq r, UserManager<VaultUser> users,
+            VaultDbContext db, VaultTokens tokens, EmailSender email) =>
+        {
+            if (!await ConsumeCodeAsync(db, r.Email, r.Code, "verify"))
+                return Results.Json(new { error = "That code is wrong or has expired." }, statusCode: 400);
+
+            var user = await users.FindByEmailAsync(r.Email.Trim());
+            if (user is null) return Results.Json(new { error = "Account not found." }, statusCode: 400);
+            user.EmailConfirmed = true;
+            await users.UpdateAsync(user);
+            await email.SendWelcomeAsync(user.Email!, user.DisplayName);
+            return Results.Ok(await IssueAsync(user, db, tokens)); // verified = signed in
+        });
+
+        g.MapPost("/resend", async (EmailReq r, UserManager<VaultUser> users,
+            VaultDbContext db, EmailSender email) =>
+        {
+            var user = await users.FindByEmailAsync(r.Email.Trim());
+            if (user is not null && !user.EmailConfirmed)
+                await email.SendVerifyCodeAsync(user.Email!, await NewCodeAsync(db, user.Email!, "verify"));
+            return Results.Ok(); // never reveal whether the address exists
         });
 
         g.MapPost("/login", async (LoginReq r, UserManager<VaultUser> users,
@@ -89,7 +117,38 @@ public static class VaultApi
             var user = await users.FindByEmailAsync(r.Email.Trim());
             if (user is null || !await users.CheckPasswordAsync(user, r.Password))
                 return Results.Json(new { error = "Wrong email or password." }, statusCode: 401);
+            if (!user.EmailConfirmed)
+                return Results.Json(new { error = "verify", email = user.Email }, statusCode: 403);
             return Results.Ok(await IssueAsync(user, db, tokens));
+        });
+
+        g.MapPost("/forgot", async (EmailReq r, UserManager<VaultUser> users,
+            VaultDbContext db, EmailSender email) =>
+        {
+            var user = await users.FindByEmailAsync(r.Email.Trim());
+            if (user is not null)
+                await email.SendResetCodeAsync(user.Email!, await NewCodeAsync(db, user.Email!, "reset"));
+            return Results.Ok(); // always OK, so we don't leak which emails exist
+        });
+
+        g.MapPost("/reset", async (ResetReq r, UserManager<VaultUser> users, VaultDbContext db) =>
+        {
+            if (r.NewPassword.Length < 8)
+                return Results.BadRequest(new { error = "Password must be at least 8 characters." });
+            if (!await ConsumeCodeAsync(db, r.Email, r.Code, "reset"))
+                return Results.Json(new { error = "That code is wrong or has expired." }, statusCode: 400);
+
+            var user = await users.FindByEmailAsync(r.Email.Trim());
+            if (user is null) return Results.Json(new { error = "Account not found." }, statusCode: 400);
+            var token = await users.GeneratePasswordResetTokenAsync(user);
+            var res = await users.ResetPasswordAsync(user, token, r.NewPassword);
+            if (!res.Succeeded)
+                return Results.BadRequest(new { error = string.Join(" ", res.Errors.Select(e => e.Description)) });
+
+            // A password change kills every existing session.
+            foreach (var t in db.RefreshTokens.Where(t => t.UserId == user.Id && !t.Revoked)) t.Revoked = true;
+            await db.SaveChangesAsync();
+            return Results.Ok();
         });
 
         g.MapPost("/refresh", async (RefreshReq r, UserManager<VaultUser> users,
@@ -156,6 +215,59 @@ public static class VaultApi
             var merged = await db.LibraryItems.Where(x => x.UserId == uid).ToListAsync();
             return Results.Ok(merged.Select(ToDto));
         }).RequireAuthorization();
+
+        g.MapPost("/delete", async (ClaimsPrincipal me, UserManager<VaultUser> users,
+            VaultDbContext db, EmailSender email) =>
+        {
+            var uid = me.FindFirstValue(JwtRegisteredClaimNames.Sub);
+            if (uid is null) return Results.Unauthorized();
+            var user = await users.FindByIdAsync(uid);
+            if (user is null) return Results.Unauthorized();
+
+            db.LibraryItems.RemoveRange(db.LibraryItems.Where(x => x.UserId == uid));
+            db.RefreshTokens.RemoveRange(db.RefreshTokens.Where(x => x.UserId == uid));
+            await db.SaveChangesAsync();
+            var (mail, name) = (user.Email!, user.DisplayName);
+            await users.DeleteAsync(user);
+            await email.SendDeletedAsync(mail, name);
+            return Results.Ok();
+        }).RequireAuthorization();
+    }
+
+    // ---- Email codes -------------------------------------------------------
+
+    private const int CodeMinutes = 20;
+
+    /// <summary>Mint a fresh 6-digit code, retiring any earlier one for this purpose.</summary>
+    private static async Task<string> NewCodeAsync(VaultDbContext db, string email, string purpose)
+    {
+        email = email.Trim().ToLowerInvariant();
+        foreach (var old in db.EmailCodes.Where(c => c.Email == email && c.Purpose == purpose && !c.Used))
+            old.Used = true;
+
+        var code = RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
+        db.EmailCodes.Add(new EmailCode
+        {
+            Email = email,
+            Code = code,
+            Purpose = purpose,
+            ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(CodeMinutes).ToUnixTimeMilliseconds(),
+        });
+        await db.SaveChangesAsync();
+        return code;
+    }
+
+    /// <summary>Validate and burn a code. True only if it matched and was live.</summary>
+    private static async Task<bool> ConsumeCodeAsync(VaultDbContext db, string email, string code, string purpose)
+    {
+        email = email.Trim().ToLowerInvariant();
+        var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var row = await db.EmailCodes.FirstOrDefaultAsync(c =>
+            c.Email == email && c.Purpose == purpose && c.Code == code && !c.Used && c.ExpiresAt > now);
+        if (row is null) return false;
+        row.Used = true;
+        await db.SaveChangesAsync();
+        return true;
     }
 
     private static async Task<AuthResp> IssueAsync(VaultUser user, VaultDbContext db, VaultTokens tokens)

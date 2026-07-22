@@ -57,8 +57,10 @@ builder.Services.AddIdentityCore<VaultUser>(o =>
         o.Password.RequireDigit = false;
         o.User.RequireUniqueEmail = true;
     })
-    .AddEntityFrameworkStores<VaultDbContext>();
+    .AddEntityFrameworkStores<VaultDbContext>()
+    .AddDefaultTokenProviders(); // needed for GeneratePasswordResetTokenAsync
 builder.Services.AddSingleton<VaultTokens>();
+builder.Services.AddScoped<EmailSender>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(o =>
     {

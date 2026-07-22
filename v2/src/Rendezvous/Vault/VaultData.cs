@@ -43,11 +43,24 @@ public class RefreshToken
     public bool Revoked { get; set; }
 }
 
+/// <summary>A short-lived numeric code emailed for verification or password reset.</summary>
+public class EmailCode
+{
+    public long Id { get; set; }
+    public string Email { get; set; } = "";
+    public string Code { get; set; } = "";
+    /// <summary>"verify" or "reset".</summary>
+    public string Purpose { get; set; } = "";
+    public long ExpiresAt { get; set; }
+    public bool Used { get; set; }
+}
+
 public class VaultDbContext(DbContextOptions<VaultDbContext> options)
     : IdentityDbContext<VaultUser>(options)
 {
     public DbSet<LibraryItem> LibraryItems => Set<LibraryItem>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<EmailCode> EmailCodes => Set<EmailCode>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
