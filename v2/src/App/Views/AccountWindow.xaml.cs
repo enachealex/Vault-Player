@@ -36,6 +36,8 @@ public partial class AccountWindow : Window
                 Subhead.Text = "Sync your library — resume points and watch counts — across your computers. Optional; the app works fully without it.";
                 NameRow.Visibility = reg ? Visibility.Visible : Visibility.Collapsed;
                 PassHint.Visibility = reg ? Visibility.Visible : Visibility.Collapsed;
+                ConfirmRow.Visibility = reg ? Visibility.Visible : Visibility.Collapsed;
+                if (!reg) ConfirmField.Clear();   // no stale confirm when signing in
                 ForgotLink.Visibility = reg ? Visibility.Collapsed : Visibility.Visible;
                 SubmitBtn.Content = reg ? "Create account" : "Sign in";
                 ToggleBtn.Content = reg ? "I have an account" : "Create account";
@@ -88,10 +90,15 @@ public partial class AccountWindow : Window
     private async void Submit_Click(object sender, RoutedEventArgs e)
     {
         var email = EmailBox.Text.Trim();
-        var pass = PassBox.Password;
+        var pass = PassField.Password;
         if (email.Length == 0 || pass.Length == 0) { ShowError("Enter your email and password."); return; }
 
         var reg = _mode == Mode.Register;
+        if (reg)
+        {
+            if (pass.Length < 8) { ShowError("Use a password of at least 8 characters."); return; }
+            if (pass != ConfirmField.Password) { ShowError("Those passwords don't match."); return; }
+        }
         Busy(true, SubmitBtn, reg ? "Creating…" : "Signing in…", "");
         var outcome = reg
             ? await AppServices.Account.RegisterAsync(email, pass, NameBox.Text.Trim())
@@ -152,7 +159,7 @@ public partial class AccountWindow : Window
     private async void Reset_Click(object sender, RoutedEventArgs e)
     {
         var code = ResetCodeBox.Text.Trim();
-        var pass = ResetPassBox.Password;
+        var pass = ResetField.Password;
         if (code.Length == 0 || pass.Length == 0) { ShowError("Enter the code and a new password."); return; }
         Busy(true, ResetBtn, "Resetting…", "");
         var error = await AppServices.Account.ResetAsync(_pendingEmail, code, pass);
