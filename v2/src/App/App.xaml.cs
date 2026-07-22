@@ -9,9 +9,12 @@ public partial class App : Application
 {
     public App()
     {
+        Services.StartupTrace.Mark("App ctor entry");
+
         // Must run before anything else touches the app: this handles the
         // install/update/uninstall hooks and can exit the process outright.
         VelopackApp.Build().Run();
+        Services.StartupTrace.Mark("VelopackApp.Run");
 
         // A film stopping dead with no explanation is the worst outcome, so
         // record what happened and keep going where we safely can.
@@ -114,13 +117,27 @@ public partial class App : Application
             return;
         }
 
-        // Initialize the libVLC engine deterministically on the UI thread before
-        // any background probing can race its lazy construction.
-        _ = Services.AppServices.LibVlc;
+        Services.StartupTrace.Mark("OnStartup entry");
+
+        // libVLC's first initialisation reads hundreds of native plugin files;
+        // on a cold disk that is ~12 seconds. Doing it here on the UI thread used
+        // to block the window from appearing at all for that whole time. Warm it
+        // on a background thread instead so the app opens immediately — the Lazy
+        // is thread-safe, so this warm-up (or whoever opens the first film) builds
+        // the engine exactly once. Media/MediaPlayer objects still live on the UI
+        // thread, which is the affinity that actually matters.
+        System.Threading.Tasks.Task.Run(() =>
+        {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            try { _ = Services.AppServices.LibVlc; } catch { /* surfaced when first used */ }
+            Services.StartupTrace.Note($"libVLC ready in background ({sw.ElapsedMilliseconds} ms after start)");
+        });
+        Services.StartupTrace.Mark("libVLC warm-up scheduled");
 
         // Offer ourselves under "Open with". Re-run every launch because a
         // Velopack update changes the executable path.
         Services.FileAssociations.Register();
+        Services.StartupTrace.Mark("FileAssociations.Register");
 
         // Launched with a film (Open with, drag onto the exe, or a shell
         // association)? Go straight to it rather than the home screen.
@@ -167,13 +184,17 @@ public partial class App : Application
     {
         var splash = new Views.SplashWindow();
         splash.Show();
+        Services.StartupTrace.Mark("splash shown");
         try
         {
             await splash.RunAsync();
+            Services.StartupTrace.Mark("update check done");
         }
         finally
         {
             new MainWindow().Show();
+            Services.StartupTrace.Mark("MainWindow shown");
+            Services.StartupTrace.Flush();
             splash.Close();
             if (fileToOpen is not null) OpenFile(fileToOpen);
             // Pull any library changes made on another machine. Fire-and-forget:
