@@ -20,6 +20,16 @@ public record LibraryItemDto(string FilmKey, string Name, long ResumeMs, int Wat
     long LastWatchedAt, string? ChaptersJson, long UpdatedAt);
 public record LibrarySyncReq(LibraryItemDto[] Items);
 
+// Friends + party invites.
+public record FriendReq(string Email);
+public record RespondReq(long RequestId, bool Accept);
+public record RemoveFriendReq(string UserId);
+public record PersonDto(string UserId, string Name, string Email, long RequestId = 0);
+public record FriendsDto(PersonDto[] Friends, PersonDto[] Incoming, PersonDto[] Outgoing);
+public record InviteReq(string ToUserId, string RoomCode, string Server, string MovieTitle);
+public record InviteDto(long Id, string FromName, string RoomCode, string Server, string MovieTitle, long CreatedAt);
+public record DismissInviteReq(long Id);
+
 /// <summary>Issues access tokens and mints/rotates refresh tokens.</summary>
 public class VaultTokens(IConfiguration cfg)
 {
@@ -226,13 +236,177 @@ public static class VaultApi
 
             db.LibraryItems.RemoveRange(db.LibraryItems.Where(x => x.UserId == uid));
             db.RefreshTokens.RemoveRange(db.RefreshTokens.Where(x => x.UserId == uid));
+            db.Friendships.RemoveRange(db.Friendships.Where(x => x.RequesterId == uid || x.AddresseeId == uid));
+            db.PartyInvites.RemoveRange(db.PartyInvites.Where(x => x.FromUserId == uid || x.ToUserId == uid));
             await db.SaveChangesAsync();
             var (mail, name) = (user.Email!, user.DisplayName);
             await users.DeleteAsync(user);
             await email.SendDeletedAsync(mail, name);
             return Results.Ok();
         }).RequireAuthorization();
+
+        MapFriendsApi(g);
     }
+
+    // ---- Friends + party invites (all require a valid access token) ---------
+
+    private static void MapFriendsApi(RouteGroupBuilder g)
+    {
+        // Ask to be someone's friend, by email. If they already asked you, this
+        // accepts instead — two people reaching for each other just become friends.
+        g.MapPost("/friends/request", async (FriendReq r, ClaimsPrincipal me,
+            UserManager<VaultUser> users, VaultDbContext db) =>
+        {
+            var uid = me.FindFirstValue(JwtRegisteredClaimNames.Sub);
+            if (uid is null) return Results.Unauthorized();
+
+            var target = await users.FindByEmailAsync((r.Email ?? "").Trim());
+            if (target is null)
+                return Results.Json(new { error = "No Vault Movies account uses that email yet." }, statusCode: 404);
+            if (target.Id == uid)
+                return Results.Json(new { error = "That's your own email." }, statusCode: 400);
+
+            var existing = await db.Friendships.FirstOrDefaultAsync(f =>
+                (f.RequesterId == uid && f.AddresseeId == target.Id) ||
+                (f.RequesterId == target.Id && f.AddresseeId == uid));
+            if (existing is not null)
+            {
+                if (existing.Status == "accepted")
+                    return Results.Json(new { error = "You're already friends." }, statusCode: 400);
+                if (existing.RequesterId == uid)
+                    return Results.Json(new { error = "You've already sent them a request." }, statusCode: 400);
+                // They already invited you — accept it now.
+                existing.Status = "accepted";
+                existing.RespondedAt = Now();
+                await db.SaveChangesAsync();
+                return Results.Ok(new { status = "accepted" });
+            }
+
+            db.Friendships.Add(new Friendship
+            {
+                RequesterId = uid, AddresseeId = target.Id, Status = "pending", CreatedAt = Now(),
+            });
+            await db.SaveChangesAsync();
+            return Results.Ok(new { status = "sent" });
+        }).RequireAuthorization();
+
+        // Accept or decline a pending request addressed to me.
+        g.MapPost("/friends/respond", async (RespondReq r, ClaimsPrincipal me, VaultDbContext db) =>
+        {
+            var uid = me.FindFirstValue(JwtRegisteredClaimNames.Sub);
+            if (uid is null) return Results.Unauthorized();
+
+            var req = await db.Friendships.FirstOrDefaultAsync(f =>
+                f.Id == r.RequestId && f.AddresseeId == uid && f.Status == "pending");
+            if (req is null) return Results.Json(new { error = "That request is no longer available." }, statusCode: 404);
+
+            if (r.Accept) { req.Status = "accepted"; req.RespondedAt = Now(); }
+            else db.Friendships.Remove(req);
+            await db.SaveChangesAsync();
+            return Results.Ok();
+        }).RequireAuthorization();
+
+        // My friends, plus requests waiting on me and requests I'm still waiting on.
+        g.MapGet("/friends", async (ClaimsPrincipal me, VaultDbContext db) =>
+        {
+            var uid = me.FindFirstValue(JwtRegisteredClaimNames.Sub);
+            if (uid is null) return Results.Unauthorized();
+
+            var rows = await db.Friendships
+                .Where(f => f.RequesterId == uid || f.AddresseeId == uid).ToListAsync();
+
+            // Resolve the other party's display info in one lookup.
+            var ids = rows.Select(f => f.RequesterId == uid ? f.AddresseeId : f.RequesterId).Distinct().ToList();
+            var people = await db.Users.Where(u => ids.Contains(u.Id))
+                .ToDictionaryAsync(u => u.Id, u => u);
+            PersonDto Person(string otherId, long requestId = 0) =>
+                people.TryGetValue(otherId, out var u)
+                    ? new PersonDto(u.Id, u.DisplayName, u.Email ?? "", requestId)
+                    : new PersonDto(otherId, "Unknown", "", requestId);
+
+            var friends = rows.Where(f => f.Status == "accepted")
+                .Select(f => Person(f.RequesterId == uid ? f.AddresseeId : f.RequesterId)).ToArray();
+            var incoming = rows.Where(f => f.Status == "pending" && f.AddresseeId == uid)
+                .Select(f => Person(f.RequesterId, f.Id)).ToArray();
+            var outgoing = rows.Where(f => f.Status == "pending" && f.RequesterId == uid)
+                .Select(f => Person(f.AddresseeId)).ToArray();
+            return Results.Ok(new FriendsDto(friends, incoming, outgoing));
+        }).RequireAuthorization();
+
+        // Unfriend, or withdraw/decline — removes the pair's row either way.
+        g.MapPost("/friends/remove", async (RemoveFriendReq r, ClaimsPrincipal me, VaultDbContext db) =>
+        {
+            var uid = me.FindFirstValue(JwtRegisteredClaimNames.Sub);
+            if (uid is null) return Results.Unauthorized();
+
+            var row = await db.Friendships.FirstOrDefaultAsync(f =>
+                (f.RequesterId == uid && f.AddresseeId == r.UserId) ||
+                (f.RequesterId == r.UserId && f.AddresseeId == uid));
+            if (row is not null) { db.Friendships.Remove(row); await db.SaveChangesAsync(); }
+            return Results.Ok();
+        }).RequireAuthorization();
+
+        // Invite a friend into the room I'm hosting right now.
+        g.MapPost("/party/invite", async (InviteReq r, ClaimsPrincipal me,
+            UserManager<VaultUser> users, VaultDbContext db) =>
+        {
+            var uid = me.FindFirstValue(JwtRegisteredClaimNames.Sub);
+            if (uid is null) return Results.Unauthorized();
+
+            var friends = await db.Friendships.AnyAsync(f => f.Status == "accepted" &&
+                ((f.RequesterId == uid && f.AddresseeId == r.ToUserId) ||
+                 (f.RequesterId == r.ToUserId && f.AddresseeId == uid)));
+            if (!friends) return Results.Json(new { error = "You can only invite friends." }, statusCode: 403);
+
+            var mine = await users.FindByIdAsync(uid);
+            db.PartyInvites.Add(new PartyInvite
+            {
+                FromUserId = uid,
+                ToUserId = r.ToUserId,
+                FromName = mine?.DisplayName ?? "A friend",
+                RoomCode = r.RoomCode,
+                Server = r.Server,
+                MovieTitle = r.MovieTitle,
+                CreatedAt = Now(),
+            });
+            await db.SaveChangesAsync();
+            return Results.Ok();
+        }).RequireAuthorization();
+
+        // Pending invites for me. Invites go stale fast — a room that ended is
+        // useless — so anything older than the window is quietly retired.
+        g.MapGet("/party/invites", async (ClaimsPrincipal me, VaultDbContext db) =>
+        {
+            var uid = me.FindFirstValue(JwtRegisteredClaimNames.Sub);
+            if (uid is null) return Results.Unauthorized();
+
+            var cutoff = Now() - InviteTtlMs;
+            var stale = db.PartyInvites.Where(i => i.ToUserId == uid && !i.Dismissed && i.CreatedAt < cutoff);
+            foreach (var s in stale) s.Dismissed = true;
+            await db.SaveChangesAsync();
+
+            var live = await db.PartyInvites
+                .Where(i => i.ToUserId == uid && !i.Dismissed && i.CreatedAt >= cutoff)
+                .OrderByDescending(i => i.CreatedAt).ToListAsync();
+            return Results.Ok(live.Select(i =>
+                new InviteDto(i.Id, i.FromName, i.RoomCode, i.Server, i.MovieTitle, i.CreatedAt)));
+        }).RequireAuthorization();
+
+        g.MapPost("/party/invites/dismiss", async (DismissInviteReq r, ClaimsPrincipal me, VaultDbContext db) =>
+        {
+            var uid = me.FindFirstValue(JwtRegisteredClaimNames.Sub);
+            if (uid is null) return Results.Unauthorized();
+
+            var inv = await db.PartyInvites.FirstOrDefaultAsync(i => i.Id == r.Id && i.ToUserId == uid);
+            if (inv is not null) { inv.Dismissed = true; await db.SaveChangesAsync(); }
+            return Results.Ok();
+        }).RequireAuthorization();
+    }
+
+    /// <summary>How long a party invite stays live. A room rarely outlasts this.</summary>
+    private const long InviteTtlMs = 3 * 60 * 60 * 1000; // 3 hours
+
+    private static long Now() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
     // ---- Email codes -------------------------------------------------------
 

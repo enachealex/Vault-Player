@@ -45,7 +45,7 @@ public class AccountService
     /// <summary>Raised on sign-in, sign-out, or after a sync changes the library.</summary>
     public event Action? Changed;
 
-    private string BaseUrl => (AppServices.Settings.AuthServer ?? DefaultServer).TrimEnd('/');
+    internal string BaseUrl => (AppServices.Settings.AuthServer ?? DefaultServer).TrimEnd('/');
 
     // ---- Auth --------------------------------------------------------------
 
@@ -186,7 +186,7 @@ public class AccountService
     }
 
     /// <summary>Valid access token, refreshing via the stored refresh token if needed.</summary>
-    private async Task<string?> AccessTokenAsync()
+    internal async Task<string?> AccessTokenAsync()
     {
         if (_accessToken is not null && DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() < _accessExpiresAt - 60_000)
             return _accessToken;

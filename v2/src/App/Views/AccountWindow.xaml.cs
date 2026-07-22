@@ -62,6 +62,8 @@ public partial class AccountWindow : Window
                 WhoEmail.Text = AppServices.Account.Email ?? "";
                 var count = AppServices.Settings.SyncedLibrary.Count;
                 SyncStatus.Text = count == 0 ? "Nothing synced yet." : $"{count} film{(count == 1 ? "" : "s")} synced.";
+                UpdateFriendsLabel();
+                _ = RefreshFriendsAsync();
                 break;
         }
     }
@@ -192,4 +194,28 @@ public partial class AccountWindow : Window
     private void Back_Click(object sender, RoutedEventArgs e) => Show(Mode.SignIn);
 
     private void Done_Click(object sender, RoutedEventArgs e) => Close();
+
+    // ---- Friends ----
+
+    private void Friends_Click(object sender, RoutedEventArgs e)
+    {
+        new FriendsWindow { Owner = this }.ShowDialog();
+        UpdateFriendsLabel();
+    }
+
+    private async System.Threading.Tasks.Task RefreshFriendsAsync()
+    {
+        await AppServices.Friends.RefreshAsync();
+        UpdateFriendsLabel();
+    }
+
+    /// <summary>Show a friend count, and flag pending requests so they're noticed.</summary>
+    private void UpdateFriendsLabel()
+    {
+        var f = AppServices.Friends;
+        if (f.Incoming.Count > 0)
+            FriendsBtnLabel.Text = $"Friends — {f.Incoming.Count} request{(f.Incoming.Count == 1 ? "" : "s")}";
+        else
+            FriendsBtnLabel.Text = f.Friends.Count == 0 ? "Friends" : $"Friends ({f.Friends.Count})";
+    }
 }

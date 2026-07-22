@@ -77,8 +77,37 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 // Create the schema on first run (no migration tooling needed at this scale).
+// EnsureCreated only helps a brand-new file; an existing vault.db keeps its old
+// schema, so tables added later are patched in with idempotent DDL below.
 using (var scope = app.Services.CreateScope())
-    scope.ServiceProvider.GetRequiredService<VaultDbContext>().Database.EnsureCreated();
+{
+    var db = scope.ServiceProvider.GetRequiredService<VaultDbContext>();
+    db.Database.EnsureCreated();
+    db.Database.ExecuteSqlRaw("""
+        CREATE TABLE IF NOT EXISTS "Friendships" (
+            "Id" INTEGER NOT NULL CONSTRAINT "PK_Friendships" PRIMARY KEY AUTOINCREMENT,
+            "RequesterId" TEXT NOT NULL,
+            "AddresseeId" TEXT NOT NULL,
+            "Status" TEXT NOT NULL,
+            "CreatedAt" INTEGER NOT NULL,
+            "RespondedAt" INTEGER NOT NULL
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS "IX_Friendships_RequesterId_AddresseeId"
+            ON "Friendships" ("RequesterId", "AddresseeId");
+        CREATE TABLE IF NOT EXISTS "PartyInvites" (
+            "Id" INTEGER NOT NULL CONSTRAINT "PK_PartyInvites" PRIMARY KEY AUTOINCREMENT,
+            "FromUserId" TEXT NOT NULL,
+            "ToUserId" TEXT NOT NULL,
+            "FromName" TEXT NOT NULL,
+            "RoomCode" TEXT NOT NULL,
+            "Server" TEXT NOT NULL,
+            "MovieTitle" TEXT NOT NULL,
+            "CreatedAt" INTEGER NOT NULL,
+            "Dismissed" INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS "IX_PartyInvites_ToUserId" ON "PartyInvites" ("ToUserId");
+        """);
+}
 
 app.MapVaultApi();
 

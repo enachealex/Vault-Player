@@ -21,6 +21,9 @@ public static class AppServices
     /// <summary>Optional account + cross-machine library sync.</summary>
     public static AccountService Account { get; } = new();
 
+    /// <summary>Account-to-account friends and Watch Party invites.</summary>
+    public static FriendsService Friends { get; } = new(Account);
+
     /// <summary>
     /// The Watch Party the user is currently in, if any.
     ///

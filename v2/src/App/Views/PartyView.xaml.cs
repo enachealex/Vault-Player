@@ -45,7 +45,13 @@ public partial class PartyView : UserControl, IDisposable
             Loaded += async (_, _) => await BeginHostingAsync(pendingHost);
             return;
         }
-        if (AppServices.Account.IsSignedIn) ShowSignedInIdentity();
+        if (AppServices.Account.IsSignedIn)
+        {
+            ShowSignedInIdentity();
+            // Signed in, a friend may have invited you into a live room.
+            AppServices.Friends.Changed += OnFriendsChanged;
+            Loaded += (_, _) => StartInvitePolling();
+        }
         else RefreshSavedNames();  // signed-out fallback: pick a nickname
     }
 
@@ -218,6 +224,48 @@ public partial class PartyView : UserControl, IDisposable
 
     private void HomeBtn_Click(object sender, RoutedEventArgs e) =>
         MainWindow.Instance.Navigate(new HomeView());
+
+    // ---- Invitations (signed in) -------------------------------------------
+
+    private DispatcherTimer? _invitePollTimer;
+
+    private void OnFriendsChanged() => Dispatcher.Invoke(RenderInvitations);
+
+    private async void StartInvitePolling()
+    {
+        await AppServices.Friends.RefreshInvitesAsync();
+        RenderInvitations();
+        // Keep it fresh while the user sits on this screen — a new invite should
+        // appear without them navigating away and back.
+        _invitePollTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(15) };
+        _invitePollTimer.Tick += async (_, _) => await AppServices.Friends.RefreshInvitesAsync();
+        _invitePollTimer.Start();
+    }
+
+    private void RenderInvitations()
+    {
+        var invites = AppServices.Friends.Invites;
+        InvitationsList.ItemsSource = invites;   // a fresh list instance each refresh
+        InvitationsPanel.Visibility = invites.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private async void JoinInvite_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.Tag is not FriendsService.Invite inv) return;
+        // Move to the join view so status and errors have somewhere to land.
+        ChoosePanel.Visibility = Visibility.Collapsed;
+        JoinPanel.Visibility = Visibility.Visible;
+        HostAddressBox.Text = inv.Server;
+        CodeBox.Text = inv.RoomCode;
+        _ = AppServices.Friends.DismissInviteAsync(inv.Id); // acted on — retire it
+        await JoinRoomAsync(inv.Server, inv.RoomCode);
+    }
+
+    private async void DismissInvite_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.Tag is FriendsService.Invite inv)
+            await AppServices.Friends.DismissInviteAsync(inv.Id);
+    }
 
     // ---- Host flow ---------------------------------------------------------
 
@@ -467,8 +515,69 @@ public partial class PartyView : UserControl, IDisposable
         System.Windows.Automation.AutomationProperties.SetName(
             StartBtn, external ? "Start countdown" : "Start watching");
         HostCuePanel.Visibility = external ? Visibility.Visible : Visibility.Collapsed;
+        // Inviting a friend needs an account (that's who the invite is addressed to).
+        InviteBtn.Visibility = AppServices.Account.IsSignedIn ? Visibility.Visible : Visibility.Collapsed;
         PickPanel.Visibility = Visibility.Collapsed;
         LobbyPanel.Visibility = Visibility.Visible;
+    }
+
+    // ---- Invite a friend into this room ------------------------------------
+
+    private async void Invite_Click(object sender, RoutedEventArgs e)
+    {
+        if (_session is null) return;
+        await AppServices.Friends.RefreshAsync();
+        var friends = AppServices.Friends.Friends;
+
+        var menu = new ContextMenu();
+        if (friends.Count == 0)
+        {
+            var add = new MenuItem { Header = "No friends yet — add some…" };
+            add.Click += (_, _) => new FriendsWindow { Owner = Window.GetWindow(this) }.ShowDialog();
+            menu.Items.Add(add);
+        }
+        else
+        {
+            foreach (var friend in friends)
+            {
+                var item = new MenuItem { Header = friend.Name, Tag = friend };
+                item.Click += InviteFriend_Click;
+                menu.Items.Add(item);
+            }
+        }
+        menu.PlacementTarget = InviteBtn;
+        menu.IsOpen = true;
+    }
+
+    private async void InviteFriend_Click(object sender, RoutedEventArgs e)
+    {
+        if (_session is null || (sender as MenuItem)?.Tag is not FriendsService.Person friend) return;
+
+        // Whatever a guest would type as the "party server": the deployed domain
+        // if we host through one, otherwise this machine's shareable address.
+        var server = AppServices.Settings.RendezvousServer ?? _session.ShareAddress;
+        var title = _session.IsExternal
+            ? $"{_session.MovieTitle} on {_session.ExternalService}"
+            : _session.MovieTitle ?? _movie?.Name ?? "a movie";
+
+        var error = await AppServices.Friends.InviteAsync(friend.UserId, _session.RoomCode, server, title);
+        FlashInvite(error is null ? $"Invited {friend.Name}" : error);
+    }
+
+    private DispatcherTimer? _inviteFlashTimer;
+
+    /// <summary>Briefly confirm on the button itself, then restore its label.</summary>
+    private void FlashInvite(string text)
+    {
+        InviteBtnLabel.Text = text;
+        _inviteFlashTimer?.Stop();
+        _inviteFlashTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2.5) };
+        _inviteFlashTimer.Tick += (_, _) =>
+        {
+            _inviteFlashTimer?.Stop();
+            InviteBtnLabel.Text = "Invite a friend";
+        };
+        _inviteFlashTimer.Start();
     }
 
     private void ChangeFilmBtn_Click(object sender, RoutedEventArgs e)
@@ -501,8 +610,12 @@ public partial class PartyView : UserControl, IDisposable
     private async void JoinGoBtn_Click(object sender, RoutedEventArgs e)
     {
         SaveName();
-        var address = HostAddressBox.Text.Trim();
-        var code = CodeBox.Text.Trim();
+        await JoinRoomAsync(HostAddressBox.Text.Trim(), CodeBox.Text.Trim());
+    }
+
+    /// <summary>Connect to a room. Shared by the manual join form and invite Join.</summary>
+    private async Task JoinRoomAsync(string address, string code)
+    {
         if (address.Length == 0 || code.Length == 0)
         {
             JoinStatus.Text = "Enter the party server and the room code.";
@@ -628,6 +741,10 @@ public partial class PartyView : UserControl, IDisposable
 
     public void Dispose()
     {
+        _invitePollTimer?.Stop();
+        _inviteFlashTimer?.Stop();
+        AppServices.Friends.Changed -= OnFriendsChanged;
+
         // Only tear the session down if it never became the app's active party
         // -- i.e. the user backed out of the lobby before anything started.
         // Once it is the current party it belongs to AppServices, which keeps it
