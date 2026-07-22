@@ -49,32 +49,117 @@ public class AccountService
 
     // ---- Auth --------------------------------------------------------------
 
-    public async Task<string?> RegisterAsync(string email, string password, string displayName)
-        => await AuthAsync("register", new { email, password, displayName });
+    public enum AuthStatus { Success, NeedsVerification, Error }
+    public record AuthOutcome(AuthStatus Status, string? Message = null, string? Email = null);
 
-    public async Task<string?> LoginAsync(string email, string password)
-        => await AuthAsync("login", new { email, password });
-
-    /// <summary>Returns null on success, or a human-readable error.</summary>
-    private async Task<string?> AuthAsync(string path, object body)
+    /// <summary>Create an account. Success means "check your email for a code".</summary>
+    public async Task<AuthOutcome> RegisterAsync(string email, string password, string displayName)
     {
         try
         {
-            var resp = await _http.PostAsJsonAsync($"{BaseUrl}/api/v1/{path}", body, Json);
+            var resp = await _http.PostAsJsonAsync($"{BaseUrl}/api/v1/register",
+                new { email, password, displayName }, Json);
             if (!resp.IsSuccessStatusCode)
-                return await ReadErrorAsync(resp);
+                return new(AuthStatus.Error, await ReadErrorAsync(resp));
+            // Backend replies { status: "verify", email } — no tokens yet.
+            return new(AuthStatus.NeedsVerification, Email: email);
+        }
+        catch (Exception ex)
+        {
+            return new(AuthStatus.Error, $"Couldn't reach the server. {ex.Message}");
+        }
+    }
 
-            var auth = await resp.Content.ReadFromJsonAsync<AuthResp>(Json);
-            if (auth is null) return "The server returned an unexpected response.";
-            StoreSession(auth);
-            Changed?.Invoke();
-            _ = SyncAsync();      // reconcile immediately after signing in
+    public async Task<AuthOutcome> LoginAsync(string email, string password)
+    {
+        try
+        {
+            var resp = await _http.PostAsJsonAsync($"{BaseUrl}/api/v1/login", new { email, password }, Json);
+            if (resp.StatusCode == System.Net.HttpStatusCode.Forbidden)
+                return new(AuthStatus.NeedsVerification, Email: email); // unverified account
+            if (!resp.IsSuccessStatusCode)
+                return new(AuthStatus.Error, await ReadErrorAsync(resp));
+            return await FinishSignInAsync(resp);
+        }
+        catch (Exception ex)
+        {
+            return new(AuthStatus.Error, $"Couldn't reach the server. {ex.Message}");
+        }
+    }
+
+    /// <summary>Confirm the emailed code; on success the user is signed in.</summary>
+    public async Task<AuthOutcome> VerifyAsync(string email, string code)
+    {
+        try
+        {
+            var resp = await _http.PostAsJsonAsync($"{BaseUrl}/api/v1/verify", new { email, code }, Json);
+            if (!resp.IsSuccessStatusCode)
+                return new(AuthStatus.Error, await ReadErrorAsync(resp));
+            return await FinishSignInAsync(resp);
+        }
+        catch (Exception ex)
+        {
+            return new(AuthStatus.Error, $"Couldn't reach the server. {ex.Message}");
+        }
+    }
+
+    public async Task ResendCodeAsync(string email)
+    {
+        try { await _http.PostAsJsonAsync($"{BaseUrl}/api/v1/resend", new { email }, Json); }
+        catch { /* best effort */ }
+    }
+
+    /// <summary>Request a reset code. Always reports success so it can't probe emails.</summary>
+    public async Task ForgotAsync(string email)
+    {
+        try { await _http.PostAsJsonAsync($"{BaseUrl}/api/v1/forgot", new { email }, Json); }
+        catch { /* best effort */ }
+    }
+
+    /// <summary>Set a new password with the emailed code. Null on success, else an error.</summary>
+    public async Task<string?> ResetAsync(string email, string code, string newPassword)
+    {
+        try
+        {
+            var resp = await _http.PostAsJsonAsync($"{BaseUrl}/api/v1/reset",
+                new { email, code, newPassword }, Json);
+            return resp.IsSuccessStatusCode ? null : await ReadErrorAsync(resp);
+        }
+        catch (Exception ex)
+        {
+            return $"Couldn't reach the server. {ex.Message}";
+        }
+    }
+
+    /// <summary>Delete the account and its synced library, then sign out. Null on success.</summary>
+    public async Task<string?> DeleteAccountAsync()
+    {
+        var token = await AccessTokenAsync();
+        if (token is null) return "You need to be signed in.";
+        try
+        {
+            using var req = new HttpRequestMessage(HttpMethod.Post, $"{BaseUrl}/api/v1/delete");
+            req.Headers.Authorization = new("Bearer", token);
+            var resp = await _http.SendAsync(req);
+            if (!resp.IsSuccessStatusCode) return await ReadErrorAsync(resp);
+            AppServices.Settings.SyncedLibrary.Clear();
+            SignOut();
             return null;
         }
         catch (Exception ex)
         {
             return $"Couldn't reach the server. {ex.Message}";
         }
+    }
+
+    private async Task<AuthOutcome> FinishSignInAsync(HttpResponseMessage resp)
+    {
+        var auth = await resp.Content.ReadFromJsonAsync<AuthResp>(Json);
+        if (auth is null) return new(AuthStatus.Error, "The server returned an unexpected response.");
+        StoreSession(auth);
+        Changed?.Invoke();
+        _ = SyncAsync();      // reconcile immediately after signing in
+        return new(AuthStatus.Success);
     }
 
     public void SignOut()
