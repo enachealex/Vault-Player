@@ -45,7 +45,17 @@ public class AccountService
     /// <summary>Raised on sign-in, sign-out, or after a sync changes the library.</summary>
     public event Action? Changed;
 
-    internal string BaseUrl => (AppServices.Settings.AuthServer ?? DefaultServer).TrimEnd('/');
+    // A blank AuthServer (not just null) must fall back to the default — an
+    // empty string here would make every request URI relative and fail with
+    // "an invalid request URI was provided".
+    internal string BaseUrl
+    {
+        get
+        {
+            var server = AppServices.Settings.AuthServer;
+            return (string.IsNullOrWhiteSpace(server) ? DefaultServer : server).TrimEnd('/');
+        }
+    }
 
     // ---- Auth --------------------------------------------------------------
 
