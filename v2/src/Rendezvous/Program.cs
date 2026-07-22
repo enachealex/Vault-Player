@@ -1,7 +1,11 @@
 using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using VideoPlayer.Protocol;
+using VideoPlayer.Rendezvous.Vault;
 
 // Watch Party rendezvous. Two jobs:
 //   1. Control relay — one host ↔ many guests over WebSockets (play/pause,
@@ -35,8 +39,46 @@ builder.WebHost.ConfigureKestrel(options =>
     options.Limits.MinResponseDataRate = null;
 });
 
+// ---- Accounts + library sync (Vault Movies) --------------------------------
+// SQLite keeps this self-contained: one file in a volume, no dependency on the
+// Supabase/jobs Postgres also on this box, and the same provider works locally
+// for testing. Isolated from everything else the server runs.
+var dbPath = Environment.GetEnvironmentVariable("VAULT_DB")
+    ?? Path.Combine(AppContext.BaseDirectory, "vault.db");
+builder.Services.AddDbContext<VaultDbContext>(o => o.UseSqlite($"Data Source={dbPath}"));
+builder.Services.AddIdentityCore<VaultUser>(o =>
+    {
+        // Length only. Character-class rules push people toward worse, harder
+        // passwords; for a friends app a decent length is the sensible bar.
+        o.Password.RequiredLength = 8;
+        o.Password.RequireNonAlphanumeric = false;
+        o.Password.RequireUppercase = false;
+        o.Password.RequireLowercase = false;
+        o.Password.RequireDigit = false;
+        o.User.RequireUniqueEmail = true;
+    })
+    .AddEntityFrameworkStores<VaultDbContext>();
+builder.Services.AddSingleton<VaultTokens>();
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(o =>
+    {
+        o.TokenValidationParameters = new VaultTokens(builder.Configuration).Validation();
+        // Keep claims as they were issued. Otherwise the handler rewrites "sub"
+        // to ClaimTypes.NameIdentifier and code reading "sub" finds nothing.
+        o.MapInboundClaims = false;
+    });
+builder.Services.AddAuthorization();
+
 var app = builder.Build();
 app.UseWebSockets();
+app.UseAuthentication();
+app.UseAuthorization();
+
+// Create the schema on first run (no migration tooling needed at this scale).
+using (var scope = app.Services.CreateScope())
+    scope.ServiceProvider.GetRequiredService<VaultDbContext>().Database.EnsureCreated();
+
+app.MapVaultApi();
 
 var rooms = new ConcurrentDictionary<string, Room>();
 var pulls = new ConcurrentDictionary<string, PendingPull>();

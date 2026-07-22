@@ -57,3 +57,8 @@ v2/publish/
 
 # Code-signing key -- never commit
 v2/certs/
+
+# Vault backend database (created at runtime)
+vault.db
+*.db-shm
+*.db-wal
