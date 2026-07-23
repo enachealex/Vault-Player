@@ -192,6 +192,16 @@
                         <TextBlock x:Name="CopyCodeLabel" Text="Copy" FontSize="13" />
                     </StackPanel>
                 </Button>
+                <Button x:Name="CopyInviteBtn" Style="{StaticResource GhostButton}" Padding="12,8"
+                        Margin="8,0,0,0" VerticalAlignment="Center" Click="CopyInvite_Click"
+                        ToolTip="Copy a link that opens Vault Movies straight into this room — paste it in any chat"
+                        AutomationProperties.Name="Copy invite link">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock x:Name="CopyInviteGlyph" Text="&#xE71B;" FontFamily="Segoe MDL2 Assets"
+                                   FontSize="13" VerticalAlignment="Center" Margin="0,0,8,0" />
+                        <TextBlock x:Name="CopyInviteLabel" Text="Invite link" FontSize="13" />
+                    </StackPanel>
+                </Button>
             </StackPanel>
             <TextBlock x:Name="LobbyAddress" FontSize="13" Foreground="{StaticResource TextMutedBrush}"
                        HorizontalAlignment="Center" Margin="0,0,0,16" />

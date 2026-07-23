@@ -55,6 +55,38 @@ public partial class PartyView : UserControl, IDisposable
         else RefreshSavedNames();  // signed-out fallback: pick a nickname
     }
 
+    // ---- Arriving via an invite link (vaultmovies://) ----------------------
+
+    private string? _pendingServer;
+    private string? _pendingCode;
+
+    /// <summary>Opened from an invite link: join this room as soon as we can.</summary>
+    public PartyView(string joinServer, string joinCode) : this((MovieItem?)null)
+    {
+        _pendingServer = joinServer;
+        _pendingCode = joinCode;
+        Loaded += async (_, _) => await TryPendingJoinAsync();
+    }
+
+    private async Task TryPendingJoinAsync()
+    {
+        if (_pendingCode is null) return;
+        // Signed out, reuse the last nickname so one click still goes straight in.
+        if (!AppServices.Account.IsSignedIn && DisplayName.Length < 2)
+            NameBox.Text = AppServices.Settings.DisplayName ?? "";
+
+        if (HasName)
+        {
+            ChoosePanel.Visibility = Visibility.Collapsed;
+            JoinPanel.Visibility = Visibility.Visible;
+            HostAddressBox.Text = _pendingServer ?? "";
+            CodeBox.Text = _pendingCode;
+            await JoinRoomAsync(_pendingServer ?? "", _pendingCode);
+        }
+        // No name yet: stay on the chooser so they pick one. The pending room
+        // prefills the join form when they continue (see JoinBtn_Click).
+    }
+
     private readonly ObservableCollection<string> _savedNames = new();
 
     /// <summary>Signed in, the account name is the party identity — no nickname needed.</summary>
@@ -224,6 +256,31 @@ public partial class PartyView : UserControl, IDisposable
 
     private void HomeBtn_Click(object sender, RoutedEventArgs e) =>
         MainWindow.Instance.Navigate(new HomeView());
+
+    /// <summary>Copy a link that opens the app straight into this room.</summary>
+    private void CopyInvite_Click(object sender, RoutedEventArgs e)
+    {
+        if (_session is null || _session.RoomCode.Length == 0) return;
+        var server = AppServices.Settings.RendezvousServer ?? _session.ShareAddress;
+        try
+        {
+            Clipboard.SetText(InviteLink.For(_session.RoomCode, server));
+            CopyInviteGlyph.Text = char.ConvertFromUtf32(0xE73E); // tick
+            CopyInviteLabel.Text = "Copied";
+            var revert = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+            revert.Tick += (_, _) =>
+            {
+                revert.Stop();
+                CopyInviteGlyph.Text = char.ConvertFromUtf32(0xE71B);
+                CopyInviteLabel.Text = "Invite link";
+            };
+            revert.Start();
+        }
+        catch
+        {
+            // Clipboard can be held open by another process; not worth a dialog.
+        }
+    }
 
     // ---- Invitations (signed in) -------------------------------------------
 
@@ -603,8 +660,11 @@ public partial class PartyView : UserControl, IDisposable
         SaveName();
         ChoosePanel.Visibility = Visibility.Collapsed;
         JoinPanel.Visibility = Visibility.Visible;
-        HostAddressBox.Text = AppServices.Settings.LastPartyAddress
+        // An invite they arrived with wins over remembered addresses.
+        HostAddressBox.Text = _pendingServer
+            ?? AppServices.Settings.LastPartyAddress
             ?? AppServices.Settings.RendezvousServer ?? "";
+        if (_pendingCode is not null) CodeBox.Text = _pendingCode;
     }
 
     private async void JoinGoBtn_Click(object sender, RoutedEventArgs e)

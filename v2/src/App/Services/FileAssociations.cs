@@ -73,4 +73,31 @@ public static class FileAssociations
         var ext = Path.GetExtension(path);
         return Array.Exists(Extensions, e => string.Equals(e, ext, StringComparison.OrdinalIgnoreCase));
     }
+
+    /// <summary>
+    /// Register the vaultmovies:// URL scheme, so an invite link shared in chat
+    /// (LAN Party, Discord, a browser) can launch the app straight into a Watch
+    /// Party. Same rules as above: HKCU only, idempotent, refreshed every launch
+    /// because updates move the executable.
+    /// </summary>
+    public static void RegisterProtocol()
+    {
+        try
+        {
+            var exe = Environment.ProcessPath;
+            if (string.IsNullOrEmpty(exe) || !File.Exists(exe)) return;
+
+            using var scheme = Registry.CurrentUser.CreateSubKey(@"Software\Classes\vaultmovies");
+            scheme.SetValue("", "URL:Vault Movies");
+            scheme.SetValue("URL Protocol", "");
+            using (var icon = scheme.CreateSubKey("DefaultIcon"))
+                icon.SetValue("", $"\"{exe}\",0");
+            using var command = scheme.CreateSubKey(@"shell\open\command");
+            command.SetValue("", $"\"{exe}\" \"%1\"");
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Protocol registration skipped: {ex.Message}");
+        }
+    }
 }

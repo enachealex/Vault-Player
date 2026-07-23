@@ -116,6 +116,66 @@ var pulls = new ConcurrentDictionary<string, PendingPull>();
 
 app.MapGet("/health", () => "ok");
 
+// ---- Invite links -----------------------------------------------------------
+// https://party.thejumpvault.com/join/MOVIE-XXXX — shared in any chat. Serves a
+// tiny page that bounces into the installed app (vaultmovies://) and offers the
+// installer to anyone who doesn't have it. ?server= carries a non-default relay
+// (e.g. a LAN host) through to the app.
+
+app.MapGet("/join/{code}", (string code, HttpContext ctx) =>
+{
+    code = code.Trim().ToUpperInvariant();
+    if (!System.Text.RegularExpressions.Regex.IsMatch(code, "^MOVIE-[A-Z0-9]{4}$"))
+        return Results.NotFound();
+
+    var server = ctx.Request.Query["server"].ToString();
+    if (string.IsNullOrWhiteSpace(server)) server = ctx.Request.Host.Host;
+
+    // EscapeDataString leaves only URL-safe characters, so the launch URI can be
+    // embedded in the page without opening an injection hole. The lone '&' still
+    // gets entity-encoded for the href.
+    var launch = $"vaultmovies://join?code={Uri.EscapeDataString(code)}&server={Uri.EscapeDataString(server)}";
+    var href = launch.Replace("&", "&amp;");
+    const string download =
+        "https://github.com/enachealex/Vault-Player/releases/latest/download/VideoPlayer-win-Setup.exe";
+
+    var html = $$"""
+        <!doctype html>
+        <html lang="en">
+        <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Join movie night — Vault Movies</title>
+        <style>
+          body { margin:0; min-height:100vh; display:grid; place-items:center;
+                 background:#1A0D09; color:#F6ECE5; font-family:'Segoe UI',system-ui,sans-serif; }
+          .card { text-align:center; padding:40px 48px; max-width:440px; }
+          .dot { width:22px; height:22px; border-radius:7px; background:#C8442A; margin:0 auto 18px; }
+          h1 { font-size:22px; margin:0 0 6px; }
+          .code { font-family:Consolas,monospace; font-size:34px; font-weight:bold; color:#C8442A;
+                  letter-spacing:2px; margin:18px 0 6px; }
+          p { color:#D9C0B3; font-size:14px; line-height:1.5; margin:8px 0; }
+          .btn { display:inline-block; margin-top:18px; padding:12px 26px; border-radius:10px;
+                 background:#C8442A; color:#fff; text-decoration:none; font-weight:600; font-size:15px; }
+          .alt { display:block; margin-top:16px; color:#F0A070; font-size:13px; }
+        </style>
+        </head>
+        <body>
+        <div class="card">
+          <div class="dot"></div>
+          <h1>You're invited to movie night</h1>
+          <div class="code">{{code}}</div>
+          <p>Opening Vault Movies… if nothing happens, use the button below.</p>
+          <a class="btn" href="{{href}}">Open Vault Movies</a>
+          <a class="alt" href="{{download}}">Don't have it? Download Vault Movies for Windows</a>
+        </div>
+        <script>location.href = '{{launch}}';</script>
+        </body>
+        </html>
+        """;
+    return Results.Content(html, "text/html; charset=utf-8");
+});
+
 // ---- Media relay: guest pulls, server fetches from host --------------------
 
 app.MapMethods("/stream/{room}", new[] { "GET", "HEAD" }, async (string room, HttpContext ctx) =>

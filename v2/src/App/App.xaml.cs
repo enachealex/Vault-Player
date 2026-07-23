@@ -134,16 +134,21 @@ public partial class App : Application
         });
         Services.StartupTrace.Mark("libVLC warm-up scheduled");
 
-        // Offer ourselves under "Open with". Re-run every launch because a
-        // Velopack update changes the executable path.
+        // Offer ourselves under "Open with" and claim vaultmovies:// links.
+        // Re-run every launch because a Velopack update changes the executable path.
         Services.FileAssociations.Register();
+        Services.FileAssociations.RegisterProtocol();
         Services.StartupTrace.Mark("FileAssociations.Register");
 
         // Launched with a film (Open with, drag onto the exe, or a shell
         // association)? Go straight to it rather than the home screen.
         var opened = Array.Find(e.Args, Services.FileAssociations.IsPlayableFile);
 
-        _ = StartAsync(opened);
+        // Launched from an invite link (LAN Party chat, Discord, browser)?
+        var invite = Array.Find(e.Args,
+            a => a.StartsWith("vaultmovies:", StringComparison.OrdinalIgnoreCase));
+
+        _ = StartAsync(opened, invite);
     }
 
     /// <summary>Play a file handed to us by the shell, with its folder as the playlist.</summary>
@@ -180,7 +185,7 @@ public partial class App : Application
     /// Show the loading screen, let it run the update check, then open the app.
     /// If the user accepts an update the process restarts and never gets here.
     /// </summary>
-    private static async System.Threading.Tasks.Task StartAsync(string? fileToOpen)
+    private static async System.Threading.Tasks.Task StartAsync(string? fileToOpen, string? inviteUri = null)
     {
         var splash = new Views.SplashWindow();
         splash.Show();
@@ -197,6 +202,9 @@ public partial class App : Application
             Services.StartupTrace.Flush();
             splash.Close();
             if (fileToOpen is not null) OpenFile(fileToOpen);
+            else if (inviteUri is not null
+                     && Services.InviteLink.TryParse(inviteUri, out var server, out var code))
+                VideoPlayer.App.MainWindow.Instance.Navigate(new Views.PartyView(server, code));
             // Pull any library changes made on another machine. Fire-and-forget:
             // signed-out or offline just no-ops, and the app is already usable.
             _ = Services.AppServices.Account.SyncAsync();
