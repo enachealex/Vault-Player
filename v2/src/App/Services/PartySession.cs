@@ -84,6 +84,10 @@ public sealed class PartySession : IDisposable
         session._hostFilePath = movie.Path;
 
         var info = new FileInfo(movie.Path);
+        // Tells web viewers (LAN Party's Movie Night) whether they can watch in
+        // the browser or need the app. Checked here so the answer travels with
+        // the room rather than every viewer guessing.
+        var (webOk, webReason) = await WebPlayback.CheckAsync(movie);
         await session.SendAsync(new PartyMessage
         {
             Type = MsgType.Hello,
@@ -91,6 +95,8 @@ public sealed class PartySession : IDisposable
             DurationMs = movie.DurationMs,
             FileSize = info.Length,
             ContentType = ContentTypeFor(movie.Path),
+            WebPlayable = webOk,
+            WebReason = webReason,
         });
 
         _ = session.PumpAsync();
@@ -209,6 +215,7 @@ public sealed class PartySession : IDisposable
         ExternalUrl = null;
         MovieTitle = movie.Name;
         var info = new FileInfo(movie.Path);
+        var (webOk, webReason) = await WebPlayback.CheckAsync(movie);
         await SendAsync(new PartyMessage
         {
             Type = MsgType.Switch,
@@ -216,6 +223,8 @@ public sealed class PartySession : IDisposable
             DurationMs = movie.DurationMs,
             FileSize = info.Length,
             ContentType = ContentTypeFor(movie.Path),
+            WebPlayable = webOk,
+            WebReason = webReason,
         });
     }
 

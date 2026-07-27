@@ -176,6 +176,50 @@ app.MapGet("/join/{code}", (string code, HttpContext ctx) =>
     return Results.Content(html, "text/html; charset=utf-8");
 });
 
+// ---- Room info for web viewers ---------------------------------------------
+// LAN Party's Movie Night polls this to decide whether it can play the film in
+// a browser <video> and, if so, where the host currently is. Public by room
+// code — the same trust level as /stream, which anyone with the code can read.
+// CORS is needed because this is a cross-origin fetch from the LAN Party page
+// (a <video> tag wouldn't need it, but fetch() does).
+
+app.MapGet("/room/{code}", (string code, HttpContext ctx) =>
+{
+    ctx.Response.Headers.AccessControlAllowOrigin = "*";
+    code = code.ToUpperInvariant();
+    if (!rooms.TryGetValue(code, out var r)) return Results.NotFound(new { error = "Room not found." });
+
+    return Results.Ok(new
+    {
+        code = r.Code,
+        host = r.HostName,
+        title = r.MovieTitle,
+        service = r.Service,               // non-null => streaming title, nothing to relay
+        durationMs = r.DurationMs,
+        started = r.Started,
+        // Web playability is decided by the host, which can actually read the file.
+        webPlayable = r.Service is null && r.FileSize > 0 && r.WebPlayable,
+        webReason = r.WebReason,
+        contentType = r.ContentType,
+        // Latest sync beacon, so a browser can follow the host's clock.
+        positionMs = r.LastState?.PositionMs,
+        playing = r.LastState?.Playing,
+        atUnixMs = r.LastState?.AtUnixMs,
+        // The beacon is stamped with the host's clock; sending ours lets a
+        // viewer cancel out the skew between the two machines instead of
+        // trusting that everyone's system time agrees.
+        serverNowMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+    });
+});
+
+// Browsers preflight the poll above; answer it without touching room state.
+app.MapMethods("/room/{code}", new[] { "OPTIONS" }, (HttpContext ctx) =>
+{
+    ctx.Response.Headers.AccessControlAllowOrigin = "*";
+    ctx.Response.Headers.AccessControlAllowMethods = "GET, OPTIONS";
+    return Results.Ok();
+});
+
 // ---- Media relay: guest pulls, server fetches from host --------------------
 
 app.MapMethods("/stream/{room}", new[] { "GET", "HEAD" }, async (string room, HttpContext ctx) =>
@@ -306,6 +350,8 @@ app.Map("/ws", async context =>
                     room.DurationMs = msg.DurationMs;
                     room.FileSize = msg.FileSize ?? 0;
                     room.ContentType = msg.ContentType;
+                    room.WebPlayable = msg.WebPlayable ?? false;
+                    room.WebReason = msg.WebReason;
                     break;
                 case MsgType.Start:
                     room.Started = true;
@@ -326,6 +372,8 @@ app.Map("/ws", async context =>
                     room.DurationMs = msg.DurationMs;
                     room.FileSize = msg.FileSize ?? 0;
                     room.ContentType = msg.ContentType;
+                    room.WebPlayable = msg.WebPlayable ?? false;
+                    room.WebReason = msg.WebReason;
                     room.LastState = null;
                     await room.Broadcast(msg);
                     break;
@@ -469,6 +517,9 @@ class Room
     public long? DurationMs;
     public long FileSize;
     public string? ContentType;
+    /// <summary>Host's verdict on whether a browser &lt;video&gt; can play this.</summary>
+    public bool WebPlayable;
+    public string? WebReason;
     public bool Started;
     public PartyMessage? LastState;
     public readonly ConcurrentDictionary<string, WebSocket> Guests = new();

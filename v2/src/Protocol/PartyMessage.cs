@@ -42,6 +42,14 @@ public class PartyMessage
     [JsonPropertyName("durationMs")] public long? DurationMs { get; set; }
     [JsonPropertyName("fileSize")] public long? FileSize { get; set; }
     [JsonPropertyName("contentType")] public string? ContentType { get; set; }
+    /// <summary>
+    /// Host → server: can a plain browser &lt;video&gt; play this stream? Lets
+    /// web viewers (LAN Party's Movie Night) watch without installing the app.
+    /// Null/false means they're told to open Vault Movies instead.
+    /// </summary>
+    [JsonPropertyName("webPlayable")] public bool? WebPlayable { get; set; }
+    /// <summary>Why it isn't web-playable, in words a viewer can act on.</summary>
+    [JsonPropertyName("webReason")] public string? WebReason { get; set; }
     [JsonPropertyName("positionMs")] public long? PositionMs { get; set; }
     [JsonPropertyName("playing")] public bool? Playing { get; set; }
     [JsonPropertyName("atUnixMs")] public long? AtUnixMs { get; set; }
