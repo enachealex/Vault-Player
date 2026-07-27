@@ -77,10 +77,13 @@ public partial class LibraryView : UserControl, IDisposable
             // Attach saved progress + watch counts so cards can show them.
             var resume = AppServices.Settings.ResumePositions;
             var counts = AppServices.Settings.WatchCounts;
+            var durations = AppServices.Settings.Durations;
             foreach (var movie in movies)
             {
                 if (resume.TryGetValue(movie.Path, out var ms)) movie.ResumeMs = ms;
                 if (counts.TryGetValue(movie.Path, out var c)) movie.WatchCount = c;
+                // Cached duration shows runtimes instantly; skips a libVLC re-parse.
+                if (durations.TryGetValue(movie.FilmKey, out var d) && d > 0) movie.DurationMs = d;
             }
             // Overlay anything synced from another machine (matched by film-key).
             AppServices.Account.ApplyTo(movies);
@@ -126,11 +129,31 @@ public partial class LibraryView : UserControl, IDisposable
 
     private async Task RunMetadataPipelineAsync(List<MovieItem> movies)
     {
-        // Durations first (thumbnail frame timing uses them), then posters.
-        await MovieLibrary.ProbeDurationsAsync(movies, _cts.Token);
-        RefreshContinueRow(); // durations make "x min left" meaningful
-        if (_sort is SortMode.LongestFirst or SortMode.ShortestFirst) ApplyFilter();
+        // Only parse what isn't already cached — a returning library is instant.
+        var need = movies.Where(m => m.DurationMs is null or 0).ToList();
+        if (need.Count > 0)
+        {
+            await MovieLibrary.ProbeDurationsAsync(need, _cts.Token);
+            PersistDurations(need);
+            RefreshContinueRow(); // durations make "x min left" meaningful
+            if (_sort is SortMode.LongestFirst or SortMode.ShortestFirst) ApplyFilter();
+        }
+        // Posters still run every time; ThumbnailService already caches to disk.
         await ThumbnailService.EnsureThumbsAsync(movies, _cts.Token);
+    }
+
+    /// <summary>Remember freshly probed durations so the next visit skips the parse.</summary>
+    private static void PersistDurations(IEnumerable<MovieItem> movies)
+    {
+        var cache = AppServices.Settings.Durations;
+        var added = false;
+        foreach (var m in movies)
+            if (m.DurationMs is > 0 && m.SizeBytes > 0)
+            {
+                cache[m.FilmKey] = m.DurationMs.Value;
+                added = true;
+            }
+        if (added) AppServices.Settings.Save();
     }
 
     /// <summary>Movies with a saved position, most-recently-watched first.</summary>

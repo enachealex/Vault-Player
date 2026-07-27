@@ -70,6 +70,13 @@ public class Settings
     /// <summary>How many times each movie has been watched through.</summary>
     public Dictionary<string, int> WatchCounts { get; set; } = new();
 
+    /// <summary>
+    /// Probed durations (ms) keyed by "filename|size", so the library shows
+    /// runtimes and "x min left" instantly instead of re-parsing every file with
+    /// libVLC on each visit. Size in the key means a re-encoded file re-probes.
+    /// </summary>
+    public Dictionary<string, long> Durations { get; set; } = new();
+
     /// <summary>User-created chapter marks keyed by file path.</summary>
     public Dictionary<string, List<ChapterMark>> CustomChapters { get; set; } = new();
 
