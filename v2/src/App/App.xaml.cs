@@ -105,6 +105,15 @@ public partial class App : Application
             return;
         }
 
+        // Headless: build the libVLC plugin cache into the bundled plugins
+        // folder, then exit. Run once at pack time so shipped copies start fast.
+        if (Array.IndexOf(e.Args, "--gen-plugin-cache") >= 0)
+        {
+            try { Services.AppServices.GeneratePluginCache(); Shutdown(0); }
+            catch { Shutdown(1); }
+            return;
+        }
+
         // Headless cast-device scan: --list-renderers [out.json] [seconds]
         var r = Array.IndexOf(e.Args, "--list-renderers");
         if (r >= 0)

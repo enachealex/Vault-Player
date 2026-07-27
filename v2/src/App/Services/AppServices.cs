@@ -14,6 +14,18 @@ public static class AppServices
 
     public static LibVLC LibVlc => _libVlc.Value;
 
+    /// <summary>
+    /// Build libVLC's plugin cache (plugins.dat) once, at pack time, then exit.
+    /// Without the cache, libVLC scans all ~320 native plugin DLLs on every cold
+    /// start — ~12 seconds. With it, startup reads one file. `--reset-plugins-cache`
+    /// forces a fresh scan and writes the cache into the bundled plugins folder.
+    /// </summary>
+    public static void GeneratePluginCache()
+    {
+        Core.Initialize();
+        using var _ = new LibVLC("--reset-plugins-cache");
+    }
+
     public static Settings Settings { get; } = Settings.Load();
 
     public static CastService Cast { get; } = new();

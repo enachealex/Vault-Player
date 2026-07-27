@@ -45,6 +45,16 @@ if (Test-Path $staging) { Remove-Item -Recurse -Force $staging }
 dotnet publish $project -c Release -r win-x64 --self-contained true -o $staging --nologo
 if ($LASTEXITCODE -ne 0) { throw "publish failed" }
 
+# Pre-build libVLC's plugin cache so shipped copies don't scan ~320 native
+# plugin DLLs on first launch (~12 s cold). The app writes plugins.dat with its
+# OWN libVLC, so the cache always matches the bundled version.
+Write-Host "Generating libVLC plugin cache ..." -ForegroundColor Cyan
+$genExe = Join-Path $staging "VideoPlayer.App.exe"
+Start-Process $genExe -ArgumentList "--gen-plugin-cache" -Wait
+$cache = Join-Path $staging "libvlc\win-x64\plugins\plugins.dat"
+if (-not (Test-Path $cache)) { throw "plugin cache was not generated" }
+Write-Host ("  plugins.dat = {0:N0} KB" -f ((Get-Item $cache).Length / 1KB)) -ForegroundColor Gray
+
 New-Item -ItemType Directory -Force $OutDir | Out-Null
 
 Write-Host "Packaging version $Version ..." -ForegroundColor Cyan
