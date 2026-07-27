@@ -330,12 +330,11 @@ public partial class LibraryView : UserControl, IDisposable
             return;
         }
 
+        // Streaming titles open in the in-app browser — signed in, ready to
+        // find. Playing a protected one hands off from there.
         if (movie.IsShortcut)
         {
-            if (!StreamingServices.Launch(movie.Path))
-                MessageBox.Show(Window.GetWindow(this),
-                    $"Couldn't open the link for “{movie.Name}”.",
-                    "Vault Movies", MessageBoxButton.OK, MessageBoxImage.Warning);
+            OpenStreamingBrowser(movie.Path, movie.Service);
             return;
         }
 
@@ -346,6 +345,41 @@ public partial class LibraryView : UserControl, IDisposable
     }
 
     // ---- Streaming shortcuts -----------------------------------------------
+
+    /// <summary>Browse a service in-app, or save a title you own as a card.</summary>
+    private void StreamingBtn_Click(object sender, RoutedEventArgs e)
+    {
+        var menu = new ContextMenu();
+        foreach (var service in StreamingServices.BrowsableServices)
+        {
+            var item = new MenuItem { Header = $"Browse {service}", Tag = service };
+            item.Click += BrowseService_Click;
+            menu.Items.Add(item);
+        }
+        menu.Items.Add(new Separator());
+        var add = new MenuItem { Header = "Add a title you own…" };
+        add.Click += AddShortcutBtn_Click;
+        menu.Items.Add(add);
+
+        menu.PlacementTarget = StreamingBtn;
+        menu.IsOpen = true;
+    }
+
+    private void BrowseService_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as MenuItem)?.Tag is not string service) return;
+        OpenStreamingBrowser(StreamingServices.BrowseUrlFor(service), service);
+    }
+
+    /// <summary>
+    /// Sign in and browse inside the app; playing a protected title hands off to
+    /// the real browser (see StreamingBrowserWindow).
+    /// </summary>
+    private void OpenStreamingBrowser(string url, string? service)
+    {
+        var window = new StreamingBrowserWindow(url, service) { Owner = Window.GetWindow(this) };
+        window.Show();
+    }
 
     private void AddShortcutBtn_Click(object sender, RoutedEventArgs e)
     {

@@ -9,29 +9,65 @@ namespace VideoPlayer.App.Services;
 /// <summary>
 /// Streaming shortcuts: library cards for titles the user owns on a service.
 ///
-/// These never play in-app. Prime Video and friends are DRM-protected, there is
-/// no consumer API for a user's purchased library, and circumventing the DRM
-/// isn't something this app does. So a shortcut is exactly one thing — a link
-/// that opens the service. No accounts, no credentials, no scraping.
+/// Browsing a service (signing in, finding what you own) happens in the in-app
+/// browser; PLAYING is handed to the real browser. Prime Video and friends are
+/// DRM-protected and only permit playback in certified browsers, so the app
+/// never tries to decode their video — and never touches credentials, which
+/// stay between the user and the service's own sign-in page.
 /// </summary>
 public static class StreamingServices
 {
-    /// <summary>Search URL template per service; {0} is the URL-encoded title.</summary>
-    private static readonly (string Name, string SearchUrl)[] Catalog =
+    /// <summary>
+    /// Per service: the search template ({0} = URL-encoded title) and the page
+    /// to open when browsing — the user's own library where the service has
+    /// one, otherwise the home page.
+    /// </summary>
+    private static readonly (string Name, string SearchUrl, string BrowseUrl)[] Catalog =
     {
-        ("Prime Video", "https://www.primevideo.com/search/ref=atv_nb_sr?phrase={0}"),
-        ("Netflix",     "https://www.netflix.com/search?q={0}"),
-        ("Disney+",     "https://www.disneyplus.com/search?q={0}"),
-        ("Max",         "https://play.max.com/search?q={0}"),
-        ("Apple TV",    "https://tv.apple.com/search?term={0}"),
-        ("Hulu",        "https://www.hulu.com/search?q={0}"),
-        ("Paramount+",  "https://www.paramountplus.com/search/{0}/"),
-        ("YouTube",     "https://www.youtube.com/results?search_query={0}"),
-        ("Other",       "https://duckduckgo.com/?q={0}+watch+online"),
+        ("Prime Video", "https://www.primevideo.com/search/ref=atv_nb_sr?phrase={0}", "https://www.primevideo.com/storefront/library"),
+        ("Netflix",     "https://www.netflix.com/search?q={0}",                        "https://www.netflix.com/browse"),
+        ("Disney+",     "https://www.disneyplus.com/search?q={0}",                     "https://www.disneyplus.com/home"),
+        ("Max",         "https://play.max.com/search?q={0}",                           "https://play.max.com"),
+        ("Apple TV",    "https://tv.apple.com/search?term={0}",                        "https://tv.apple.com/library"),
+        ("Hulu",        "https://www.hulu.com/search?q={0}",                           "https://www.hulu.com/hub/home"),
+        ("Paramount+",  "https://www.paramountplus.com/search/{0}/",                   "https://www.paramountplus.com/"),
+        ("YouTube",     "https://www.youtube.com/results?search_query={0}",            "https://www.youtube.com/feed/library"),
+        ("Other",       "https://duckduckgo.com/?q={0}+watch+online",                  "https://duckduckgo.com/"),
     };
 
     public static IReadOnlyList<string> ServiceNames =>
         Catalog.Select(c => c.Name).ToList();
+
+    /// <summary>Services worth offering a "browse in-app" entry for.</summary>
+    public static IReadOnlyList<string> BrowsableServices =>
+        Catalog.Where(c => c.Name != "Other").Select(c => c.Name).ToList();
+
+    /// <summary>Where "browse this service" starts — their library page where one exists.</summary>
+    public static string BrowseUrlFor(string service) =>
+        Catalog.FirstOrDefault(c => c.Name == service).BrowseUrl ?? Catalog[^1].BrowseUrl;
+
+    /// <summary>
+    /// True when a URL is a DRM-protected player page. Those can't decode in an
+    /// embedded browser (no Widevine, and the services only allow certified
+    /// ones), so the app offers to hand the page to the real browser instead of
+    /// letting someone stare at a black rectangle.
+    /// </summary>
+    public static bool IsProtectedPlayer(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return false;
+        // YouTube is not DRM-gated and plays fine embedded, so it's excluded.
+        return url.Contains("netflix.com/watch", StringComparison.OrdinalIgnoreCase)
+            || url.Contains("hulu.com/watch", StringComparison.OrdinalIgnoreCase)
+            || url.Contains("play.max.com/video", StringComparison.OrdinalIgnoreCase)
+            || url.Contains("disneyplus.com/video", StringComparison.OrdinalIgnoreCase)
+            || url.Contains("disneyplus.com/play", StringComparison.OrdinalIgnoreCase)
+            || url.Contains("paramountplus.com/shows/video", StringComparison.OrdinalIgnoreCase)
+            || url.Contains("paramountplus.com/movies/video", StringComparison.OrdinalIgnoreCase)
+            || url.Contains("primevideo.com/detail", StringComparison.OrdinalIgnoreCase)
+            || url.Contains("amazon.com/gp/video/detail", StringComparison.OrdinalIgnoreCase)
+            || url.Contains("tv.apple.com/episode", StringComparison.OrdinalIgnoreCase)
+            || url.Contains("tv.apple.com/movie", StringComparison.OrdinalIgnoreCase);
+    }
 
     /// <summary>
     /// Where a shortcut should point. A saved direct link wins; otherwise we

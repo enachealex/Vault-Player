@@ -121,14 +121,16 @@
             </Border>
 
             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                <Button Style="{StaticResource GhostButton}" Click="AddShortcutBtn_Click"
+                <Button x:Name="StreamingBtn" Style="{StaticResource GhostButton}" Click="StreamingBtn_Click"
                         Padding="12,8" Margin="0,0,14,0"
-                        ToolTip="Add a title you own on a streaming service"
-                        AutomationProperties.Name="Add streaming shortcut">
+                        ToolTip="Browse a streaming service, or add a title you own"
+                        AutomationProperties.Name="Streaming">
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="&#xE710;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                        <TextBlock Text="&#xE7B5;" FontFamily="Segoe MDL2 Assets" FontSize="12"
                                    VerticalAlignment="Center" Margin="0,0,8,0" />
                         <TextBlock Text="Streaming" FontSize="12.5" />
+                        <TextBlock Text="&#xE70D;" FontFamily="Segoe MDL2 Assets" FontSize="9"
+                                   VerticalAlignment="Center" Margin="8,1,0,0" />
                     </StackPanel>
                 </Button>
                 <TextBlock Text="&#xE8CB;" FontFamily="Segoe MDL2 Assets" FontSize="13"
