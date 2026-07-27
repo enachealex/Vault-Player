@@ -58,7 +58,7 @@
 
                     <StackPanel Grid.Column="2" Orientation="Horizontal">
                         <Button x:Name="SettingsBtn" Style="{StaticResource CaptionButton}"
-                                Click="SettingsBtn_Click" Content="&#xE713;"
+                                Click="SettingsBtn_Click" Content="&#xE713;" FontSize="16"
                                 ToolTip="Settings" AutomationProperties.Name="Settings" />
                         <Button x:Name="MinBtn" Style="{StaticResource CaptionButton}"
                                 Click="MinBtn_Click" Content="&#xE921;"
