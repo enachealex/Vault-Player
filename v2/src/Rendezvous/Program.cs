@@ -61,6 +61,10 @@ builder.Services.AddIdentityCore<VaultUser>(o =>
     .AddDefaultTokenProviders(); // needed for GeneratePasswordResetTokenAsync
 builder.Services.AddSingleton<VaultTokens>();
 builder.Services.AddScoped<EmailSender>();
+// Single sign-on from LAN Party. Verification happens here rather than in the
+// desktop app, which cannot keep a shared secret.
+builder.Services.AddHttpClient();
+builder.Services.AddScoped<LanPartySso>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(o =>
     {
@@ -106,6 +110,25 @@ using (var scope = app.Services.CreateScope())
             "Dismissed" INTEGER NOT NULL
         );
         CREATE INDEX IF NOT EXISTS "IX_PartyInvites_ToUserId" ON "PartyInvites" ("ToUserId");
+        CREATE TABLE IF NOT EXISTS "LinkedIdentities" (
+            "Id" INTEGER NOT NULL CONSTRAINT "PK_LinkedIdentities" PRIMARY KEY AUTOINCREMENT,
+            "Provider" TEXT NOT NULL,
+            "Subject" TEXT NOT NULL,
+            "UserId" TEXT NOT NULL,
+            "ProviderName" TEXT NOT NULL,
+            "CreatedAt" INTEGER NOT NULL,
+            "LastSeenAt" INTEGER NOT NULL
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS "IX_LinkedIdentities_Provider_Subject"
+            ON "LinkedIdentities" ("Provider", "Subject");
+        CREATE UNIQUE INDEX IF NOT EXISTS "IX_LinkedIdentities_Provider_UserId"
+            ON "LinkedIdentities" ("Provider", "UserId");
+        CREATE TABLE IF NOT EXISTS "ConsumedJtis" (
+            "Id" INTEGER NOT NULL CONSTRAINT "PK_ConsumedJtis" PRIMARY KEY AUTOINCREMENT,
+            "Jti" TEXT NOT NULL,
+            "ExpiresAt" INTEGER NOT NULL
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS "IX_ConsumedJtis_Jti" ON "ConsumedJtis" ("Jti");
         """);
 }
 

@@ -28,7 +28,14 @@ public partial class FriendsWindow : Window
         RequestsSection.Visibility = f.Incoming.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
 
         FriendsList.ItemsSource = f.Friends;
-        EmptyFriends.Visibility = f.Friends.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        // Only claim "no friends yet" when there are none from either source.
+        EmptyFriends.Visibility = f.Friends.Count == 0 && f.LanPartyFriends.Count == 0
+            ? Visibility.Visible : Visibility.Collapsed;
+
+        LanPartyList.ItemsSource = f.LanPartyFriends;
+        LanPartySection.Visibility = f.LanPartyFriends.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        if (f.LanPartyUsername is { Length: > 0 } who)
+            LanPartyHeader.Text = $"FROM LAN PARTY ({who.ToUpperInvariant()})";
 
         if (f.Outgoing.Count > 0)
         {

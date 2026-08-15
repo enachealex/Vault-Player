@@ -160,6 +160,23 @@ public partial class App : Application
         _ = StartAsync(opened, invite);
     }
 
+    /// <summary>
+    /// Open an invite link. When it carries a LAN Party assertion, redeem it
+    /// first so the party is joined as that person rather than as a nickname.
+    /// A failed sign-in is never fatal — the room still opens as a guest, which
+    /// is exactly what happens for anyone who isn't a LAN Party user.
+    /// </summary>
+    private static async System.Threading.Tasks.Task OpenInviteAsync(string server, string code, string? sso)
+    {
+        if (sso is not null)
+        {
+            var outcome = await Services.AppServices.Account.SignInWithLanPartyAsync(sso);
+            if (outcome.Status != Services.AccountService.AuthStatus.Success)
+                Services.StartupTrace.Note($"LAN Party sign-in skipped: {outcome.Message}");
+        }
+        VideoPlayer.App.MainWindow.Instance.Navigate(new Views.PartyView(server, code));
+    }
+
     /// <summary>Play a file handed to us by the shell, with its folder as the playlist.</summary>
     private static void OpenFile(string path)
     {
@@ -196,12 +213,19 @@ public partial class App : Application
     /// </summary>
     private static async System.Threading.Tasks.Task StartAsync(string? fileToOpen, string? inviteUri = null)
     {
+        var hasInvite = inviteUri is not null
+            && Services.InviteLink.TryParse(inviteUri, out _, out _, out var assertion)
+            && assertion is not null;
+
         var splash = new Views.SplashWindow();
         splash.Show();
         Services.StartupTrace.Mark("splash shown");
         try
         {
-            await splash.RunAsync();
+            // A sign-in assertion expires in minutes, and an update prompt can
+            // sit here indefinitely waiting to be answered. Redeem the link
+            // first; the update is offered on the next ordinary launch.
+            if (!hasInvite) await splash.RunAsync();
             Services.StartupTrace.Mark("update check done");
         }
         finally
@@ -212,8 +236,8 @@ public partial class App : Application
             splash.Close();
             if (fileToOpen is not null) OpenFile(fileToOpen);
             else if (inviteUri is not null
-                     && Services.InviteLink.TryParse(inviteUri, out var server, out var code))
-                VideoPlayer.App.MainWindow.Instance.Navigate(new Views.PartyView(server, code));
+                     && Services.InviteLink.TryParse(inviteUri, out var server, out var code, out var sso))
+                _ = OpenInviteAsync(server, code, sso);
             // Pull any library changes made on another machine. Fire-and-forget:
             // signed-out or offline just no-ops, and the app is already usable.
             _ = Services.AppServices.Account.SyncAsync();

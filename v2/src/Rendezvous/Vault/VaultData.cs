@@ -92,6 +92,39 @@ public class PartyInvite
     public bool Dismissed { get; set; }
 }
 
+/// <summary>
+/// An account on another service that maps to a Vault account — today only LAN
+/// Party. <see cref="Subject"/> is that service's stable id for the person
+/// (LAN Party's username), stored verbatim: it is the ONLY join key. Email is
+/// deliberately never used to match, because LAN Party does not verify
+/// addresses, so matching on one would let anyone claim someone else's library.
+/// </summary>
+public class LinkedIdentity
+{
+    public long Id { get; set; }
+    /// <summary>Issuer, e.g. "lanparty".</summary>
+    public string Provider { get; set; } = "";
+    /// <summary>The provider's stable user id — never case-folded, never an email.</summary>
+    public string Subject { get; set; } = "";
+    public string UserId { get; set; } = "";
+    /// <summary>Display name as the provider last reported it.</summary>
+    public string ProviderName { get; set; } = "";
+    public long CreatedAt { get; set; }
+    public long LastSeenAt { get; set; }
+}
+
+/// <summary>
+/// A single-sign-on assertion that has already been spent. The assertion itself
+/// is short-lived, so rows only need to outlive it; the sweep keeps the table
+/// from growing without bound.
+/// </summary>
+public class ConsumedJti
+{
+    public long Id { get; set; }
+    public string Jti { get; set; } = "";
+    public long ExpiresAt { get; set; }
+}
+
 public class VaultDbContext(DbContextOptions<VaultDbContext> options)
     : IdentityDbContext<VaultUser>(options)
 {
@@ -100,6 +133,8 @@ public class VaultDbContext(DbContextOptions<VaultDbContext> options)
     public DbSet<EmailCode> EmailCodes => Set<EmailCode>();
     public DbSet<Friendship> Friendships => Set<Friendship>();
     public DbSet<PartyInvite> PartyInvites => Set<PartyInvite>();
+    public DbSet<LinkedIdentity> LinkedIdentities => Set<LinkedIdentity>();
+    public DbSet<ConsumedJti> ConsumedJtis => Set<ConsumedJti>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -110,5 +145,10 @@ public class VaultDbContext(DbContextOptions<VaultDbContext> options)
         // One row per pair, so a request can't be duplicated.
         b.Entity<Friendship>().HasIndex(x => new { x.RequesterId, x.AddresseeId }).IsUnique();
         b.Entity<PartyInvite>().HasIndex(x => x.ToUserId);
+        // One Vault account per provider identity, and vice versa — neither a
+        // person nor an account may be linked twice.
+        b.Entity<LinkedIdentity>().HasIndex(x => new { x.Provider, x.Subject }).IsUnique();
+        b.Entity<LinkedIdentity>().HasIndex(x => new { x.Provider, x.UserId }).IsUnique();
+        b.Entity<ConsumedJti>().HasIndex(x => x.Jti).IsUnique();
     }
 }

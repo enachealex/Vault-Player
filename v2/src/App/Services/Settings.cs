@@ -101,6 +101,12 @@ public class Settings
     public string? RefreshToken { get; set; }
 
     /// <summary>
+    /// LAN Party username, when this session arrived through their sign-in.
+    /// Display only — the link itself lives on the server, keyed on that name.
+    /// </summary>
+    public string? LanPartyUsername { get; set; }
+
+    /// <summary>
     /// Library activity keyed by film identity ("filename|size") rather than
     /// path, so it can sync across machines. Maintained alongside the path-keyed
     /// stores above; this is the copy that goes to and from the server.

@@ -20,6 +20,12 @@ public record LibraryItemDto(string FilmKey, string Name, long ResumeMs, int Wat
     long LastWatchedAt, string? ChaptersJson, long UpdatedAt);
 public record LibrarySyncReq(LibraryItemDto[] Items);
 
+// Single sign-on from LAN Party.
+public record LanPartyAuthReq(string Assertion);
+public record LanPartyPerson(string Username, string DisplayName, string? AvatarUrl,
+    string? AvatarColor, string? Status);
+public record LanPartyProfile(LanPartyPerson User, LanPartyPerson[] Friends);
+
 // Friends + party invites.
 public record FriendReq(string Email);
 public record RespondReq(long RequestId, bool Accept);
@@ -136,7 +142,9 @@ public static class VaultApi
             VaultDbContext db, EmailSender email) =>
         {
             var user = await users.FindByEmailAsync(r.Email.Trim());
-            if (user is not null)
+            // A LAN Party-linked account has no password and a non-routable
+            // address; there is nothing to reset and nowhere to send it.
+            if (user is not null && await users.HasPasswordAsync(user))
                 await email.SendResetCodeAsync(user.Email!, await NewCodeAsync(db, user.Email!, "reset"));
             return Results.Ok(); // always OK, so we don't leak which emails exist
         });
@@ -238,6 +246,7 @@ public static class VaultApi
             db.RefreshTokens.RemoveRange(db.RefreshTokens.Where(x => x.UserId == uid));
             db.Friendships.RemoveRange(db.Friendships.Where(x => x.RequesterId == uid || x.AddresseeId == uid));
             db.PartyInvites.RemoveRange(db.PartyInvites.Where(x => x.FromUserId == uid || x.ToUserId == uid));
+            db.LinkedIdentities.RemoveRange(db.LinkedIdentities.Where(x => x.UserId == uid));
             await db.SaveChangesAsync();
             var (mail, name) = (user.Email!, user.DisplayName);
             await users.DeleteAsync(user);
@@ -245,7 +254,141 @@ public static class VaultApi
             return Results.Ok();
         }).RequireAuthorization();
 
+        MapLanPartyApi(g);
         MapFriendsApi(g);
+    }
+
+    // ---- Single sign-on from LAN Party -------------------------------------
+
+    private static void MapLanPartyApi(RouteGroupBuilder g)
+    {
+        // The desktop app forwards the assertion it received on the deep link.
+        // Everything sensitive happens here: the app never holds the secret and
+        // never inspects the token.
+        g.MapPost("/auth/lanparty", async (LanPartyAuthReq r, LanPartySso sso,
+            UserManager<VaultUser> users, VaultDbContext db, VaultTokens tokens) =>
+        {
+            var (principal, error) = sso.Verify(r.Assertion ?? "");
+            if (principal is null) return Results.Json(new { error }, statusCode: 401);
+
+            var subject = principal.FindFirst("sub")?.Value?.Trim();
+            var jti = principal.FindFirst("jti")?.Value;
+            var name = principal.FindFirst("name")?.Value;
+            var email = principal.FindFirst("email")?.Value?.Trim();
+            if (string.IsNullOrWhiteSpace(subject))
+                return Results.Json(new { error = "That sign-in link is missing its user." }, statusCode: 401);
+
+            // Burn the assertion. Unique index on Jti makes a concurrent replay
+            // lose the race rather than sneak through behind the check.
+            if (!string.IsNullOrWhiteSpace(jti))
+            {
+                var now = Now();
+                db.ConsumedJtis.RemoveRange(db.ConsumedJtis.Where(c => c.ExpiresAt < now));
+                db.ConsumedJtis.Add(new ConsumedJti { Jti = jti!, ExpiresAt = now + JtiRetentionMs });
+                try { await db.SaveChangesAsync(); }
+                catch (DbUpdateException)
+                {
+                    return Results.Json(new { error = "That sign-in link has already been used." },
+                        statusCode: 401);
+                }
+            }
+
+            var link = await db.LinkedIdentities.FirstOrDefaultAsync(
+                l => l.Provider == LanPartySso.Provider && l.Subject == subject);
+
+            VaultUser? user = null;
+            if (link is not null)
+            {
+                user = await users.FindByIdAsync(link.UserId);
+                if (user is null)
+                {
+                    // Account deleted out from under the link; start clean.
+                    db.LinkedIdentities.Remove(link);
+                    await db.SaveChangesAsync();
+                    link = null;
+                }
+            }
+
+            if (link is null)
+            {
+                // NEVER auto-link by email. LAN Party does not verify addresses,
+                // so anyone can register with someone else's — matching on one
+                // would hand over that person's library. Ask instead.
+                if (!string.IsNullOrWhiteSpace(email) && await users.FindByEmailAsync(email!) is not null)
+                    return Results.Json(new { status = "confirm-merge", email }, statusCode: 409);
+
+                // A shadow account with no password and a non-routable address:
+                // it exists to own a library, and is only ever reachable through
+                // LAN Party until the person deliberately adds a password.
+                // UserName mirrors Email, as the ordinary register path does —
+                // Identity's default allowed-character set rejects a colon, and
+                // a second naming scheme would only be a second thing to get wrong.
+                var shadowEmail = $"{Sanitise(subject!)}@{LanPartySso.Provider}.invalid";
+                user = new VaultUser
+                {
+                    UserName = shadowEmail,
+                    Email = shadowEmail,
+                    EmailConfirmed = true,
+                    DisplayName = string.IsNullOrWhiteSpace(name) ? subject! : name!,
+                };
+                var created = await users.CreateAsync(user);
+                if (!created.Succeeded)
+                    return Results.Json(new { error = string.Join(" ", created.Errors.Select(e => e.Description)) },
+                        statusCode: 400);
+
+                link = new LinkedIdentity
+                {
+                    Provider = LanPartySso.Provider,
+                    Subject = subject!,
+                    UserId = user.Id,
+                    ProviderName = user.DisplayName,
+                    CreatedAt = Now(),
+                };
+                db.LinkedIdentities.Add(link);
+            }
+
+            // One snapshot per sign-in — never polled.
+            var profile = await sso.FetchProfileAsync(r.Assertion!);
+
+            var display = profile?.User.DisplayName ?? name ?? subject!;
+            if (user!.DisplayName != display)
+            {
+                user.DisplayName = display;
+                await users.UpdateAsync(user);
+            }
+            link.ProviderName = display;
+            link.LastSeenAt = Now();
+            await db.SaveChangesAsync();
+
+            var auth = await IssueAsync(user, db, tokens);
+            return Results.Ok(new
+            {
+                auth.AccessToken,
+                auth.RefreshToken,
+                auth.ExpiresAt,
+                auth.DisplayName,
+                auth.Email,
+                lanParty = new
+                {
+                    username = subject,
+                    displayName = display,
+                    avatarUrl = profile?.User.AvatarUrl,
+                    avatarColor = profile?.User.AvatarColor,
+                    status = profile?.User.Status,
+                    friends = profile?.Friends ?? Array.Empty<LanPartyPerson>(),
+                },
+            });
+        });
+    }
+
+    /// <summary>Kept longer than the assertion itself, so a replay can never outlive its own record.</summary>
+    private const long JtiRetentionMs = 10 * 60 * 1000;
+
+    /// <summary>Keep a generated address to characters an email may contain.</summary>
+    private static string Sanitise(string subject)
+    {
+        var clean = new string(subject.Where(c => char.IsLetterOrDigit(c) || c is '.' or '-' or '_').ToArray());
+        return clean.Length > 0 ? clean : Guid.NewGuid().ToString("N");
     }
 
     // ---- Friends + party invites (all require a valid access token) ---------

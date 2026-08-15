@@ -97,6 +97,59 @@ public class AccountService
         }
     }
 
+    /// <summary>
+    /// Sign in as a LAN Party user, using the assertion that arrived on the
+    /// launch link. The assertion is opaque to us: the relay holds the shared
+    /// secret, verifies it, and answers with an ordinary Vault session — so this
+    /// is just a different way of arriving at the same signed-in state.
+    /// </summary>
+    public async Task<AuthOutcome> SignInWithLanPartyAsync(string assertion)
+    {
+        try
+        {
+            var resp = await _http.PostAsJsonAsync($"{BaseUrl}/api/v1/auth/lanparty",
+                new { assertion }, Json);
+
+            // 409: an existing Vault account already uses that email address. We
+            // deliberately do NOT merge — LAN Party doesn't verify addresses, so
+            // linking on one would hand over somebody else's library.
+            if (resp.StatusCode == System.Net.HttpStatusCode.Conflict)
+                return new(AuthStatus.Error,
+                    "A Vault Movies account already uses that email. Sign in to it here first, "
+                    + "then link LAN Party from your account.");
+
+            if (!resp.IsSuccessStatusCode) return new(AuthStatus.Error, await ReadErrorAsync(resp));
+
+            var lp = await resp.Content.ReadFromJsonAsync<LanPartyAuthResp>(Json);
+            if (lp is null) return new(AuthStatus.Error, "The server returned an unexpected response.");
+
+            StoreSession(new AuthResp(lp.AccessToken, lp.RefreshToken, lp.ExpiresAt, lp.DisplayName, lp.Email));
+            LanParty = lp.LanParty;
+            AppServices.Settings.LanPartyUsername = lp.LanParty?.Username;
+            AppServices.Settings.Save();
+            Changed?.Invoke();
+            _ = SyncAsync();
+            return new(AuthStatus.Success);
+        }
+        catch (Exception ex)
+        {
+            return new(AuthStatus.Error, $"Couldn't reach the server. {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Who LAN Party says we are, plus their friends — a snapshot taken at
+    /// sign-in, never polled. Null when we didn't arrive via LAN Party.
+    /// </summary>
+    public LanPartyIdentity? LanParty { get; private set; }
+
+    public record LanPartyPerson(string Username, string DisplayName, string? AvatarUrl,
+        string? AvatarColor, string? Status);
+    public record LanPartyIdentity(string Username, string DisplayName, string? AvatarUrl,
+        string? AvatarColor, string? Status, LanPartyPerson[] Friends);
+    private record LanPartyAuthResp(string AccessToken, string RefreshToken, long ExpiresAt,
+        string DisplayName, string Email, LanPartyIdentity? LanParty);
+
     /// <summary>Confirm the emailed code; on success the user is signed in.</summary>
     public async Task<AuthOutcome> VerifyAsync(string email, string code)
     {
@@ -176,8 +229,9 @@ public class AccountService
     {
         var s = AppServices.Settings;
         var refresh = s.RefreshToken;
-        s.RefreshToken = s.AccountEmail = s.AccountName = null;
+        s.RefreshToken = s.AccountEmail = s.AccountName = s.LanPartyUsername = null;
         _accessToken = null;
+        LanParty = null;
         s.Save();
         Changed?.Invoke();
         if (refresh is not null)

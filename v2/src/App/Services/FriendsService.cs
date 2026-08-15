@@ -31,6 +31,19 @@ public class FriendsService
 
     public FriendsService(AccountService account) => _account = account;
 
+    /// <summary>
+    /// Friends carried over from LAN Party. Read-only and read-through: they are
+    /// a snapshot taken at sign-in, never written into Vault's own friend table.
+    /// LAN Party has no unfriend route, so rows mirrored here could never be
+    /// retired — and a LAN Party friendship must never disclose an email, which
+    /// Vault's own friend records do.
+    /// </summary>
+    public IReadOnlyList<AccountService.LanPartyPerson> LanPartyFriends =>
+        _account.LanParty?.Friends ?? Array.Empty<AccountService.LanPartyPerson>();
+
+    /// <summary>The LAN Party account this session signed in through, if any.</summary>
+    public string? LanPartyUsername => _account.LanParty?.Username;
+
     public IReadOnlyList<Person> Friends { get; private set; } = Array.Empty<Person>();
     public IReadOnlyList<Person> Incoming { get; private set; } = Array.Empty<Person>();
     public IReadOnlyList<Person> Outgoing { get; private set; } = Array.Empty<Person>();

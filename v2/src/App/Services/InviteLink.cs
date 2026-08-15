@@ -37,10 +37,20 @@ public static class InviteLink
     /// Parse a vaultmovies:// launch argument into (server, code). False for
     /// anything that isn't a well-formed join link with a plausible room code.
     /// </summary>
-    public static bool TryParse(string arg, out string server, out string code)
+    public static bool TryParse(string arg, out string server, out string code) =>
+        TryParse(arg, out server, out code, out _);
+
+    /// <summary>
+    /// As above, and also hands back LAN Party's single sign-on assertion when
+    /// the link carries one. The assertion is treated as OPAQUE here — the app
+    /// never verifies it, because the shared secret lives on the relay and can't
+    /// be shipped in a binary. It is simply forwarded.
+    /// </summary>
+    public static bool TryParse(string arg, out string server, out string code, out string? sso)
     {
         server = PublicHost;
         code = "";
+        sso = null;
         if (string.IsNullOrWhiteSpace(arg)) return false;
         if (!arg.StartsWith("vaultmovies:", StringComparison.OrdinalIgnoreCase)) return false;
         if (!Uri.TryCreate(arg, UriKind.Absolute, out var uri)) return false;
@@ -55,6 +65,8 @@ public static class InviteLink
                 server = value;
             else if (key.Equals("code", StringComparison.OrdinalIgnoreCase))
                 code = value.Trim().ToUpperInvariant();
+            else if (key.Equals("sso", StringComparison.OrdinalIgnoreCase) && value.Length > 0)
+                sso = value;
         }
         return Regex.IsMatch(code, "^MOVIE-[A-Z0-9]{4}$");
     }
