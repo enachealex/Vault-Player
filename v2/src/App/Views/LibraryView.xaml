@@ -145,6 +145,14 @@
                                    VerticalAlignment="Center" Margin="8,1,0,0" />
                     </StackPanel>
                 </Button>
+                <!-- Shelves. Hidden entirely until the account has one, so a
+                     library nobody has organised looks exactly as it did. -->
+                <TextBlock x:Name="CollectionIcon" Text="&#xE8B7;" FontFamily="Segoe MDL2 Assets" FontSize="13"
+                           Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center"
+                           Margin="0,0,8,0" Visibility="Collapsed" />
+                <ComboBox x:Name="CollectionBox" Width="170" Margin="0,0,14,0" Visibility="Collapsed"
+                          SelectionChanged="CollectionBox_SelectionChanged"
+                          AutomationProperties.Name="Collection" />
                 <TextBlock Text="&#xE8CB;" FontFamily="Segoe MDL2 Assets" FontSize="13"
                            Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center"
                            Margin="0,0,8,0" />
@@ -227,6 +235,13 @@
                                                       Tag="{Binding PlacementTarget.Tag,
                                                             RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                                             <MenuItem Header="Remove shortcut" Click="RemoveShortcut_Click"
+                                                      Tag="{Binding PlacementTarget.Tag,
+                                                            RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                            <!-- Filled in per-open by CardMenu_Opened, because the shelves
+                                                 and which ones already hold this film both change. Kept
+                                                 last so the menu.Items[0] Tag fallback above still finds a
+                                                 MenuItem carrying the movie. -->
+                                            <MenuItem x:Name="CollectMenu" Header="Add to collection"
                                                       Tag="{Binding PlacementTarget.Tag,
                                                             RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                                         </ContextMenu>

@@ -24,13 +24,24 @@ namespace VideoPlayer.App.Services;
 /// Requires an account, and degrades to nothing without one: signed out, or
 /// offline, the library is simply the films in your folder.
 /// </summary>
+/// <summary>One film on a shelf. See the server's CollectionItem for why FilmKey.</summary>
+public record CollectionEntryDto(string FilmKey, string Name);
+
+/// <summary>
+/// A shelf of films, belonging to the signed-in account. Anyone signed in with
+/// that account sees the same shelves, on any machine.
+/// </summary>
+public record CollectionDto(long Id, string Name, string? ArtFilmKey, int SortOrder,
+    CollectionEntryDto[] Items, long UpdatedAt);
+
 public class CatalogService(AccountService account)
 {
     // Wire shapes, matching the backend's /api/v1/catalog DTOs.
     private record CatalogItemDto(string ItemKey, string Name, long SizeBytes, long? DurationMs,
         string ContentType, string FilmKey, bool WebPlayable, string? VideoCodec, string? AudioCodec,
         string StreamUrl, string? ArtUrl, long AddedAt);
-    private record CatalogDto(CatalogItemDto[] Items, bool Scanning, long LastScanAt, bool MediaRootPresent);
+    private record CatalogDto(CatalogItemDto[] Items, bool Scanning, long LastScanAt, bool MediaRootPresent,
+        CollectionDto[]? Collections);
 
     private static readonly JsonSerializerOptions Json = new()
     {
@@ -43,6 +54,13 @@ public class CatalogService(AccountService account)
 
     /// <summary>Last fetched library, so navigating back doesn't refetch.</summary>
     public IReadOnlyList<MovieItem> Items { get; private set; } = Array.Empty<MovieItem>();
+
+    /// <summary>
+    /// This account's shelves, newest server state. Empty against a relay that
+    /// predates collections, which is why the wire field is nullable — an older
+    /// server simply omits it and the library still works.
+    /// </summary>
+    public IReadOnlyList<CollectionDto> Collections { get; private set; } = Array.Empty<CollectionDto>();
 
     /// <summary>Whether the server is mid-scan; the UI says so rather than claiming an empty library.</summary>
     public bool ServerScanning { get; private set; }
@@ -105,6 +123,7 @@ public class CatalogService(AccountService account)
             }
 
             ServerScanning = dto.Scanning;
+            Collections = dto.Collections ?? Array.Empty<CollectionDto>();
             Items = dto.Items.Select(x => new MovieItem
             {
                 Name = x.Name,
@@ -212,5 +231,96 @@ public class CatalogService(AccountService account)
         image.EndInit();
         image.Freeze();
         return image;
+    }
+
+    // ---- Shelves -----------------------------------------------------------
+
+    /// <summary>
+    /// Create a shelf. Returns null and sets <see cref="LastError"/> on failure,
+    /// matching how the rest of this service reports trouble — the library keeps
+    /// working, and the caller decides whether it is worth a message.
+    /// </summary>
+    public Task<CollectionDto?> CreateCollectionAsync(string name, CancellationToken ct = default) =>
+        SendCollectionAsync(HttpMethod.Post, "/api/v1/collections", new { name }, ct);
+
+    public Task<CollectionDto?> AddToCollectionAsync(long id, string filmKey, CancellationToken ct = default) =>
+        SendCollectionAsync(HttpMethod.Post, $"/api/v1/collections/{id}/items/add", new { filmKey }, ct);
+
+    public Task<CollectionDto?> RemoveFromCollectionAsync(long id, string filmKey, CancellationToken ct = default) =>
+        SendCollectionAsync(HttpMethod.Post, $"/api/v1/collections/{id}/items/remove", new { filmKey }, ct);
+
+    public async Task<bool> DeleteCollectionAsync(long id, CancellationToken ct = default)
+    {
+        var token = await account.AccessTokenAsync();
+        if (token is null) { LastError = "You're signed out."; return false; }
+        try
+        {
+            using var req = new HttpRequestMessage(HttpMethod.Delete,
+                $"{account.BaseUrl}/api/v1/collections/{id}");
+            req.Headers.Authorization = new("Bearer", token);
+            var resp = await _http.SendAsync(req, ct);
+            if (!resp.IsSuccessStatusCode) { LastError = await ReasonAsync(resp, ct); return false; }
+            ReplaceLocal(id, null);
+            Changed?.Invoke();
+            return true;
+        }
+        catch (Exception ex) { LastError = ex.Message; return false; }
+    }
+
+    private async Task<CollectionDto?> SendCollectionAsync(
+        HttpMethod method, string path, object body, CancellationToken ct)
+    {
+        LastError = null;
+        var token = await account.AccessTokenAsync();
+        if (token is null) { LastError = "You're signed out."; return null; }
+        try
+        {
+            using var req = new HttpRequestMessage(method, $"{account.BaseUrl}{path}")
+            {
+                Content = JsonContent.Create(body),
+            };
+            req.Headers.Authorization = new("Bearer", token);
+            var resp = await _http.SendAsync(req, ct);
+
+            // A relay older than collections answers 404 for the whole route.
+            // Say so plainly rather than letting it read as "that shelf is gone".
+            if (resp.StatusCode == System.Net.HttpStatusCode.NotFound && path == "/api/v1/collections")
+            {
+                LastError = "This server is too old to keep collections. Update it and try again.";
+                return null;
+            }
+            if (!resp.IsSuccessStatusCode) { LastError = await ReasonAsync(resp, ct); return null; }
+
+            var dto = await resp.Content.ReadFromJsonAsync<CollectionDto>(Json, ct);
+            if (dto is null) { LastError = "The server returned an unexpected response."; return null; }
+
+            // Keep the cached list in step, so the UI reflects the change without
+            // refetching the whole catalogue and re-minting every stream token.
+            ReplaceLocal(dto.Id, dto);
+            Changed?.Invoke();
+            return dto;
+        }
+        catch (Exception ex) { LastError = ex.Message; return null; }
+    }
+
+    /// <summary>Swap one shelf in the cached list, or drop it when <paramref name="dto"/> is null.</summary>
+    private void ReplaceLocal(long id, CollectionDto? dto)
+    {
+        var next = Collections.Where(c => c.Id != id).ToList();
+        if (dto is not null) next.Add(dto);
+        Collections = next.OrderBy(c => c.SortOrder).ThenBy(c => c.Id).ToList();
+    }
+
+    /// <summary>The server's own explanation if it sent one, else the status code.</summary>
+    private static async Task<string> ReasonAsync(HttpResponseMessage resp, CancellationToken ct)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync(ct));
+            if (doc.RootElement.TryGetProperty("error", out var e) && e.GetString() is { Length: > 0 } msg)
+                return msg;
+        }
+        catch { }
+        return $"The server refused that ({(int)resp.StatusCode}).";
     }
 }

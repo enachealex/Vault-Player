@@ -26,6 +26,7 @@ public partial class LibraryView : UserControl, IDisposable
         (SortMode.ShortestFirst, "Shortest first"),
     };
 
+    private bool _suppressCollectionChange;
     private readonly CancellationTokenSource _cts = new();
     private List<MovieItem> _movies = new();
 
@@ -135,6 +136,8 @@ public partial class LibraryView : UserControl, IDisposable
             .OrderBy(m => m.Name, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
 
+        _movies = Deduplicate(_movies);
+
         if (_movies.Count == 0)
         {
             Toolbar.Visibility = Visibility.Collapsed;
@@ -147,7 +150,36 @@ public partial class LibraryView : UserControl, IDisposable
         Toolbar.Visibility = Visibility.Visible;
         EmptyState.Visibility = Visibility.Collapsed;
         RefreshContinueRow();
+        RefreshCollectionBox();
         ApplyFilter();
+    }
+
+    /// <summary>
+    /// One card per film, even when the same film is in your folder AND on the
+    /// Vault.
+    ///
+    /// The two are genuinely the same film — FilmKey is name-plus-size precisely
+    /// so a server copy and a local rip resolve to one identity — and showing
+    /// both was always noise. Collections make it worse than noise: a shelf of
+    /// four films renders eight cards, which reads as the feature being broken.
+    ///
+    /// The local copy wins, because it plays off the disk instead of streaming.
+    /// Shortcuts are exempt: their key degrades to "&lt;url-segment&gt;|0", so they
+    /// would all collide with each other and all but one would vanish.
+    /// </summary>
+    private static List<MovieItem> Deduplicate(List<MovieItem> movies)
+    {
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var result = new List<MovieItem>(movies.Count);
+
+        // Local first so it claims the key, then everything else in the order
+        // it already had — the list arrives sorted by name and must stay so.
+        foreach (var movie in movies.Where(m => !m.IsOnServer).Concat(movies.Where(m => m.IsOnServer)))
+        {
+            if (!movie.IsShortcut && movie.SizeBytes > 0 && !seen.Add(movie.FilmKey)) continue;
+            result.Add(movie);
+        }
+        return result.OrderBy(m => m.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
     }
 
     /// <summary>
@@ -340,6 +372,20 @@ public partial class LibraryView : UserControl, IDisposable
 
         if (query.Length > 0)
             view = view.Where(m => m.Name.Contains(query, StringComparison.CurrentCultureIgnoreCase));
+
+        // A shelf narrows the grid to its films. Matched on FilmKey rather than
+        // on anything stored on the item: Compose rebuilds every MovieItem from
+        // scratch on each refresh, so a flag written onto an instance would be
+        // gone by the next background sync tick.
+        //
+        // Matching by key also means a film you own locally AND have on the
+        // server resolves from whichever copy is in the grid, without the shelf
+        // needing to know which one you are looking at.
+        if (SelectedCollection() is { } shelf)
+        {
+            var keys = shelf.Items.Select(i => i.FilmKey).ToHashSet(StringComparer.Ordinal);
+            view = view.Where(m => keys.Contains(m.FilmKey));
+        }
 
         var watchedAt = AppServices.Settings.LastWatchedAt;
 
@@ -548,9 +594,127 @@ public partial class LibraryView : UserControl, IDisposable
                                      && AppServices.Account is { IsSignedIn: true, IsOwner: true }
                     ? Visibility.Visible : Visibility.Collapsed,
                 "Remove shortcut" => movie is { IsShortcut: true } ? Visibility.Visible : Visibility.Collapsed,
+                "Add to collection" => CanCollect(movie) ? Visibility.Visible : Visibility.Collapsed,
                 _ => item.Visibility,
             };
+            if (item.Header as string == "Add to collection" && CanCollect(movie))
+                BuildCollectMenu(item, movie!);
         }
+    }
+
+    /// <summary>
+    /// Whether a film can go on a shelf at all.
+    ///
+    /// Shelves hold films the server has, identified by FilmKey. A streaming
+    /// shortcut is a URL with no size, and a film handed over inside a party is
+    /// a session URL with no size — both degrade FilmKey to something like
+    /// "watch|0", which collides with every other such item. Offering the menu
+    /// for those would produce shelves full of entries that mean nothing.
+    /// </summary>
+    private static bool CanCollect(MovieItem? movie) =>
+        movie is { IsShortcut: false, SizeBytes: > 0 }
+        && AppServices.Account.IsSignedIn
+        && AppServices.Catalog.Items.Any(x => x.FilmKey == movie.FilmKey);
+
+    /// <summary>
+    /// Rebuild the shelf submenu each time the menu opens: which shelves exist,
+    /// and which already hold this film, both change under us.
+    /// </summary>
+    private void BuildCollectMenu(MenuItem parent, MovieItem movie)
+    {
+        parent.Items.Clear();
+        foreach (var shelf in AppServices.Catalog.Collections)
+        {
+            var on = shelf.Items.Any(i => string.Equals(i.FilmKey, movie.FilmKey, StringComparison.Ordinal));
+            var entry = new MenuItem { Header = shelf.Name, IsCheckable = true, IsChecked = on, Tag = movie };
+            var id = shelf.Id;
+            // Checking adds, unchecking removes — one control for both, so a
+            // film already on a shelf can be taken off from the same place.
+            entry.Click += async (_, _) => await ToggleCollectionAsync(id, movie, !on);
+            parent.Items.Add(entry);
+        }
+        if (parent.Items.Count > 0) parent.Items.Add(new Separator());
+        var make = new MenuItem { Header = "New collection…", Tag = movie };
+        make.Click += async (_, _) => await NewCollectionAsync(movie);
+        parent.Items.Add(make);
+    }
+
+    private async Task ToggleCollectionAsync(long id, MovieItem movie, bool add)
+    {
+        var catalog = AppServices.Catalog;
+        var result = add
+            ? await catalog.AddToCollectionAsync(id, movie.FilmKey)
+            : await catalog.RemoveFromCollectionAsync(id, movie.FilmKey);
+        if (result is null && catalog.LastError is { Length: > 0 } why)
+            MessageBox.Show(Window.GetWindow(this), why, "Collections",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+        RefreshCollectionBox();
+        ApplyFilter();
+    }
+
+    private async Task NewCollectionAsync(MovieItem movie)
+    {
+        var name = NameCollectionWindow.Ask(Window.GetWindow(this));
+        if (name is null) return;
+
+        var catalog = AppServices.Catalog;
+        var made = await catalog.CreateCollectionAsync(name);
+        if (made is null)
+        {
+            MessageBox.Show(Window.GetWindow(this), catalog.LastError ?? "Couldn't create that collection.",
+                "Collections", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        await ToggleCollectionAsync(made.Id, movie, add: true);
+    }
+
+    // ---- The shelf picker in the toolbar -----------------------------------
+
+    /// <summary>The chosen shelf, or null for "All films".</summary>
+    private CollectionDto? SelectedCollection() =>
+        CollectionBox.SelectedItem is ComboBoxItem { Tag: CollectionDto dto } ? dto : null;
+
+    /// <summary>
+    /// Rebuild the picker from the current shelves, keeping the chosen one
+    /// selected where it survives. This runs on every background sync tick, so
+    /// it must not steal the user's selection out from under them.
+    /// </summary>
+    private void RefreshCollectionBox()
+    {
+        var shelves = AppServices.Catalog.Collections;
+        var wasId = SelectedCollection()?.Id;
+
+        _suppressCollectionChange = true;
+        CollectionBox.Items.Clear();
+        CollectionBox.Items.Add(new ComboBoxItem { Content = "All films", Tag = null });
+        foreach (var shelf in shelves)
+            CollectionBox.Items.Add(new ComboBoxItem
+            {
+                Content = $"{shelf.Name}  ({shelf.Items.Length})",
+                Tag = shelf,
+            });
+
+        var restored = 0;
+        if (wasId is { } id)
+        {
+            for (var i = 1; i < CollectionBox.Items.Count; i++)
+                if (((ComboBoxItem)CollectionBox.Items[i]!).Tag is CollectionDto d && d.Id == id)
+                { restored = i; break; }
+        }
+        CollectionBox.SelectedIndex = restored;
+        _suppressCollectionChange = false;
+
+        // Nothing to choose between until a shelf exists; an empty picker is
+        // just clutter on a library nobody has organised.
+        var show = shelves.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        CollectionBox.Visibility = show;
+        CollectionIcon.Visibility = show;
+    }
+
+    private void CollectionBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_suppressCollectionChange) return;
+        ApplyFilter();
     }
 
     private void UploadToVault_Click(object sender, RoutedEventArgs e)
