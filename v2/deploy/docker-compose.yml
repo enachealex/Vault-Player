@@ -39,12 +39,28 @@ services:
       - PORT=5555
       # SQLite for accounts lives on a volume so it survives rebuilds.
       - VAULT_DB=/data/vault.db
+      # The server's own film library. Indexed on startup and streamed on
+      # demand; see MEDIA_DIR in deploy/.env for where it lives on the host.
+      - VAULT_MEDIA=/media
+      # Where owner uploads land: the films directory alone, writable.
+      - VAULT_UPLOADS=/uploads
     # Account secrets (JWT signing key + SMTP credentials) come from
     # deploy/vault.env, which is gitignored. See deploy/README.md.
     env_file:
       - vault.env
     volumes:
       - vault_data:/data
+      # The media disk, mounted READ-ONLY. The server only ever indexes and
+      # reads these files; :ro makes that structural rather than a promise, so
+      # no bug in here can ever delete somebody's film collection.
+      #
+      # MEDIA_DIR defaults to /srv/vault-media. Point it at the mount you keep
+      # films on — e.g. /mnt/hdd/media on a box with a separate media drive.
+      - ${MEDIA_DIR:-/srv/vault-media}:/media:ro
+      # The one deliberate exception: owner uploads write into films/ and
+      # nowhere else. Music and the rest of the disk stay structurally
+      # untouchable even from the upload path.
+      - ${MEDIA_DIR:-/srv/vault-media}/films:/uploads
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:5555/health || exit 1"]
       interval: 30s

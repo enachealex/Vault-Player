@@ -97,6 +97,12 @@ public class Settings
     public string? AuthServer { get; set; }
     public string? AccountEmail { get; set; }
     public string? AccountName { get; set; }
+    /// <summary>The account's login/handle. Shown verified in parties.</summary>
+    public string? AccountUsername { get; set; }
+    /// <summary>"pending" | "approved" | "blocked" as of the last sign-in/refresh.</summary>
+    public string? AccountStatus { get; set; }
+    /// <summary>Server owner: may upload films and manage users.</summary>
+    public bool AccountIsOwner { get; set; }
     /// <summary>Long-lived refresh token; the only credential kept on disk.</summary>
     public string? RefreshToken { get; set; }
 
@@ -121,6 +127,8 @@ public class Settings
     public string? LastPartyAddress { get; set; }
     /// <summary>Deployed rendezvous to host through (e.g. "party.example.com"); null = run one locally.</summary>
     public string? RendezvousServer { get; set; }
+    /// <summary>Host parties as private (signed-in, approved guests only). Applies when signed in.</summary>
+    public bool PrivateParties { get; set; }
 
     private static string FilePath =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),

@@ -121,6 +121,18 @@
             </Border>
 
             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                <!-- Only shown once the server has actually answered with films;
+                     there is nothing to refresh otherwise. -->
+                <Button x:Name="VaultBtn" Style="{StaticResource GhostButton}" Click="VaultBtn_Click"
+                        Padding="12,8" Margin="0,0,14,0" Visibility="Collapsed"
+                        ToolTip="Re-check the Vault server for films added or removed"
+                        AutomationProperties.Name="Refresh Vault library">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE753;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                   VerticalAlignment="Center" Margin="0,0,8,0" />
+                        <TextBlock x:Name="VaultBtnText" Text="Vault" FontSize="12.5" />
+                    </StackPanel>
+                </Button>
                 <Button x:Name="StreamingBtn" Style="{StaticResource GhostButton}" Click="StreamingBtn_Click"
                         Padding="12,8" Margin="0,0,14,0"
                         ToolTip="Browse a streaming service, or add a title you own"
@@ -209,7 +221,11 @@
                                 <Button Style="{StaticResource MovieCard}" Click="MovieCard_Click"
                                         Tag="{Binding}" AutomationProperties.Name="{Binding Name}">
                                     <Button.ContextMenu>
-                                        <ContextMenu>
+                                        <!-- Items show/hide per card kind in CardMenu_Opened. -->
+                                        <ContextMenu Opened="CardMenu_Opened">
+                                            <MenuItem Header="Upload to Vault" Click="UploadToVault_Click"
+                                                      Tag="{Binding PlacementTarget.Tag,
+                                                            RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                                             <MenuItem Header="Remove shortcut" Click="RemoveShortcut_Click"
                                                       Tag="{Binding PlacementTarget.Tag,
                                                             RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
@@ -238,6 +254,20 @@
                                                         <TextBlock Text="{Binding Service}" FontSize="10.5" Margin="6,0,0,0"
                                                                    FontWeight="SemiBold"
                                                                    Foreground="{StaticResource AccentWarmBrush}" />
+                                                    </StackPanel>
+                                                </Border>
+                                                <!-- Vault film: streamed from the server, nothing stored here. -->
+                                                <Border Background="#CC0E0604" CornerRadius="9" Padding="8,3"
+                                                        HorizontalAlignment="Left" VerticalAlignment="Top" Margin="7"
+                                                        Visibility="{Binding ServerBadgeVisibility}"
+                                                        ToolTip="Streams from the Vault server">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="&#xE753;" FontFamily="Segoe MDL2 Assets"
+                                                                   FontSize="9" VerticalAlignment="Center"
+                                                                   Foreground="{StaticResource AccentBrush}" />
+                                                        <TextBlock Text="Vault" FontSize="10.5" Margin="6,0,0,0"
+                                                                   FontWeight="SemiBold"
+                                                                   Foreground="{StaticResource AccentBrush}" />
                                                     </StackPanel>
                                                 </Border>
                                                 <!-- Times-watched badge -->

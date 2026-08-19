@@ -29,6 +29,7 @@
   <ItemGroup>
     <PackageReference Include="LibVLCSharp.WPF" Version="3.10.0" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4078.44" />
+    <PackageReference Include="QRCoder" Version="1.8.0" />
     <PackageReference Include="Velopack" Version="1.2.0" />
     <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.23.1" />
   </ItemGroup>
@@ -55,11 +56,7 @@
          hrtfs\, lua\) per item. A Link with %(RecursiveDir) collapses to a
          single destination during publish, which is the MSB3094 above.
          The C/C++ headers and import libs are build-time only. -->
-    <None Include="$(VlcX64Dir)**\*"
-          Exclude="$(VlcX64Dir)include\**\*;$(VlcX64Dir)*.lib"
-          LinkBase="libvlc\win-x64"
-          CopyToOutputDirectory="PreserveNewest"
-          Condition="Exists('$(VlcX64Dir)')" />
+    <None Include="$(VlcX64Dir)**\*" Exclude="$(VlcX64Dir)include\**\*;$(VlcX64Dir)*.lib" LinkBase="libvlc\win-x64" CopyToOutputDirectory="PreserveNewest" Condition="Exists('$(VlcX64Dir)')" />
   </ItemGroup>
 
   <ItemGroup>

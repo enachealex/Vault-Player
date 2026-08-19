@@ -68,6 +68,8 @@ public static class InviteLink
             else if (key.Equals("sso", StringComparison.OrdinalIgnoreCase) && value.Length > 0)
                 sso = value;
         }
-        return Regex.IsMatch(code, "^MOVIE-[A-Z0-9]{4}$");
+        // Plain 6-character codes; the retired MOVIE-XXXX form stays valid so
+        // links in old chat messages keep working.
+        return Regex.IsMatch(code, "^([A-Z0-9]{6}|MOVIE-[A-Z0-9]{4})$");
     }
 }

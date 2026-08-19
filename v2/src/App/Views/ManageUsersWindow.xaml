@@ -1,0 +1,91 @@
+<Window x:Class="VideoPlayer.App.Views.ManageUsersWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Manage users"
+        Width="520" Height="480" ResizeMode="CanResize"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource BgBrush}"
+        FontFamily="{StaticResource BodyFont}">
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <StackPanel>
+            <TextBlock Text="Who can use this server" FontSize="19" FontWeight="Bold"
+                       FontFamily="{StaticResource DisplayFont}" Foreground="{StaticResource TextBrush}" />
+            <TextBlock x:Name="Subhead" FontSize="12" Foreground="{StaticResource TextMutedBrush}"
+                       TextWrapping="Wrap" Margin="0,6,0,14"
+                       Text="New accounts start as pending and can't see your films until you approve them." />
+            <TextBlock x:Name="ErrorText" FontSize="12" TextWrapping="Wrap"
+                       Foreground="{StaticResource AccentBrush}" Margin="0,0,0,10" Visibility="Collapsed" />
+        </StackPanel>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <ItemsControl x:Name="UserList">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Background="{StaticResource SurfaceBrush}" CornerRadius="10"
+                                Padding="14,10" Margin="0,0,0,8">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="{Binding Username}" FontSize="14" FontWeight="SemiBold"
+                                                   Foreground="{StaticResource TextBrush}" />
+                                        <TextBlock Text="{Binding Badge}" FontSize="11" Margin="8,2,0,0"
+                                                   Foreground="{Binding BadgeBrush}" />
+                                    </StackPanel>
+                                    <TextBlock Text="{Binding Detail}" FontSize="11.5"
+                                               Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Button Content="Approve" Style="{StaticResource PrimaryButton}" Padding="10,5"
+                                            Margin="0,0,6,0" Click="Approve_Click" Tag="{Binding}"
+                                            Visibility="{Binding ApproveVisible}"
+                                            AutomationProperties.Name="Approve user" />
+                                    <Button Content="Block" Style="{StaticResource GhostButton}" Padding="10,5"
+                                            Margin="0,0,6,0" Click="Block_Click" Tag="{Binding}"
+                                            Visibility="{Binding BlockVisible}"
+                                            AutomationProperties.Name="Block user" />
+                                    <Button Content="Unblock" Style="{StaticResource GhostButton}" Padding="10,5"
+                                            Margin="0,0,6,0" Click="Approve_Click" Tag="{Binding}"
+                                            Visibility="{Binding UnblockVisible}"
+                                            AutomationProperties.Name="Unblock user" />
+                                    <Button Content="Remove" Style="{StaticResource GhostButton}" Padding="10,5"
+                                            Click="Remove_Click" Tag="{Binding}"
+                                            Visibility="{Binding RemoveVisible}"
+                                            AutomationProperties.Name="Remove user" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+        <Grid Grid.Row="2" Margin="0,14,0,0">
+            <!-- The invite is how people are SUPPOSED to arrive: approval
+                 granted up front, no pending queue. -->
+            <Button Style="{StaticResource PrimaryButton}" Padding="12,7" HorizontalAlignment="Left"
+                    Click="Invite_Click" AutomationProperties.Name="Invite a friend">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="&#xE8FB;" FontFamily="Segoe MDL2 Assets" FontSize="13"
+                               VerticalAlignment="Center" Margin="0,0,8,0" />
+                    <TextBlock Text="Invite a friend" FontSize="12.5" />
+                </StackPanel>
+            </Button>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="Refresh" Style="{StaticResource GhostButton}" Padding="12,7" Margin="0,0,10,0"
+                        Click="Refresh_Click" AutomationProperties.Name="Refresh users" />
+                <Button Content="Done" Style="{StaticResource PrimaryButton}" Padding="18,7"
+                        Click="Done_Click" IsDefault="True" AutomationProperties.Name="Done" />
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>

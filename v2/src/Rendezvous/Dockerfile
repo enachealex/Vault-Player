@@ -11,8 +11,14 @@ RUN dotnet publish Rendezvous/VideoPlayer.Rendezvous.csproj -c Release -o /app
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
 # curl is only here for the container healthcheck — the runtime image ships
 # with neither curl nor wget, so without it the check can never pass.
+#
+# ffmpeg brings ffprobe with it, and the catalogue scanner uses both: ffprobe
+# for runtimes and codecs, ffmpeg for poster frames. Neither is required — a
+# library without them still lists and streams, it just shows names and sizes
+# and no artwork. It costs roughly 200 MB of image, which is the price of the
+# library looking like a library.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends curl \
+ && apt-get install -y --no-install-recommends curl ffmpeg \
  && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=build /app .

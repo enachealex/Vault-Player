@@ -36,6 +36,12 @@ public static class AppServices
     /// <summary>Optional account + cross-machine library sync.</summary>
     public static AccountService Account { get; } = new();
 
+    /// <summary>Films held on the Vault server and streamed from it.</summary>
+    public static CatalogService Catalog { get; } = new(Account);
+
+    /// <summary>Owner-only queue pushing films from the folder up to the server.</summary>
+    public static UploadService Uploads { get; } = new(Account);
+
     /// <summary>Account-to-account friends and Watch Party invites.</summary>
     public static FriendsService Friends { get; } = new(Account);
 

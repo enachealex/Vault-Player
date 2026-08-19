@@ -9,13 +9,26 @@ using Microsoft.IdentityModel.Tokens;
 namespace VideoPlayer.Rendezvous.Vault;
 
 // ---- DTOs (what the app sends/receives) ------------------------------------
-public record RegisterReq(string Email, string Password, string DisplayName);
-public record LoginReq(string Email, string Password);
+public record RegisterReq(string Username, string Password, string? Email,
+    string CaptchaId, string CaptchaAnswer, string? InviteCode = null);
+public record LoginReq(string Username, string Password);
 public record RefreshReq(string RefreshToken);
 public record EmailReq(string Email);
-public record VerifyReq(string Email, string Code);
 public record ResetReq(string Email, string Code, string NewPassword);
-public record AuthResp(string AccessToken, string RefreshToken, long ExpiresAt, string DisplayName, string Email);
+public record AuthResp(string AccessToken, string RefreshToken, long ExpiresAt, string DisplayName,
+    string Email, string Username, string Status, bool IsOwner);
+
+// Owner-only user management.
+public record AdminUserDto(string UserId, string Username, string DisplayName, string Email,
+    string Status, bool IsOwner, long CreatedAt);
+public record SetStatusReq(string UserId, string Status);
+public record AdminRemoveReq(string UserId);
+
+// Invites: the owner's approval handed out in advance, usually as a QR code.
+// (Distinct from InviteDto above, which is a party invite between friends.)
+public record LibraryInviteDto(string Code, string Url, long CreatedAt, long ExpiresAt,
+    bool Revoked, string UsedByName, long UsedAt);
+public record RevokeInviteReq(string Code);
 public record LibraryItemDto(string FilmKey, string Name, long ResumeMs, int WatchCount,
     long LastWatchedAt, string? ChaptersJson, long UpdatedAt);
 public record LibrarySyncReq(LibraryItemDto[] Items);
@@ -82,59 +95,131 @@ public static class VaultApi
     {
         var g = app.MapGroup("/api/v1");
 
-        g.MapPost("/register", async (RegisterReq r, UserManager<VaultUser> users,
-            VaultDbContext db, EmailSender email) =>
+        // A fresh challenge for the sign-up form. The image is base64 in JSON
+        // because the WPF client is going to decode it into a bitmap anyway,
+        // and one response shape is simpler than an image URL plus a cookie.
+        g.MapGet("/captcha", (CaptchaStore captcha) =>
         {
-            if (string.IsNullOrWhiteSpace(r.Email) || r.Password.Length < 8)
-                return Results.BadRequest(new { error = "Email required and password must be at least 8 characters." });
+            var issued = captcha.Issue();
+            if (issued is null)
+                return Results.Json(new { error = "Too many open challenges — try again in a minute." },
+                    statusCode: 429);
+
+            // Test hook, never set in production: lets an automated check walk
+            // the register flow without OCR. The answer is only otherwise
+            // available by reading the image.
+            if (Environment.GetEnvironmentVariable("VAULT_CAPTCHA_REVEAL") == "1")
+                return Results.Ok(new
+                {
+                    id = issued.Value.Id,
+                    image = Convert.ToBase64String(issued.Value.Png),
+                    answer = captcha.Peek(issued.Value.Id),
+                });
+            return Results.Ok(new { id = issued.Value.Id, image = Convert.ToBase64String(issued.Value.Png) });
+        });
+
+        g.MapPost("/register", async (RegisterReq r, UserManager<VaultUser> users,
+            VaultDbContext db, VaultTokens tokens, CaptchaStore captcha, EmailSender email) =>
+        {
+            // Captcha first, before any validation an enumeration script could
+            // learn from. It is single-use: failing anything below costs the
+            // caller a fresh image.
+            if (!captcha.Consume(r.CaptchaId, r.CaptchaAnswer))
+                return Results.BadRequest(new { error = "The characters didn't match the image. Try the new one." });
+
+            var username = (r.Username ?? "").Trim();
+            if (username.Length is < 3 or > 20 || !username.All(c => char.IsAsciiLetterOrDigit(c) || c is '.' or '_' or '-'))
+                return Results.BadRequest(new
+                    { error = "Username must be 3–20 characters: letters, digits, dots, dashes or underscores." });
+            if (r.Password.Length < 8)
+                return Results.BadRequest(new { error = "Password must be at least 8 characters." });
+
+            // Email is optional and exists only for password reset. Uniqueness
+            // is enforced here rather than by Identity, because Identity's
+            // unique-email rule refuses accounts with no email at all.
+            var mail = string.IsNullOrWhiteSpace(r.Email) ? null : r.Email.Trim();
+            if (mail is not null)
+            {
+                if (!mail.Contains('@') || mail.Length > 254)
+                    return Results.BadRequest(new { error = "That email address doesn't look right." });
+                if (await users.FindByEmailAsync(mail) is not null)
+                    return Results.BadRequest(new { error = "That email is already on an account." });
+            }
+
+            // An invite is the owner's approval handed out in advance: register
+            // with a live one and the pending queue is skipped entirely. A code
+            // that was typed but is wrong gets a loud error rather than a
+            // silently-pending account — the person believes they were invited,
+            // and quietly ignoring that belief produces a confusing empty
+            // library and a "why can't my friend see anything" conversation.
+            InviteCode? invite = null;
+            if (!string.IsNullOrWhiteSpace(r.InviteCode))
+            {
+                var code = r.InviteCode.Trim().ToUpperInvariant();
+                invite = await db.InviteCodes.FirstOrDefaultAsync(i => i.Code == code);
+                if (invite is null || invite.Revoked || invite.UsedByUserId is not null
+                    || invite.ExpiresAt < Now())
+                    return Results.BadRequest(new
+                    {
+                        error = "That invite code isn't valid any more — it may have expired or "
+                              + "already been used. Ask for a fresh one, or register without it "
+                              + "and wait for approval.",
+                    });
+            }
 
             var user = new VaultUser
             {
-                UserName = r.Email.Trim(),
-                Email = r.Email.Trim(),
-                EmailConfirmed = false, // confirmed by the emailed code
-                DisplayName = string.IsNullOrWhiteSpace(r.DisplayName) ? r.Email.Split('@')[0] : r.DisplayName.Trim(),
+                UserName = username,
+                Email = mail,
+                EmailConfirmed = false,
+                DisplayName = username,
+                CreatedAt = Now(),
+                AccessStatus = invite is null ? AccessStates.Pending : AccessStates.Approved,
             };
+            ApplyFirstAccountRule(user, users);
+
             var created = await users.CreateAsync(user, r.Password);
             if (!created.Succeeded)
                 return Results.BadRequest(new { error = string.Join(" ", created.Errors.Select(e => e.Description)) });
 
-            await email.SendVerifyCodeAsync(user.Email!, await NewCodeAsync(db, user.Email!, "verify"));
-            // No tokens yet — the client goes to the "enter your code" step.
-            return Results.Ok(new { status = "verify", email = user.Email });
+            // Burn the invite only after the account actually exists, so a
+            // failed registration doesn't waste it.
+            if (invite is not null)
+            {
+                invite.UsedByUserId = user.Id;
+                invite.UsedByName = username;
+                invite.UsedAt = Now();
+                await db.SaveChangesAsync();
+            }
+
+            if (mail is not null)
+                try { await email.SendWelcomeAsync(mail, username); } catch { /* optional nicety */ }
+
+            // Signed in at once — approval gates the library, not the account.
+            return Results.Ok(await IssueAsync(user, db, tokens));
         });
 
-        g.MapPost("/verify", async (VerifyReq r, UserManager<VaultUser> users,
-            VaultDbContext db, VaultTokens tokens, EmailSender email) =>
-        {
-            if (!await ConsumeCodeAsync(db, r.Email, r.Code, "verify"))
-                return Results.Json(new { error = "That code is wrong or has expired." }, statusCode: 400);
-
-            var user = await users.FindByEmailAsync(r.Email.Trim());
-            if (user is null) return Results.Json(new { error = "Account not found." }, statusCode: 400);
-            user.EmailConfirmed = true;
-            await users.UpdateAsync(user);
-            await email.SendWelcomeAsync(user.Email!, user.DisplayName);
-            return Results.Ok(await IssueAsync(user, db, tokens)); // verified = signed in
-        });
-
-        g.MapPost("/resend", async (EmailReq r, UserManager<VaultUser> users,
-            VaultDbContext db, EmailSender email) =>
-        {
-            var user = await users.FindByEmailAsync(r.Email.Trim());
-            if (user is not null && !user.EmailConfirmed)
-                await email.SendVerifyCodeAsync(user.Email!, await NewCodeAsync(db, user.Email!, "verify"));
-            return Results.Ok(); // never reveal whether the address exists
-        });
+        // Pre-username clients (≤2.8.0) posted here to finish registration.
+        // There is nothing to finish any more; tell them what to do instead.
+        g.MapPost("/verify", () => Results.Json(
+            new { error = "This server now uses username sign-in. Please update Vault Movies." },
+            statusCode: 400));
+        g.MapPost("/resend", () => Results.Json(
+            new { error = "This server now uses username sign-in. Please update Vault Movies." },
+            statusCode: 400));
 
         g.MapPost("/login", async (LoginReq r, UserManager<VaultUser> users,
             VaultDbContext db, VaultTokens tokens) =>
         {
-            var user = await users.FindByEmailAsync(r.Email.Trim());
+            var id = (r.Username ?? "").Trim();
+            // Username is the credential; accepting an email too costs one
+            // lookup and saves everyone who forgets which one they typed.
+            var user = await users.FindByNameAsync(id) ?? await users.FindByEmailAsync(id);
             if (user is null || !await users.CheckPasswordAsync(user, r.Password))
-                return Results.Json(new { error = "Wrong email or password." }, statusCode: 401);
-            if (!user.EmailConfirmed)
-                return Results.Json(new { error = "verify", email = user.Email }, statusCode: 403);
+                return Results.Json(new { error = "Wrong username or password." }, statusCode: 401);
+            if (user.AccessStatus == AccessStates.Blocked)
+                return Results.Json(new { error = "This account has been blocked by the server owner." },
+                    statusCode: 403);
             return Results.Ok(await IssueAsync(user, db, tokens));
         });
 
@@ -242,6 +327,16 @@ public static class VaultApi
             var user = await users.FindByIdAsync(uid);
             if (user is null) return Results.Unauthorized();
 
+            // The owner deleting themselves would strand the server: the
+            // first-account rule only fires on an EMPTY user table, so with other
+            // accounts present nothing could ever grant that role again.
+            if (user.IsOwner)
+                return Results.BadRequest(new
+                {
+                    error = "This is the server's owner account, so it can't be deleted. "
+                          + "Hand ownership to someone else first.",
+                });
+
             db.LibraryItems.RemoveRange(db.LibraryItems.Where(x => x.UserId == uid));
             db.RefreshTokens.RemoveRange(db.RefreshTokens.Where(x => x.UserId == uid));
             db.Friendships.RemoveRange(db.Friendships.Where(x => x.RequesterId == uid || x.AddresseeId == uid));
@@ -256,6 +351,136 @@ public static class VaultApi
 
         MapLanPartyApi(g);
         MapFriendsApi(g);
+        MapAdminApi(g);
+    }
+
+    // ---- Owner-only user management ----------------------------------------
+
+    /// <summary>Resolve the caller iff they are the owner; null otherwise.</summary>
+    private static async Task<VaultUser?> OwnerAsync(ClaimsPrincipal me, UserManager<VaultUser> users)
+    {
+        var uid = me.FindFirstValue(JwtRegisteredClaimNames.Sub);
+        if (uid is null) return null;
+        var user = await users.FindByIdAsync(uid);
+        return user is { IsOwner: true } ? user : null;
+    }
+
+    private static void MapAdminApi(RouteGroupBuilder g)
+    {
+        g.MapGet("/admin/users", async (ClaimsPrincipal me, UserManager<VaultUser> users) =>
+        {
+            if (await OwnerAsync(me, users) is null) return Results.StatusCode(403);
+            var all = users.Users
+                .OrderBy(u => u.CreatedAt)
+                .Select(u => new AdminUserDto(u.Id, u.UserName ?? "", u.DisplayName,
+                    u.Email ?? "", u.AccessStatus, u.IsOwner, u.CreatedAt))
+                .ToList();
+            return Results.Ok(all);
+        }).RequireAuthorization();
+
+        g.MapPost("/admin/users/status", async (SetStatusReq r, ClaimsPrincipal me,
+            UserManager<VaultUser> users, VaultDbContext db) =>
+        {
+            var owner = await OwnerAsync(me, users);
+            if (owner is null) return Results.StatusCode(403);
+            if (r.Status is not (AccessStates.Pending or AccessStates.Approved or AccessStates.Blocked))
+                return Results.BadRequest(new { error = "Unknown status." });
+
+            var target = await users.FindByIdAsync(r.UserId);
+            if (target is null) return Results.NotFound(new { error = "No such user." });
+            // The owner demoting themself would leave a server nobody administers.
+            if (target.IsOwner) return Results.BadRequest(new { error = "The owner's access can't be changed." });
+
+            target.AccessStatus = r.Status;
+            await users.UpdateAsync(target);
+
+            // Blocking must end their sessions, not just their next sign-in:
+            // access tokens live an hour, refresh tokens two months.
+            if (r.Status == AccessStates.Blocked)
+            {
+                foreach (var t in db.RefreshTokens.Where(t => t.UserId == target.Id && !t.Revoked))
+                    t.Revoked = true;
+                await db.SaveChangesAsync();
+            }
+            return Results.Ok(new AdminUserDto(target.Id, target.UserName ?? "", target.DisplayName,
+                target.Email ?? "", target.AccessStatus, target.IsOwner, target.CreatedAt));
+        }).RequireAuthorization();
+
+        // ---- Invites -------------------------------------------------------
+
+        g.MapPost("/admin/invites", async (ClaimsPrincipal me, UserManager<VaultUser> users,
+            VaultDbContext db, HttpContext ctx) =>
+        {
+            if (await OwnerAsync(me, users) is null) return Results.StatusCode(403);
+
+            // Same unambiguous alphabet as room codes. Eight characters is
+            // ~10^12 possibilities against a rate-limited HTTPS endpoint that
+            // also demands a captcha — brute force is not the weak point here.
+            const string alphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+            var code = "VAULT-" + new string(Enumerable.Range(0, 8)
+                .Select(_ => alphabet[System.Security.Cryptography.RandomNumberGenerator.GetInt32(alphabet.Length)])
+                .ToArray());
+
+            var invite = new InviteCode
+            {
+                Code = code,
+                CreatedAt = Now(),
+                // A week: long enough to hand out at your leisure, short enough
+                // that a code lost in some chat log dies on its own.
+                ExpiresAt = Now() + 7L * 24 * 60 * 60 * 1000,
+            };
+            db.InviteCodes.Add(invite);
+            await db.SaveChangesAsync();
+
+            // The QR points here; the page tells the phone-holder what to do.
+            var url = $"https://{ctx.Request.Host.Host}/invite/{code}";
+            return Results.Ok(new LibraryInviteDto(code, url, invite.CreatedAt, invite.ExpiresAt,
+                false, "", 0));
+        }).RequireAuthorization();
+
+        g.MapGet("/admin/invites", async (ClaimsPrincipal me, UserManager<VaultUser> users,
+            VaultDbContext db, HttpContext ctx) =>
+        {
+            if (await OwnerAsync(me, users) is null) return Results.StatusCode(403);
+            var host = ctx.Request.Host.Host;
+            var invites = await db.InviteCodes.OrderByDescending(i => i.CreatedAt)
+                .Take(50).ToListAsync();
+            return Results.Ok(invites.Select(i => new LibraryInviteDto(
+                i.Code, $"https://{host}/invite/{i.Code}", i.CreatedAt, i.ExpiresAt,
+                i.Revoked, i.UsedByName, i.UsedAt)));
+        }).RequireAuthorization();
+
+        g.MapPost("/admin/invites/revoke", async (RevokeInviteReq r, ClaimsPrincipal me,
+            UserManager<VaultUser> users, VaultDbContext db) =>
+        {
+            if (await OwnerAsync(me, users) is null) return Results.StatusCode(403);
+            var invite = await db.InviteCodes.FirstOrDefaultAsync(i => i.Code == r.Code.Trim().ToUpperInvariant());
+            if (invite is null) return Results.NotFound(new { error = "No such invite." });
+            invite.Revoked = true;
+            await db.SaveChangesAsync();
+            return Results.Ok();
+        }).RequireAuthorization();
+
+        g.MapPost("/admin/users/remove", async (AdminRemoveReq r, ClaimsPrincipal me,
+            UserManager<VaultUser> users, VaultDbContext db) =>
+        {
+            var owner = await OwnerAsync(me, users);
+            if (owner is null) return Results.StatusCode(403);
+            var target = await users.FindByIdAsync(r.UserId);
+            if (target is null) return Results.NotFound(new { error = "No such user." });
+            if (target.IsOwner) return Results.BadRequest(new { error = "The owner can't be removed." });
+
+            // Same cleanup the self-service delete does.
+            var uid = target.Id;
+            db.LibraryItems.RemoveRange(db.LibraryItems.Where(x => x.UserId == uid));
+            db.RefreshTokens.RemoveRange(db.RefreshTokens.Where(x => x.UserId == uid));
+            db.Friendships.RemoveRange(db.Friendships.Where(x => x.RequesterId == uid || x.AddresseeId == uid));
+            db.PartyInvites.RemoveRange(db.PartyInvites.Where(x => x.FromUserId == uid || x.ToUserId == uid));
+            db.LinkedIdentities.RemoveRange(db.LinkedIdentities.Where(x => x.UserId == uid));
+            await db.SaveChangesAsync();
+            await users.DeleteAsync(target);
+            return Results.Ok();
+        }).RequireAuthorization();
     }
 
     // ---- Single sign-on from LAN Party -------------------------------------
@@ -307,6 +532,13 @@ public static class VaultApi
                     await db.SaveChangesAsync();
                     link = null;
                 }
+                else if (user.AccessStatus == AccessStates.Blocked)
+                {
+                    // Blocked is blocked, whichever door they come in through.
+                    return Results.Json(
+                        new { error = "This account has been blocked by the server owner." },
+                        statusCode: 403);
+                }
             }
 
             if (link is null)
@@ -330,7 +562,13 @@ public static class VaultApi
                     Email = shadowEmail,
                     EmailConfirmed = true,
                     DisplayName = string.IsNullOrWhiteSpace(name) ? subject! : name!,
+                    CreatedAt = Now(),
                 };
+                // Deliberately NOT ApplyFirstAccountRule. On an empty server that
+                // would hand ownership to whoever presents the first assertion —
+                // and to a passwordless account that /forgot refuses to reset, so
+                // it could never be recovered. Ownership is claimed by
+                // registering, which proves possession of a password.
                 var created = await users.CreateAsync(user);
                 if (!created.Succeeded)
                     return Results.Json(new { error = string.Join(" ", created.Errors.Select(e => e.Description)) },
@@ -368,6 +606,9 @@ public static class VaultApi
                 auth.ExpiresAt,
                 auth.DisplayName,
                 auth.Email,
+                auth.Username,
+                auth.Status,
+                auth.IsOwner,
                 lanParty = new
                 {
                     username = subject,
@@ -587,6 +828,17 @@ public static class VaultApi
         return true;
     }
 
+    /// <summary>
+    /// The very first account on a fresh server is the owner, approved by
+    /// definition — otherwise nobody exists who could approve anyone.
+    /// </summary>
+    private static void ApplyFirstAccountRule(VaultUser user, UserManager<VaultUser> users)
+    {
+        if (users.Users.Any()) return;
+        user.IsOwner = true;
+        user.AccessStatus = AccessStates.Approved;
+    }
+
     private static async Task<AuthResp> IssueAsync(VaultUser user, VaultDbContext db, VaultTokens tokens)
     {
         var (access, expiresAt) = tokens.AccessToken(user);
@@ -598,7 +850,8 @@ public static class VaultApi
             ExpiresAt = DateTimeOffset.UtcNow.AddDays(VaultTokens.RefreshTokenDays).ToUnixTimeMilliseconds(),
         });
         await db.SaveChangesAsync();
-        return new AuthResp(access, refresh, expiresAt, user.DisplayName, user.Email ?? "");
+        return new AuthResp(access, refresh, expiresAt, user.DisplayName, user.Email ?? "",
+            user.UserName ?? "", user.AccessStatus, user.IsOwner);
     }
 
     private static LibraryItemDto ToDto(LibraryItem x) =>

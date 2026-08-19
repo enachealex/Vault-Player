@@ -1,14 +1,18 @@
+using System;
+using System.IO;
 using System.Windows;
+using System.Windows.Media.Imaging;
 using VideoPlayer.App.Services;
 
 namespace VideoPlayer.App.Views;
 
 public partial class AccountWindow : Window
 {
-    private enum Mode { SignIn, Register, Verify, Forgot, Reset, SignedIn }
+    private enum Mode { SignIn, Register, Phone, Forgot, Reset, SignedIn }
 
     private Mode _mode;
-    private string _pendingEmail = "";   // carried into the verify/reset steps
+    private string _pendingEmail = "";     // carried into the reset step
+    private string _captchaId = "";
 
     public AccountWindow()
     {
@@ -22,7 +26,7 @@ public partial class AccountWindow : Window
         ErrorText.Visibility = Visibility.Collapsed;
 
         FormPanel.Visibility = mode is Mode.SignIn or Mode.Register ? Visibility.Visible : Visibility.Collapsed;
-        VerifyPanel.Visibility = mode == Mode.Verify ? Visibility.Visible : Visibility.Collapsed;
+        PhonePanel.Visibility = mode == Mode.Phone ? Visibility.Visible : Visibility.Collapsed;
         ForgotPanel.Visibility = mode == Mode.Forgot ? Visibility.Visible : Visibility.Collapsed;
         ResetPanel.Visibility = mode == Mode.Reset ? Visibility.Visible : Visibility.Collapsed;
         SignedInPanel.Visibility = mode == Mode.SignedIn ? Visibility.Visible : Visibility.Collapsed;
@@ -33,24 +37,34 @@ public partial class AccountWindow : Window
             case Mode.Register:
                 var reg = mode == Mode.Register;
                 Heading.Text = reg ? "Create account" : "Sign in";
-                Subhead.Text = "Sync your library — resume points and watch counts — across your computers. Optional; the app works fully without it.";
-                NameRow.Visibility = reg ? Visibility.Visible : Visibility.Collapsed;
+                Subhead.Text = reg
+                    ? "Pick a username your friends will see. New accounts wait for the server owner's "
+                      + "approval before the shared film library opens up."
+                    : "Sync your library across computers, join private parties, and watch films "
+                      + "hosted on the Vault server.";
+                UsernameHint.Visibility = reg ? Visibility.Visible : Visibility.Collapsed;
                 PassHint.Visibility = reg ? Visibility.Visible : Visibility.Collapsed;
                 ConfirmRow.Visibility = reg ? Visibility.Visible : Visibility.Collapsed;
+                EmailRow.Visibility = reg ? Visibility.Visible : Visibility.Collapsed;
+                InviteRow.Visibility = reg ? Visibility.Visible : Visibility.Collapsed;
+                CaptchaRow.Visibility = reg ? Visibility.Visible : Visibility.Collapsed;
                 if (!reg) ConfirmField.Clear();   // no stale confirm when signing in
                 ForgotLink.Visibility = reg ? Visibility.Collapsed : Visibility.Visible;
                 SubmitBtn.Content = reg ? "Create account" : "Sign in";
                 ToggleBtn.Content = reg ? "I have an account" : "Create account";
+                if (reg) _ = LoadCaptchaAsync();
                 break;
-            case Mode.Verify:
-                Heading.Text = "Check your email";
-                Subhead.Text = $"We sent a 6-digit code to {_pendingEmail}. Enter it to finish. It expires in 20 minutes.";
-                CodeBox.Clear();
+            case Mode.Phone:
+                Heading.Text = "Sign in with your phone";
+                Subhead.Text = "Your password stays on your phone — this screen only ever sees a short code.";
+                LinkCodeBox.Clear();
+                var linkUrl = $"{AppServices.Account.BaseUrl}/link";
+                LinkUrlText.Text = linkUrl;
+                LinkQrImage.Source = Helpers.QrRender.Render(linkUrl);
                 break;
             case Mode.Forgot:
                 Heading.Text = "Reset password";
-                Subhead.Text = "Enter your email and we'll send a reset code.";
-                ForgotEmailBox.Text = EmailBox.Text;
+                Subhead.Text = "Enter the email on your account and we'll send a reset code.";
                 break;
             case Mode.Reset:
                 Heading.Text = "Set a new password";
@@ -60,8 +74,23 @@ public partial class AccountWindow : Window
             case Mode.SignedIn:
                 Heading.Text = "Account";
                 Subhead.Text = "Your library syncs across the computers you sign in on.";
-                WhoName.Text = AppServices.Account.Name ?? "Signed in";
-                WhoEmail.Text = AppServices.Account.Email ?? "";
+                var acct = AppServices.Account;
+                WhoName.Text = acct.Username ?? acct.Name ?? "Signed in";
+                WhoEmail.Text = string.IsNullOrEmpty(acct.Email) ? "No email on this account" : acct.Email;
+
+                // Pending accounts see plainly why the Vault library is empty.
+                if (acct.Status == "pending")
+                {
+                    StatusLine.Text = "Waiting for the server owner to approve this account — "
+                        + "the shared film library unlocks once they do.";
+                    StatusLine.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    StatusLine.Visibility = Visibility.Collapsed;
+                }
+                ManageUsersBtn.Visibility = acct.IsOwner ? Visibility.Visible : Visibility.Collapsed;
+
                 var count = AppServices.Settings.SyncedLibrary.Count;
                 SyncStatus.Text = count == 0 ? "Nothing synced yet." : $"{count} film{(count == 1 ? "" : "s")} synced.";
                 UpdateFriendsLabel();
@@ -82,6 +111,32 @@ public partial class AccountWindow : Window
         btn.Content = busy ? busyText : idleText;
     }
 
+    // ---- Captcha ----
+
+    private async System.Threading.Tasks.Task LoadCaptchaAsync()
+    {
+        CaptchaBox.Clear();
+        CaptchaImage.Source = null;
+        var challenge = await AppServices.Account.FetchCaptchaAsync();
+        if (challenge is null)
+        {
+            ShowError("Couldn't reach the server for a challenge image. Check your connection and press refresh.");
+            return;
+        }
+        _captchaId = challenge.Id;
+
+        using var stream = new MemoryStream(challenge.Png);
+        var image = new BitmapImage();
+        image.BeginInit();
+        image.CacheOption = BitmapCacheOption.OnLoad;
+        image.StreamSource = stream;
+        image.EndInit();
+        image.Freeze();
+        CaptchaImage.Source = image;
+    }
+
+    private async void RefreshCaptcha_Click(object sender, RoutedEventArgs e) => await LoadCaptchaAsync();
+
     // ---- Sign in / Register ----
 
     private void Toggle_Click(object sender, RoutedEventArgs e) =>
@@ -89,56 +144,51 @@ public partial class AccountWindow : Window
 
     private async void Submit_Click(object sender, RoutedEventArgs e)
     {
-        var email = EmailBox.Text.Trim();
+        var username = UsernameBox.Text.Trim();
         var pass = PassField.Password;
-        if (email.Length == 0 || pass.Length == 0) { ShowError("Enter your email and password."); return; }
+        if (username.Length == 0 || pass.Length == 0) { ShowError("Enter your username and password."); return; }
 
         var reg = _mode == Mode.Register;
         if (reg)
         {
             if (pass.Length < 8) { ShowError("Use a password of at least 8 characters."); return; }
             if (pass != ConfirmField.Password) { ShowError("Those passwords don't match."); return; }
+            if (CaptchaBox.Text.Trim().Length == 0) { ShowError("Type the characters from the image."); return; }
         }
         Busy(true, SubmitBtn, reg ? "Creating…" : "Signing in…", "");
         var outcome = reg
-            ? await AppServices.Account.RegisterAsync(email, pass, NameBox.Text.Trim())
-            : await AppServices.Account.LoginAsync(email, pass);
+            ? await AppServices.Account.RegisterAsync(username, pass,
+                string.IsNullOrWhiteSpace(EmailBox.Text) ? null : EmailBox.Text.Trim(),
+                _captchaId, CaptchaBox.Text.Trim(),
+                string.IsNullOrWhiteSpace(InviteBox.Text) ? null : InviteBox.Text.Trim())
+            : await AppServices.Account.LoginAsync(username, pass);
         Busy(false, SubmitBtn, "", reg ? "Create account" : "Sign in");
 
-        _pendingEmail = email;
-        HandleOutcome(outcome);
-    }
-
-    private void HandleOutcome(AccountService.AuthOutcome outcome)
-    {
-        switch (outcome.Status)
+        if (outcome.Status == AccountService.AuthStatus.Success)
         {
-            case AccountService.AuthStatus.Success: Show(Mode.SignedIn); break;
-            case AccountService.AuthStatus.NeedsVerification:
-                _pendingEmail = outcome.Email ?? _pendingEmail;
-                Show(Mode.Verify);
-                break;
-            default: ShowError(outcome.Message ?? "Something went wrong."); break;
+            Show(Mode.SignedIn);
+        }
+        else
+        {
+            ShowError(outcome.Message ?? "Something went wrong.");
+            // The challenge is single-use: any failed attempt burned it.
+            if (reg) _ = LoadCaptchaAsync();
         }
     }
 
-    // ---- Verify ----
+    // ---- Sign in with phone (device-link) ----
 
-    private async void Verify_Click(object sender, RoutedEventArgs e)
-    {
-        var code = CodeBox.Text.Trim();
-        if (code.Length == 0) { ShowError("Enter the code from your email."); return; }
-        Busy(true, VerifyBtn, "Verifying…", "");
-        var outcome = await AppServices.Account.VerifyAsync(_pendingEmail, code);
-        Busy(false, VerifyBtn, "", "Verify");
-        HandleOutcome(outcome);
-    }
+    private void PhoneSignIn_Click(object sender, RoutedEventArgs e) => Show(Mode.Phone);
 
-    private async void Resend_Click(object sender, RoutedEventArgs e)
+    private async void LinkClaim_Click(object sender, RoutedEventArgs e)
     {
-        await AppServices.Account.ResendCodeAsync(_pendingEmail);
-        ShowError("");   // clear any prior error
-        Subhead.Text = $"A new code is on its way to {_pendingEmail}.";
+        var code = LinkCodeBox.Text.Trim();
+        if (code.Length == 0) { ShowError("Type the code your phone showed you."); return; }
+        Busy(true, LinkClaimBtn, "Signing in…", "");
+        var outcome = await AppServices.Account.LoginWithLinkCodeAsync(code);
+        Busy(false, LinkClaimBtn, "", "Sign in");
+        if (outcome.Status == AccountService.AuthStatus.Success) Show(Mode.SignedIn);
+        else ShowError(outcome.Message ?? "Something went wrong.");
     }
 
     // ---- Forgot / Reset ----
@@ -166,7 +216,6 @@ public partial class AccountWindow : Window
         Busy(false, ResetBtn, "", "Reset password");
         if (error is null)
         {
-            EmailBox.Text = _pendingEmail;
             Show(Mode.SignIn);
             Subhead.Text = "Password reset. Sign in with your new password.";
         }
@@ -225,4 +274,9 @@ public partial class AccountWindow : Window
         else
             FriendsBtnLabel.Text = f.Friends.Count == 0 ? "Friends" : $"Friends ({f.Friends.Count})";
     }
+
+    // ---- Owner: manage users ----
+
+    private void ManageUsers_Click(object sender, RoutedEventArgs e) =>
+        new ManageUsersWindow { Owner = this }.ShowDialog();
 }

@@ -48,12 +48,31 @@ public partial class PartyView : UserControl, IDisposable
         if (AppServices.Account.IsSignedIn)
         {
             ShowSignedInIdentity();
+            // Private hosting needs an account (guests are vetted against the
+            // same server), so the toggle only exists for the signed-in.
+            PrivateCheck.Visibility = Visibility.Visible;
+            PrivateCheck.IsChecked = AppServices.Settings.PrivateParties;
+            PrivateCheck.Checked += (_, _) => SavePrivatePreference(true);
+            PrivateCheck.Unchecked += (_, _) => SavePrivatePreference(false);
             // Signed in, a friend may have invited you into a live room.
             AppServices.Friends.Changed += OnFriendsChanged;
             Loaded += (_, _) => StartInvitePolling();
         }
         else RefreshSavedNames();  // signed-out fallback: pick a nickname
     }
+
+    /// <summary>
+    /// Remembered in settings, not read from the checkbox at host time: picking
+    /// a film navigates away and rebuilds this view, which would reset it.
+    /// </summary>
+    private static void SavePrivatePreference(bool value)
+    {
+        AppServices.Settings.PrivateParties = value;
+        AppServices.Settings.Save();
+    }
+
+    private static bool HostPrivate =>
+        AppServices.Settings.PrivateParties && AppServices.Account.IsSignedIn;
 
     // ---- Arriving via an invite link (vaultmovies://) ----------------------
 
@@ -376,7 +395,7 @@ public partial class PartyView : UserControl, IDisposable
 
             _session = await PartySession.HostExternalAsync(
                 item.Name, item.Service ?? "your service", item.Path,
-                DisplayName, AppServices.Settings.RendezvousServer);
+                DisplayName, AppServices.Settings.RendezvousServer, HostPrivate);
             AppServices.CurrentParty = _session;
             _session.RosterChanged += OnRoster;
             _session.Closed += OnClosed;
@@ -422,7 +441,8 @@ public partial class PartyView : UserControl, IDisposable
                 return;
             }
 
-            _session = await PartySession.HostAsync(movie, DisplayName, AppServices.Settings.RendezvousServer);
+            _session = await PartySession.HostAsync(movie, DisplayName,
+                AppServices.Settings.RendezvousServer, HostPrivate);
             AppServices.CurrentParty = _session;
             _session.RosterChanged += OnRoster;
             _session.ReadyChanged += OnReady;
@@ -749,8 +769,51 @@ public partial class PartyView : UserControl, IDisposable
     private void OnRoster(string[] members)
     {
         _roster.Clear();
-        foreach (var member in members) _roster.Add(member);
+        // The session's Roster (ids + verified) is parallel to these names; a
+        // check mark shows who is a real signed-in account rather than a typed
+        // nickname anyone could copy.
+        var entries = _session?.Roster;
+        for (var i = 0; i < members.Length; i++)
+        {
+            var verified = entries is not null && i < entries.Length && entries[i].Verified;
+            _roster.Add(verified ? members[i] + " ✓" : members[i]);
+        }
         UpdateBandwidthNote(Math.Max(0, members.Length - 1)); // exclude the host
+    }
+
+    /// <summary>Roster index of the row whose context menu is in play, or -1.</summary>
+    private int RosterIndexOf(object? element)
+    {
+        if (element is not DependencyObject d) return -1;
+        var container = System.Windows.Controls.ItemsControl.ContainerFromElement(RosterList, d);
+        return container is null ? -1 : RosterList.ItemContainerGenerator.IndexFromContainer(container);
+    }
+
+    /// <summary>Only the host gets a menu, and only over a kickable (guest) row.</summary>
+    private void RosterItem_MenuOpening(object sender, ContextMenuEventArgs e)
+    {
+        var index = RosterIndexOf(sender);
+        var entries = _session?.Roster;
+        if (_session is not { IsHost: true } || entries is null
+            || index <= 0 || index >= entries.Length || entries[index].Id.Length == 0)
+            e.Handled = true;
+    }
+
+    private async void KickMember_Click(object sender, RoutedEventArgs e)
+    {
+        if (_session is not { IsHost: true } session) return;
+        var menu = (sender as MenuItem)?.Parent as ContextMenu;
+        var index = RosterIndexOf(menu?.PlacementTarget);
+        var entries = session.Roster;
+        if (index <= 0 || index >= entries.Length || entries[index].Id.Length == 0) return;
+
+        var entry = entries[index];
+        var confirm = MessageBox.Show(
+            $"Remove {entry.Name} from the party?" +
+            (entry.Verified ? " They won't be able to rejoin this room." : ""),
+            "Watch Party", MessageBoxButton.YesNo, MessageBoxImage.Question);
+        if (confirm != MessageBoxResult.Yes) return;
+        await session.KickAsync(entry.Id);
     }
 
     /// <summary>

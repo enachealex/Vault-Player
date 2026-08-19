@@ -120,7 +120,14 @@
                                 <DataTemplate>
                                     <TextBlock Text="{Binding}" FontSize="13.5" Margin="0,2"
                                                HorizontalAlignment="Center"
-                                               Foreground="{StaticResource TextBrush}" />
+                                               Foreground="{StaticResource TextBrush}"
+                                               ContextMenuOpening="PausedRosterItem_MenuOpening">
+                                        <TextBlock.ContextMenu>
+                                            <ContextMenu>
+                                                <MenuItem Header="Remove from party" Click="KickFromPlayer_Click" />
+                                            </ContextMenu>
+                                        </TextBlock.ContextMenu>
+                                    </TextBlock>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>

@@ -4,11 +4,35 @@ using Microsoft.EntityFrameworkCore;
 
 namespace VideoPlayer.Rendezvous.Vault;
 
-/// <summary>A Vault Movies account. Identity supplies email, password hash, etc.</summary>
+/// <summary>A Vault Movies account. Identity supplies username, password hash, etc.</summary>
 public class VaultUser : IdentityUser
 {
-    /// <summary>What friends see. Not unique; the email is the identity.</summary>
+    /// <summary>What friends see. Defaults to the username; not unique.</summary>
     public string DisplayName { get; set; } = "";
+
+    /// <summary>
+    /// "pending" | "approved" | "blocked". The server's film library is the
+    /// owner's own collection, so an account existing is not the same as an
+    /// account being allowed in: everyone starts pending and the owner decides.
+    /// Blocked also refuses login outright.
+    /// </summary>
+    public string AccessStatus { get; set; } = AccessStates.Pending;
+
+    /// <summary>
+    /// The person whose server this is. Exactly one in practice — the first
+    /// account registered — and the only one who sees the admin endpoints and
+    /// may upload films.
+    /// </summary>
+    public bool IsOwner { get; set; }
+
+    public long CreatedAt { get; set; }
+}
+
+public static class AccessStates
+{
+    public const string Pending = "pending";
+    public const string Approved = "approved";
+    public const string Blocked = "blocked";
 }
 
 /// <summary>
@@ -114,6 +138,27 @@ public class LinkedIdentity
 }
 
 /// <summary>
+/// A single-use ticket into the library, minted by the owner and handed to one
+/// person — usually as a QR code. Registering with a live one skips the pending
+/// queue entirely: the invite is the owner's approval, given in advance. This
+/// is what makes membership personal rather than "whoever found the domain".
+/// </summary>
+public class InviteCode
+{
+    public long Id { get; set; }
+    /// <summary>What the friend types, e.g. "VAULT-7KM2Q4XB". Unique.</summary>
+    public string Code { get; set; } = "";
+    public long CreatedAt { get; set; }
+    public long ExpiresAt { get; set; }
+    public bool Revoked { get; set; }
+    /// <summary>Set when spent; a used invite admits nobody else.</summary>
+    public string? UsedByUserId { get; set; }
+    /// <summary>Denormalised so the owner's invite list reads without a join.</summary>
+    public string UsedByName { get; set; } = "";
+    public long UsedAt { get; set; }
+}
+
+/// <summary>
 /// A single-sign-on assertion that has already been spent. The assertion itself
 /// is short-lived, so rows only need to outlive it; the sweep keeps the table
 /// from growing without bound.
@@ -123,6 +168,60 @@ public class ConsumedJti
     public long Id { get; set; }
     public string Jti { get; set; } = "";
     public long ExpiresAt { get; set; }
+}
+
+/// <summary>
+/// One media file that lives on the SERVER rather than on somebody's PC — the
+/// shared library everyone with an account can stream from.
+///
+/// This is the one thing here the relay does not otherwise do: everything else
+/// treats media as somebody else's bytes passing through. Rows are built by
+/// <see cref="CatalogScanner"/> from the media root and are disposable — delete
+/// the table and a rescan rebuilds it. The files themselves are never written.
+/// </summary>
+public class CatalogItem
+{
+    public long Id { get; set; }
+
+    /// <summary>
+    /// Opaque, stable id used in stream URLs. Derived from the relative path, so
+    /// it survives rescans and reboots but changes if the file is renamed —
+    /// which is fine, because resume follows <see cref="FilmKey"/>, not this.
+    /// </summary>
+    public string ItemKey { get; set; } = "";
+
+    /// <summary>
+    /// Path beneath the media root, '/'-separated. Stored relative so the disk
+    /// can be remounted somewhere else without invalidating the catalogue.
+    /// </summary>
+    public string RelativePath { get; set; } = "";
+
+    /// <summary>"film" or "track". Only films are scanned today; music is next.</summary>
+    public string Kind { get; set; } = "film";
+
+    public string Name { get; set; } = "";
+    public long SizeBytes { get; set; }
+    public long? DurationMs { get; set; }
+    public string ContentType { get; set; } = "application/octet-stream";
+    public string? VideoCodec { get; set; }
+    public string? AudioCodec { get; set; }
+
+    /// <summary>Whether a plain browser &lt;video&gt; can play this. See CatalogScanner.</summary>
+    public bool WebPlayable { get; set; }
+
+    /// <summary>
+    /// "filename|size" — the same film identity the app uses locally. Sharing it
+    /// means a film watched from the server and the same rip watched off a USB
+    /// drive are one film as far as resume points and watch counts go.
+    /// </summary>
+    public string FilmKey { get; set; } = "";
+
+    public long AddedAt { get; set; }
+    /// <summary>Unix ms the scanner last saw the file on disk.</summary>
+    public long LastSeenAt { get; set; }
+
+    /// <summary>Cached poster filename under the art directory; null until extracted.</summary>
+    public string? ArtFile { get; set; }
 }
 
 public class VaultDbContext(DbContextOptions<VaultDbContext> options)
@@ -135,6 +234,8 @@ public class VaultDbContext(DbContextOptions<VaultDbContext> options)
     public DbSet<PartyInvite> PartyInvites => Set<PartyInvite>();
     public DbSet<LinkedIdentity> LinkedIdentities => Set<LinkedIdentity>();
     public DbSet<ConsumedJti> ConsumedJtis => Set<ConsumedJti>();
+    public DbSet<CatalogItem> CatalogItems => Set<CatalogItem>();
+    public DbSet<InviteCode> InviteCodes => Set<InviteCode>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -150,5 +251,9 @@ public class VaultDbContext(DbContextOptions<VaultDbContext> options)
         b.Entity<LinkedIdentity>().HasIndex(x => new { x.Provider, x.Subject }).IsUnique();
         b.Entity<LinkedIdentity>().HasIndex(x => new { x.Provider, x.UserId }).IsUnique();
         b.Entity<ConsumedJti>().HasIndex(x => x.Jti).IsUnique();
+        // One row per file; the scanner upserts on this key every sweep.
+        b.Entity<CatalogItem>().HasIndex(x => x.ItemKey).IsUnique();
+        b.Entity<CatalogItem>().HasIndex(x => x.Kind);
+        b.Entity<InviteCode>().HasIndex(x => x.Code).IsUnique();
     }
 }

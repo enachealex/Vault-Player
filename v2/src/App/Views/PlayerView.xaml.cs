@@ -76,6 +76,43 @@ public partial class PlayerView : UserControl, IDisposable
     private bool DlnaActive => _dlnaDevice is not null;
     private string Mode => AppServices.Settings.PlaybackMode;
 
+    // ---- Kicking from the pause overlay (host only) ------------------------
+
+    /// <summary>Roster index of the row whose context menu is opening, or -1.</summary>
+    private int PausedRosterIndexOf(object? element)
+    {
+        if (element is not System.Windows.DependencyObject d) return -1;
+        var container = System.Windows.Controls.ItemsControl.ContainerFromElement(PausedRoster, d);
+        return container is null ? -1 : PausedRoster.ItemContainerGenerator.IndexFromContainer(container);
+    }
+
+    private void PausedRosterItem_MenuOpening(object sender, System.Windows.Controls.ContextMenuEventArgs e)
+    {
+        var index = PausedRosterIndexOf(sender);
+        var entries = _party?.Roster;
+        if (_party is not { IsHost: true } || entries is null
+            || index <= 0 || index >= entries.Length || entries[index].Id.Length == 0)
+            e.Handled = true;
+        else
+            _pendingKickIndex = index;
+    }
+
+    private int _pendingKickIndex = -1;
+
+    private async void KickFromPlayer_Click(object sender, RoutedEventArgs e)
+    {
+        if (_party is not { IsHost: true } party) return;
+        var entries = party.Roster;
+        var index = _pendingKickIndex;
+        _pendingKickIndex = -1;
+        if (index <= 0 || index >= entries.Length || entries[index].Id.Length == 0) return;
+
+        var entry = entries[index];
+        if (MessageBox.Show($"Remove {entry.Name} from the party?", "Watch Party",
+                MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        await party.KickAsync(entry.Id);
+    }
+
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
         if (_player is not null) return; // Loaded can re-fire
@@ -95,7 +132,7 @@ public partial class PlayerView : UserControl, IDisposable
         VolumeSlider.Value = s.Volume;
         _initializing = false;
 
-        var resume = s.ResumePositions.TryGetValue(_movie.Path, out var pos) ? pos : 0;
+        var resume = s.ResumePositions.TryGetValue(_movie.StoreKey, out var pos) ? pos : 0;
         var durationMs = _movie.DurationMs ?? 0;
         if (resume < 5000 || (durationMs > 0 && resume > durationMs - 15000)) resume = 0;
 
@@ -161,7 +198,12 @@ public partial class PlayerView : UserControl, IDisposable
             _party.RosterChanged += members => Dispatcher.Invoke(() =>
             {
                 _partyRoster.Clear();
-                foreach (var member in members) _partyRoster.Add(member);
+                var entries = _party.Roster;
+                for (var i = 0; i < members.Length; i++)
+                {
+                    var verified = i < entries.Length && entries[i].Verified;
+                    _partyRoster.Add(verified ? members[i] + " ✓" : members[i]);
+                }
             });
             _party.ChatReceived += (who, text) => AddChatLine($"{who}: {text}");
             _party.Closed += reason =>
@@ -460,7 +502,7 @@ public partial class PlayerView : UserControl, IDisposable
         if (_party is not null) return; // parties end together; no auto-chaining
 
         CountWatchOnce();
-        AppServices.Settings.ResumePositions.Remove(_movie.Path);
+        AppServices.Settings.ResumePositions.Remove(_movie.StoreKey);
         AppServices.Settings.Save();
 
         if (Autoplay && _index < _playlist.Count - 1)
@@ -512,7 +554,7 @@ public partial class PlayerView : UserControl, IDisposable
         }
 
         // The user's own marks for this movie.
-        if (s.CustomChapters.TryGetValue(_movie.Path, out var marks) && marks.Count > 0)
+        if (s.CustomChapters.TryGetValue(_movie.StoreKey, out var marks) && marks.Count > 0)
         {
             menu.Items.Add(new MenuItem { Header = "My chapters", IsEnabled = false, FontWeight = FontWeights.Bold });
             foreach (var mark in marks.OrderBy(m => m.TimeMs))
@@ -530,19 +572,19 @@ public partial class PlayerView : UserControl, IDisposable
         var add = new MenuItem { Header = $"Add chapter at {Fmt(currentMs)}" };
         add.Click += (_, _) =>
         {
-            var list = s.CustomChapters.TryGetValue(_movie.Path, out var existing) ? existing : new List<ChapterMark>();
+            var list = s.CustomChapters.TryGetValue(_movie.StoreKey, out var existing) ? existing : new List<ChapterMark>();
             list.Add(new ChapterMark { Name = $"Chapter {list.Count + 1}", TimeMs = currentMs });
-            s.CustomChapters[_movie.Path] = list;
+            s.CustomChapters[_movie.StoreKey] = list;
             s.Save();
         };
         menu.Items.Add(add);
 
-        if (s.CustomChapters.TryGetValue(_movie.Path, out var any) && any.Count > 0)
+        if (s.CustomChapters.TryGetValue(_movie.StoreKey, out var any) && any.Count > 0)
         {
             var clear = new MenuItem { Header = "Remove my chapters" };
             clear.Click += (_, _) =>
             {
-                s.CustomChapters.Remove(_movie.Path);
+                s.CustomChapters.Remove(_movie.StoreKey);
                 s.Save();
             };
             menu.Items.Add(clear);
@@ -1327,8 +1369,8 @@ public partial class PlayerView : UserControl, IDisposable
     {
         var s = AppServices.Settings;
         var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-        s.ResumePositions[_movie.Path] = positionMs;
-        s.LastWatchedAt[_movie.Path] = now;
+        s.ResumePositions[_movie.StoreKey] = positionMs;
+        s.LastWatchedAt[_movie.StoreKey] = now;
         s.Save();
         // Mirror to the sync store (film-key) and push if signed in.
         AppServices.Account.NoteLocalChange(_movie, positionMs, _movie.WatchCount, now,
@@ -1336,7 +1378,7 @@ public partial class PlayerView : UserControl, IDisposable
     }
 
     private static string? ChaptersJsonFor(MovieItem movie) =>
-        AppServices.Settings.CustomChapters.TryGetValue(movie.Path, out var ch) && ch.Count > 0
+        AppServices.Settings.CustomChapters.TryGetValue(movie.StoreKey, out var ch) && ch.Count > 0
             ? System.Text.Json.JsonSerializer.Serialize(ch)
             : null;
 
@@ -1351,11 +1393,11 @@ public partial class PlayerView : UserControl, IDisposable
         if (_countedWatch || _party is not null) return;
         _countedWatch = true;
         var s = AppServices.Settings;
-        s.WatchCounts.TryGetValue(_movie.Path, out var count);
-        s.WatchCounts[_movie.Path] = count + 1;
+        s.WatchCounts.TryGetValue(_movie.StoreKey, out var count);
+        s.WatchCounts[_movie.StoreKey] = count + 1;
         _movie.WatchCount = count + 1;
         s.Save();
-        var pos = s.ResumePositions.TryGetValue(_movie.Path, out var r) ? r : 0;
+        var pos = s.ResumePositions.TryGetValue(_movie.StoreKey, out var r) ? r : 0;
         AppServices.Account.NoteLocalChange(_movie, pos, count + 1,
             DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), ChaptersJsonFor(_movie));
     }

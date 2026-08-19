@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using VideoPlayer.Protocol;
 using VideoPlayer.Rendezvous.Vault;
 
-// Watch Party rendezvous. Two jobs:
+// Watch Party rendezvous. Three jobs:
 //   1. Control relay — one host ↔ many guests over WebSockets (play/pause,
 //      sync beacons, chat, roster, pause requests).
 //   2. MEDIA relay — guests pull the movie from THIS server (GET /stream/{room});
@@ -15,6 +15,10 @@ using VideoPlayer.Rendezvous.Vault;
 //      channel, the host pushes it back (POST /upload/{reqId}), and the server
 //      pipes it straight to the guest. So guests need only the server address +
 //      a room code — no reachable host, works across the internet through NAT.
+//   3. LIBRARY — films kept on this machine's own disk, indexed by the catalogue
+//      scanner and streamed to signed-in accounts (GET /media/{key}). Unlike the
+//      relay, here the server is the origin: nobody has to be at their PC with
+//      the file open for someone else to watch it.
 //
 // Runs locally today (the host auto-spawns it); deploy this same binary to a
 // small cloud box for room-code-only joins over the internet.
@@ -55,11 +59,27 @@ builder.Services.AddIdentityCore<VaultUser>(o =>
         o.Password.RequireUppercase = false;
         o.Password.RequireLowercase = false;
         o.Password.RequireDigit = false;
-        o.User.RequireUniqueEmail = true;
+        // Email is optional now (usernames are the credential), and Identity's
+        // unique-email rule refuses an account with no email at all — so the
+        // register endpoint enforces uniqueness itself, only when one is given.
+        o.User.RequireUniqueEmail = false;
+        // The register endpoint enforces the user-facing 3–20 letters/digits/._-
+        // rule; this wider set additionally admits '@' because LAN Party shadow
+        // accounts use a synthesised address as their username.
+        o.User.AllowedUserNameCharacters =
+            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-@";
     })
     .AddEntityFrameworkStores<VaultDbContext>()
     .AddDefaultTokenProviders(); // needed for GeneratePasswordResetTokenAsync
 builder.Services.AddSingleton<VaultTokens>();
+// The server's own library: an index of what is on the media disk, plus the
+// signer for the stream URLs players fetch it with. Singletons because the
+// scanner holds the "am I already sweeping" gate.
+builder.Services.AddSingleton<CatalogScanner>();
+builder.Services.AddSingleton<MediaTokens>();
+// Sign-up CAPTCHA challenges; in memory on purpose — a restart voiding open
+// challenges costs a registrant one refresh.
+builder.Services.AddSingleton<CaptchaStore>();
 builder.Services.AddScoped<EmailSender>();
 // Single sign-on from LAN Party. Verification happens here rather than in the
 // desktop app, which cannot keep a shared secret.
@@ -130,9 +150,66 @@ using (var scope = app.Services.CreateScope())
         );
         CREATE UNIQUE INDEX IF NOT EXISTS "IX_ConsumedJtis_Jti" ON "ConsumedJtis" ("Jti");
         """);
+
+    // Columns added to an Identity table after first ship. SQLite has no
+    // ADD COLUMN IF NOT EXISTS, so each one is attempted and allowed to fail
+    // on databases that already have it.
+    foreach (var ddl in new[]
+    {
+        """ALTER TABLE "AspNetUsers" ADD COLUMN "AccessStatus" TEXT NOT NULL DEFAULT 'pending'""",
+        """ALTER TABLE "AspNetUsers" ADD COLUMN "IsOwner" INTEGER NOT NULL DEFAULT 0""",
+        """ALTER TABLE "AspNetUsers" ADD COLUMN "CreatedAt" INTEGER NOT NULL DEFAULT 0""",
+    })
+    {
+        try { db.Database.ExecuteSqlRaw(ddl); }
+        catch { /* column already there */ }
+    }
+
+    db.Database.ExecuteSqlRaw("""
+        SELECT 1;
+        CREATE TABLE IF NOT EXISTS "CatalogItems" (
+            "Id" INTEGER NOT NULL CONSTRAINT "PK_CatalogItems" PRIMARY KEY AUTOINCREMENT,
+            "ItemKey" TEXT NOT NULL,
+            "RelativePath" TEXT NOT NULL,
+            "Kind" TEXT NOT NULL,
+            "Name" TEXT NOT NULL,
+            "SizeBytes" INTEGER NOT NULL,
+            "DurationMs" INTEGER NULL,
+            "ContentType" TEXT NOT NULL,
+            "VideoCodec" TEXT NULL,
+            "AudioCodec" TEXT NULL,
+            "WebPlayable" INTEGER NOT NULL,
+            "FilmKey" TEXT NOT NULL,
+            "AddedAt" INTEGER NOT NULL,
+            "LastSeenAt" INTEGER NOT NULL,
+            "ArtFile" TEXT NULL
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS "IX_CatalogItems_ItemKey" ON "CatalogItems" ("ItemKey");
+        CREATE INDEX IF NOT EXISTS "IX_CatalogItems_Kind" ON "CatalogItems" ("Kind");
+        CREATE TABLE IF NOT EXISTS "InviteCodes" (
+            "Id" INTEGER NOT NULL CONSTRAINT "PK_InviteCodes" PRIMARY KEY AUTOINCREMENT,
+            "Code" TEXT NOT NULL,
+            "CreatedAt" INTEGER NOT NULL,
+            "ExpiresAt" INTEGER NOT NULL,
+            "Revoked" INTEGER NOT NULL,
+            "UsedByUserId" TEXT NULL,
+            "UsedByName" TEXT NOT NULL DEFAULT '',
+            "UsedAt" INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS "IX_InviteCodes_Code" ON "InviteCodes" ("Code");
+        """);
 }
 
 app.MapVaultApi();
+
+app.MapCatalogApi();
+app.MapUploadApi();
+app.MapLinkApi();
+
+// Index the media disk in the background. Not awaited: a first sweep of a large
+// library probes and extracts a poster for every file, and the relay must be
+// answering /health and hosting parties long before that finishes.
+_ = Task.Run(() => app.Services.GetRequiredService<CatalogScanner>().ScanAsync());
 
 var rooms = new ConcurrentDictionary<string, Room>();
 var pulls = new ConcurrentDictionary<string, PendingPull>();
@@ -148,7 +225,9 @@ app.MapGet("/health", () => "ok");
 app.MapGet("/join/{code}", (string code, HttpContext ctx) =>
 {
     code = code.Trim().ToUpperInvariant();
-    if (!System.Text.RegularExpressions.Regex.IsMatch(code, "^MOVIE-[A-Z0-9]{4}$"))
+    // Plain 6-character codes, plus the retired MOVIE-XXXX form so links
+    // already sitting in somebody's chat history keep resolving.
+    if (!System.Text.RegularExpressions.Regex.IsMatch(code, "^([A-Z0-9]{6}|MOVIE-[A-Z0-9]{4})$"))
         return Results.NotFound();
 
     var server = ctx.Request.Query["server"].ToString();
@@ -158,6 +237,62 @@ app.MapGet("/join/{code}", (string code, HttpContext ctx) =>
         "https://github.com/enachealex/Vault-Player/releases/latest/download/VideoPlayer-win-Setup.exe";
     return Results.Content(VideoPlayer.Rendezvous.JoinPage.Render(code, Uri.EscapeDataString(server), download),
         "text/html; charset=utf-8");
+});
+
+// ---- Invite landing page ----------------------------------------------------
+// What a phone sees after scanning the owner's invite QR. Deliberately dumb: it
+// shows the code and the way in, and never checks the database — a page that
+// answered "valid or not" would be an oracle for guessing codes. Registration
+// is where a bad code gets refused.
+
+app.MapGet("/invite/{code}", (string code) =>
+{
+    code = code.Trim().ToUpperInvariant();
+    if (!System.Text.RegularExpressions.Regex.IsMatch(code, "^VAULT-[A-Z0-9]{8}$"))
+        return Results.NotFound();
+
+    const string download =
+        "https://github.com/enachealex/Vault-Player/releases/latest/download/VideoPlayer-win-Setup.exe";
+
+    var html = $$"""
+        <!doctype html>
+        <html lang="en">
+        <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>You're invited — Vault Movies</title>
+        <style>
+          body { margin:0; min-height:100vh; display:grid; place-items:center;
+                 background:#1A0D09; color:#F6ECE5; font-family:'Segoe UI',system-ui,sans-serif; }
+          .card { text-align:center; padding:40px 48px; max-width:460px; }
+          .dot { width:22px; height:22px; border-radius:7px; background:#C8442A; margin:0 auto 18px; }
+          h1 { font-size:22px; margin:0 0 6px; }
+          .code { font-family:Consolas,monospace; font-size:28px; font-weight:bold; color:#C8442A;
+                  letter-spacing:2px; margin:18px 0 6px; user-select:all; }
+          p { color:#D9C0B3; font-size:14px; line-height:1.55; margin:8px 0; }
+          ol { text-align:left; color:#D9C0B3; font-size:14px; line-height:1.7; }
+          .btn { display:inline-block; margin-top:14px; padding:12px 26px; border-radius:10px;
+                 background:#C8442A; color:#fff; text-decoration:none; font-weight:600; font-size:15px; }
+        </style>
+        </head>
+        <body>
+        <div class="card">
+          <div class="dot"></div>
+          <h1>You're invited to a film library</h1>
+          <p>Someone wants to share their Vault Movies collection with you.</p>
+          <div class="code">{{code}}</div>
+          <ol>
+            <li>Install <b>Vault Movies</b> on your Windows PC.</li>
+            <li>Open it, choose <b>Sign in &rarr; Create account</b>.</li>
+            <li>Enter this invite code with your new username.</li>
+          </ol>
+          <p>The code works once and expires after a week.</p>
+          <a class="btn" href="{{download}}">Download Vault Movies for Windows</a>
+        </div>
+        </body>
+        </html>
+        """;
+    return Results.Content(html, "text/html; charset=utf-8");
 });
 
 // ---- Room info for web viewers ---------------------------------------------
@@ -317,11 +452,53 @@ app.Map("/ws", async context =>
     var code = context.Request.Query["room"].ToString().ToUpperInvariant();
     if (string.IsNullOrWhiteSpace(name)) name = "Someone";
 
+    // Optional account: `auth` carries an ordinary access token. A valid one
+    // pins the person's roster name to their real username — a signed-in guest
+    // cannot be impersonated by whoever types the same nickname — and it is
+    // the admission ticket for private rooms.
+    string? accountUser = null;
+    var accountApproved = false;
+    var authToken = context.Request.Query["auth"].ToString();
+    if (!string.IsNullOrWhiteSpace(authToken))
+    {
+        try
+        {
+            var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler
+            { MapInboundClaims = false };
+            var validation = context.RequestServices.GetRequiredService<VaultTokens>().Validation();
+            var principal = handler.ValidateToken(authToken, validation, out _);
+            var uid = principal.FindFirst("sub")?.Value;
+            if (uid is not null)
+            {
+                var vdb = context.RequestServices.GetRequiredService<VaultDbContext>();
+                var account = await vdb.Users.FindAsync(uid);
+                if (account is not null && account.AccessStatus != AccessStates.Blocked)
+                {
+                    accountUser = account.UserName;
+                    accountApproved = account.AccessStatus == AccessStates.Approved;
+                }
+            }
+        }
+        catch
+        {
+            // Bad or expired token: treated as anonymous, and the private-room
+            // gate below says so in words rather than dropping the socket.
+        }
+    }
+    if (accountUser is not null) name = accountUser;
+
     using var socket = await context.WebSockets.AcceptWebSocketAsync();
 
     if (role == "host")
     {
-        var room = new Room { Code = NewCode(rooms), HostName = name, Host = socket };
+        var room = new Room
+        {
+            Code = NewCode(rooms),
+            HostName = name,
+            Host = socket,
+            Private = context.Request.Query["private"] == "1",
+            HostUserName = accountUser,
+        };
         rooms[room.Code] = room;
         await SendTo(socket, new PartyMessage { Type = MsgType.Welcome, Room = room.Code });
         await Pump(socket, async msg =>
@@ -366,6 +543,27 @@ app.Map("/ws", async context =>
                     // few tens of ms of network jitter is irrelevant here.
                     await room.Broadcast(msg);
                     break;
+                case MsgType.Kick:
+                    if (msg.GuestId is { Length: > 0 } kickId
+                        && room.Guests.TryGetValue(kickId, out var kicked))
+                    {
+                        // Ban by account first, so a signed-in guest can't
+                        // rejoin on a fresh connection. Anonymous guests have
+                        // no durable identity to ban — closing the socket is
+                        // all there is, and rejoining needs the code anyway.
+                        if (room.GuestUserNames.TryGetValue(kickId, out var kickedUser)
+                            && kickedUser is not null)
+                            room.Banned[kickedUser] = true;
+                        await SendTo(kicked, new PartyMessage
+                        {
+                            Type = MsgType.Error,
+                            Text = "The host removed you from the party.",
+                        });
+                        // The guest's own connection handler does the roster
+                        // cleanup when this abort lands.
+                        TryClose(kicked);
+                    }
+                    break;
             }
         });
         rooms.TryRemove(room.Code, out _);
@@ -381,13 +579,49 @@ app.Map("/ws", async context =>
         return;
     }
 
+    // A private room admits only signed-in, approved accounts. The refusals
+    // are distinct on purpose: "sign in" and "wait for approval" are different
+    // things to go and do.
+    if (joined.Private && accountUser is null)
+    {
+        await SendTo(socket, new PartyMessage
+        {
+            Type = MsgType.Error,
+            Text = "This party is private — sign in to your Vault account to join.",
+        });
+        return;
+    }
+    if (joined.Private && !accountApproved)
+    {
+        await SendTo(socket, new PartyMessage
+        {
+            Type = MsgType.Error,
+            Text = "This party is private and your account hasn't been approved yet.",
+        });
+        return;
+    }
+
+    // Kicked is kicked — for the life of this room, not this connection.
+    if (accountUser is not null && joined.Banned.ContainsKey(accountUser))
+    {
+        await SendTo(socket, new PartyMessage
+        {
+            Type = MsgType.Error,
+            Text = "The host removed you from this party.",
+        });
+        return;
+    }
+
     var guestId = Guid.NewGuid().ToString("N");
     joined.Guests[guestId] = socket;
     joined.GuestNames[guestId] = name;
+    joined.GuestUserNames[guestId] = accountUser;
     await SendTo(socket, new PartyMessage
     {
         Type = MsgType.Welcome,
         Room = joined.Code,
+        GuestId = guestId,
+        Private = joined.Private,
         MovieTitle = joined.MovieTitle,
         Service = joined.Service,
         Name = joined.HostName, // so guests can say whose screen they're watching
@@ -422,6 +656,7 @@ app.Map("/ws", async context =>
 
     joined.Guests.TryRemove(guestId, out _);
     joined.GuestNames.TryRemove(guestId, out _);
+    joined.GuestUserNames.TryRemove(guestId, out _);
     joined.Ready.TryRemove(guestId, out _);
     await joined.BroadcastRoster();
     await joined.SendReadyCount();
@@ -431,11 +666,14 @@ app.Run();
 
 static string NewCode(ConcurrentDictionary<string, Room> rooms)
 {
-    const string alphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // no ambiguous chars
+    // Six plain characters, no prefix — typed into TV remotes and read out
+    // over voice chat, so every character costs something. The alphabet drops
+    // lookalikes (no I/L/O/0/1).
+    const string alphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
     var rng = Random.Shared;
     while (true)
     {
-        var code = "MOVIE-" + new string(Enumerable.Range(0, 4).Select(_ => alphabet[rng.Next(alphabet.Length)]).ToArray());
+        var code = new string(Enumerable.Range(0, 6).Select(_ => alphabet[rng.Next(alphabet.Length)]).ToArray());
         if (!rooms.ContainsKey(code)) return code;
     }
 }
@@ -506,8 +744,18 @@ class Room
     public string? WebReason;
     public bool Started;
     public PartyMessage? LastState;
+
+    /// <summary>Only signed-in, approved accounts may join.</summary>
+    public bool Private;
+    /// <summary>The host's account username, when they connected signed in.</summary>
+    public string? HostUserName;
+    /// <summary>Account usernames kicked from this room; refused on rejoin.</summary>
+    public readonly ConcurrentDictionary<string, bool> Banned = new();
+
     public readonly ConcurrentDictionary<string, WebSocket> Guests = new();
     public readonly ConcurrentDictionary<string, string> GuestNames = new();
+    /// <summary>Roster id → account username, or null for an anonymous guest.</summary>
+    public readonly ConcurrentDictionary<string, string?> GuestUserNames = new();
     public readonly ConcurrentDictionary<string, bool> Ready = new();
 
     public async Task Broadcast(PartyMessage msg)
@@ -528,9 +776,24 @@ class Room
 
     public async Task BroadcastRoster()
     {
+        // Parallel arrays rather than a member-object list, so pre-management
+        // clients (which only read Members) still render the roster.
+        var ids = new List<string> { "" };
         var members = new List<string> { HostName + " (host)" };
-        members.AddRange(GuestNames.Values);
-        var msg = new PartyMessage { Type = MsgType.Roster, Members = members.ToArray() };
+        var verified = new List<bool> { HostUserName is not null };
+        foreach (var (id, guestName) in GuestNames)
+        {
+            ids.Add(id);
+            members.Add(guestName);
+            verified.Add(GuestUserNames.TryGetValue(id, out var u) && u is not null);
+        }
+        var msg = new PartyMessage
+        {
+            Type = MsgType.Roster,
+            Members = members.ToArray(),
+            MemberIds = ids.ToArray(),
+            Verified = verified.ToArray(),
+        };
         await Broadcast(msg);
         await SendOne(Host, msg);
     }

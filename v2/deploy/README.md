@@ -84,6 +84,92 @@ If your home IP changes, use a dynamic DNS updater so the record follows it.
 In the app, set the party server to `party.thejumpvault.com`. Guests then only
 need the room code.
 
+## The server's own library
+
+Separate from Watch Party: films kept on the server itself, listed in the app
+for anyone signed in and streamed on demand. Nobody has to be at their PC with
+the file open.
+
+### Where the films live
+
+Mount the media disk on the host, then tell compose where it is:
+
+```
+# deploy/.env
+MEDIA_DIR=/mnt/media
+```
+
+Compose bind-mounts that at `/media` inside the container, **read-only**. The
+server indexes and reads; it never writes there, so nothing it does can damage
+the collection.
+
+Layout inside is up to you — subfolders are walked, and the film's name comes
+from its filename:
+
+```
+/mnt/media/
+  Arrival (2016).mkv
+  Heat (1995)/Heat.mkv
+```
+
+A dedicated disk is worth doing. On a box that boots off a small eMMC or SSD,
+`df -h` will show the root filesystem is nowhere near big enough for films, and
+Docker's own storage may already have been moved off it (see
+`move-docker-to-hdd.sh`). Mount the media disk somewhere stable and put it in
+`/etc/fstab` so it survives a reboot — a missing mount means an empty catalogue
+and, worse, a rescan that decides every film has been deleted.
+
+### Indexing
+
+The catalogue is built at startup and rebuilt on demand:
+
+```bash
+curl -X POST https://party.thejumpvault.com/api/v1/catalog/rescan \
+  -H "Authorization: Bearer <access token>"
+```
+
+The first sweep of a large library takes a while — every file is probed for its
+runtime and codecs and has a poster frame extracted — and runs in the
+background, so parties and health checks keep working throughout. Later sweeps
+only look at what changed.
+
+### What it costs
+
+Storage is the obvious one: films run 5–30 GB each, so a 2 TB disk holds
+somewhere between 70 and 400 of them.
+
+**Upload bandwidth is the real ceiling**, and it is the same arithmetic as the
+relay section above, minus the doubling:
+
+```
+upload needed = film bitrate x number of people watching
+```
+
+The difference is that a server-hosted film is read off local disk instead of
+being pushed up from someone's PC first, so the traffic crosses your connection
+**once**. On a home line, expect a handful of simultaneous viewers at film
+bitrates. Music, when it lands, is roughly twenty times cheaper per listener.
+
+### Who can see it
+
+Only accounts the owner has approved. Registration (username + password + a
+captcha the server draws itself) creates an account, but new accounts start
+**pending** and see an empty library until the owner approves them from the
+app's Manage Users screen. The owner is simply the first account registered on
+a fresh server — **register yours immediately after deploying**.
+
+There is no per-film permission model: approval opens the whole library.
+Playback URLs are signed and expire after 12 hours, and each one only opens the
+single film it was issued for.
+
+### Getting films up there
+
+Besides copying files onto the disk, the owner can upload straight from the
+app: right-click a film in the library → "Upload to Vault". Uploads are
+chunked, resume after interruptions, and are checksum-verified before they're
+indexed — but they run at your home connection's upload speed, so a 20 GB remux
+is hours, not minutes.
+
 ## Checking it works
 
 ```bash

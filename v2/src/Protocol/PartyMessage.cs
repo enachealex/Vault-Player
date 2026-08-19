@@ -26,6 +26,8 @@ public static class MsgType
     public const string Pull = "pull";             // server → host: fetch a byte range for a guest
     public const string Bye = "bye";               // server → guests: host left / room closed
     public const string Error = "error";
+    /// <summary>Host → server: remove a guest from the party (by roster id).</summary>
+    public const string Kick = "kick";
 }
 
 /// <summary>
@@ -58,6 +60,17 @@ public class PartyMessage
     [JsonPropertyName("members")] public string[]? Members { get; set; }
     [JsonPropertyName("readyCount")] public int? ReadyCount { get; set; }
     [JsonPropertyName("guestCount")] public int? GuestCount { get; set; }
+
+    // Party management. Old clients never see these fields (unknown JSON is
+    // ignored), so the protocol stays compatible in both directions.
+    /// <summary>Roster ids parallel to <see cref="Members"/>; "" for the host slot.</summary>
+    [JsonPropertyName("memberIds")] public string[]? MemberIds { get; set; }
+    /// <summary>Parallel to <see cref="Members"/>: signed in to a Vault account, or just a typed name.</summary>
+    [JsonPropertyName("verified")] public bool[]? Verified { get; set; }
+    /// <summary>In Welcome: the receiving guest's own roster id. In Kick: who to remove.</summary>
+    [JsonPropertyName("guestId")] public string? GuestId { get; set; }
+    /// <summary>In Welcome: whether this room requires a signed-in account.</summary>
+    [JsonPropertyName("private")] public bool? Private { get; set; }
 
     // External (streaming service) countdown.
     [JsonPropertyName("seconds")] public int? Seconds { get; set; }

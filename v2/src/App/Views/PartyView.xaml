@@ -159,6 +159,16 @@
                 <Button x:Name="JoinBtn" Style="{StaticResource GhostButton}" Click="JoinBtn_Click"
                         Content="Join with room code" AutomationProperties.Name="Join with room code" />
             </StackPanel>
+
+            <!-- Only offered signed in: a private room admits only signed-in,
+                 approved Vault accounts, so an anonymous host couldn't join
+                 their own standards. -->
+            <CheckBox x:Name="PrivateCheck" HorizontalAlignment="Center" Margin="0,14,0,0"
+                      Visibility="Collapsed" Foreground="{StaticResource TextMutedBrush}"
+                      AutomationProperties.Name="Private party">
+                <TextBlock FontSize="12" TextWrapping="Wrap" MaxWidth="300"
+                           Text="Private party — only signed-in, approved Vault accounts can join, even with the code" />
+            </CheckBox>
         </StackPanel>
 
         <!-- Host: pick a movie -->
@@ -213,7 +223,15 @@
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
                                 <TextBlock Text="{Binding}" FontSize="13.5" Foreground="{StaticResource TextBrush}"
-                                           Margin="0,2" />
+                                           Margin="0,2" ContextMenuOpening="RosterItem_MenuOpening">
+                                    <TextBlock.ContextMenu>
+                                        <ContextMenu>
+                                            <MenuItem Header="Remove from party" Click="KickMember_Click"
+                                                      Tag="{Binding PlacementTarget.Text,
+                                                            RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                        </ContextMenu>
+                                    </TextBlock.ContextMenu>
+                                </TextBlock>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>

@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.WebSockets;
@@ -30,6 +31,7 @@ public sealed class PartySession : IDisposable
     private string _pushBase = "";      // http base of the rendezvous (host pushes here)
     private string? _hostFilePath;      // host: the movie file to serve
     private long _lastBeaconAt;
+    private bool _saidGoodbye;          // a real reason reached Closed already
 
     public bool IsHost { get; private set; }
     public string RoomCode { get; private set; } = "";
@@ -57,6 +59,15 @@ public sealed class PartySession : IDisposable
     public long BeaconAtUnixMs { get; private set; }
     public bool HasBeacon { get; private set; }
 
+    /// <summary>One roster slot: id for kicks, name for display, verified = signed-in account.</summary>
+    public record RosterEntry(string Id, string Name, bool Verified);
+
+    /// <summary>This room only admits signed-in, approved accounts.</summary>
+    public bool IsPrivate { get; private set; }
+
+    /// <summary>Latest roster with identities; parallel to what RosterChanged reports.</summary>
+    public RosterEntry[] Roster { get; private set; } = Array.Empty<RosterEntry>();
+
     public event Action<string>? GuestJoined;
     public event Action<string[]>? RosterChanged;
     /// <summary>(guestName, kind) — kind is "pause" or "resume".</summary>
@@ -78,9 +89,11 @@ public sealed class PartySession : IDisposable
     // ---- Host --------------------------------------------------------------
 
     /// <param name="serverAddress">Rendezvous to use; null = spawn a local one.</param>
-    public static async Task<PartySession> HostAsync(Models.MovieItem movie, string displayName, string? serverAddress = null)
+    /// <param name="isPrivate">Only signed-in, approved Vault accounts may join.</param>
+    public static async Task<PartySession> HostAsync(Models.MovieItem movie, string displayName,
+        string? serverAddress = null, bool isPrivate = false)
     {
-        var session = await ConnectHostAsync(displayName, serverAddress);
+        var session = await ConnectHostAsync(displayName, serverAddress, isPrivate);
         session._hostFilePath = movie.Path;
 
         var info = new FileInfo(movie.Path);
@@ -109,9 +122,10 @@ public sealed class PartySession : IDisposable
     /// room exists purely for the roster, chat, and the synchronised start cue.
     /// </summary>
     public static async Task<PartySession> HostExternalAsync(
-        string title, string service, string url, string displayName, string? serverAddress = null)
+        string title, string service, string url, string displayName, string? serverAddress = null,
+        bool isPrivate = false)
     {
-        var session = await ConnectHostAsync(displayName, serverAddress);
+        var session = await ConnectHostAsync(displayName, serverAddress, isPrivate);
         session.IsExternal = true;
         session.ExternalService = service;
         session.ExternalUrl = url;
@@ -164,9 +178,10 @@ public sealed class PartySession : IDisposable
         return builder.Uri;
     }
 
-    private static async Task<PartySession> ConnectHostAsync(string displayName, string? serverAddress)
+    private static async Task<PartySession> ConnectHostAsync(string displayName, string? serverAddress,
+        bool isPrivate = false)
     {
-        var session = new PartySession { IsHost = true, DisplayName = displayName };
+        var session = new PartySession { IsHost = true, DisplayName = displayName, IsPrivate = isPrivate };
 
         Uri baseUri;
         if (string.IsNullOrWhiteSpace(serverAddress))
@@ -184,12 +199,26 @@ public sealed class PartySession : IDisposable
 
         session._socket = new ClientWebSocket();
         await session._socket.ConnectAsync(
-            SocketUri(baseUri, $"/ws?role=host&name={Uri.EscapeDataString(displayName)}"),
+            SocketUri(baseUri, $"/ws?role=host&name={Uri.EscapeDataString(displayName)}"
+                + (isPrivate ? "&private=1" : "")
+                + await AuthQueryAsync()),
             Cts(8));
 
         var welcome = await session.ReceiveAsync() ?? throw new InvalidOperationException("Rendezvous did not answer.");
         session.RoomCode = welcome.Room ?? "";
         return session;
+    }
+
+    /// <summary>
+    /// "&auth=..." when signed in, else "". Sent by hosts and guests alike so
+    /// the roster shows real usernames; required by the server only for
+    /// private rooms. Signed-out stays fully anonymous, exactly as before.
+    /// </summary>
+    private static async Task<string> AuthQueryAsync()
+    {
+        if (!AppServices.Account.IsSignedIn) return "";
+        var token = await AppServices.Account.AccessTokenAsync();
+        return token is null ? "" : $"&auth={Uri.EscapeDataString(token)}";
     }
 
     public void PushState(long positionMs, bool playing, bool force = false)
@@ -325,7 +354,8 @@ public sealed class PartySession : IDisposable
         var baseUri = ResolveBase(address);
         session._socket = new ClientWebSocket();
         await session._socket.ConnectAsync(
-            SocketUri(baseUri, $"/ws?role=guest&room={Uri.EscapeDataString(session.RoomCode)}&name={Uri.EscapeDataString(displayName)}"),
+            SocketUri(baseUri, $"/ws?role=guest&room={Uri.EscapeDataString(session.RoomCode)}&name={Uri.EscapeDataString(displayName)}"
+                + await AuthQueryAsync()),
             Cts(8));
 
         var welcome = await session.ReceiveAsync() ?? throw new InvalidOperationException("No answer from the party.");
@@ -339,6 +369,7 @@ public sealed class PartySession : IDisposable
         // there's no stream to pull, only the synchronised start cue.
         session.IsExternal = welcome.Service is not null;
         session.ExternalService = welcome.Service;
+        session.IsPrivate = welcome.Private == true;
         session.DurationMs = welcome.DurationMs ?? 0;
         session.AlreadyStarted = welcome.Started == true;
         if (welcome.PositionMs is { } p)
@@ -362,6 +393,10 @@ public sealed class PartySession : IDisposable
 
     public Task SendChatAsync(string text) => SendAsync(new PartyMessage { Type = MsgType.Chat, Text = text });
 
+    /// <summary>Host: remove a guest by roster id. They can't rejoin this room on the same account.</summary>
+    public Task KickAsync(string guestId) =>
+        SendAsync(new PartyMessage { Type = MsgType.Kick, GuestId = guestId });
+
     private async Task PumpAsync()
     {
         try
@@ -383,7 +418,9 @@ public sealed class PartySession : IDisposable
         catch
         {
         }
-        OnUi(() => Closed?.Invoke("Connection lost."));
+        // A kick or "host ended" already told the user why; don't follow the
+        // real reason with a generic one.
+        OnUi(() => { if (!_saidGoodbye) Closed?.Invoke("Connection lost."); });
     }
 
     private void Handle(PartyMessage msg)
@@ -391,7 +428,23 @@ public sealed class PartySession : IDisposable
         switch (msg.Type)
         {
             case MsgType.Join: GuestJoined?.Invoke(msg.Name ?? "Someone"); break;
-            case MsgType.Roster: RosterChanged?.Invoke(msg.Members ?? Array.Empty<string>()); break;
+            case MsgType.Roster:
+                var names = msg.Members ?? Array.Empty<string>();
+                // Ids and verified flags ride alongside the names; an older
+                // server sends names alone, and the roster still works minus
+                // the kick menu and the verified marks.
+                Roster = names.Select((memberName, i) => new RosterEntry(
+                    msg.MemberIds is { } ids && i < ids.Length ? ids[i] : "",
+                    memberName,
+                    msg.Verified is { } v && i < v.Length && v[i])).ToArray();
+                RosterChanged?.Invoke(names);
+                break;
+            case MsgType.Error:
+                // Mid-session error = the server showed us the door (kicked,
+                // room closed under us). The socket is about to die; say why.
+                Closed?.Invoke(msg.Text ?? "Disconnected by the server.");
+                _saidGoodbye = true;
+                break;
             case MsgType.PauseRequest: PauseRequested?.Invoke(msg.Name ?? "Someone", msg.Text ?? "pause"); break;
             case MsgType.Ready: ReadyChanged?.Invoke(msg.ReadyCount ?? 0, msg.GuestCount ?? 0); break;
             case MsgType.Chat: ChatReceived?.Invoke(msg.Name ?? "?", msg.Text ?? ""); break;
@@ -414,7 +467,10 @@ public sealed class PartySession : IDisposable
                 HasBeacon = true;
                 BeaconUpdated?.Invoke();
                 break;
-            case MsgType.Bye: Closed?.Invoke("The host ended the session."); break;
+            case MsgType.Bye:
+                Closed?.Invoke("The host ended the session.");
+                _saidGoodbye = true;
+                break;
         }
     }
 

@@ -1,0 +1,56 @@
+<Window x:Class="VideoPlayer.App.Views.UploadsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Uploads to Vault"
+        Width="480" Height="400" ResizeMode="CanResize"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource BgBrush}"
+        FontFamily="{StaticResource BodyFont}">
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <StackPanel>
+            <TextBlock Text="Uploads" FontSize="19" FontWeight="Bold"
+                       FontFamily="{StaticResource DisplayFont}" Foreground="{StaticResource TextBrush}" />
+            <TextBlock FontSize="12" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"
+                       Margin="0,6,0,14"
+                       Text="Films upload one at a time and survive interruptions — closing the app pauses the queue, and re-queuing a film resumes where it stopped." />
+        </StackPanel>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <ItemsControl x:Name="JobList">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Background="{StaticResource SurfaceBrush}" CornerRadius="10"
+                                Padding="14,10" Margin="0,0,0,8">
+                            <StackPanel>
+                                <Grid>
+                                    <TextBlock Text="{Binding Name}" FontSize="13.5" FontWeight="SemiBold"
+                                               Foreground="{StaticResource TextBrush}"
+                                               TextTrimming="CharacterEllipsis" Margin="0,0,90,0" />
+                                    <TextBlock Text="{Binding Detail}" FontSize="11.5" HorizontalAlignment="Right"
+                                               Foreground="{StaticResource TextMutedBrush}" />
+                                </Grid>
+                                <ProgressBar Value="{Binding Fraction, Mode=OneWay}" Maximum="1" Height="4"
+                                             Margin="0,8,0,0" Background="{StaticResource BgDeepBrush}"
+                                             Foreground="{StaticResource AccentBrush}" BorderThickness="0" />
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+        <TextBlock x:Name="EmptyText" Grid.Row="1" Text="Nothing queued. Right-click a film in your library and choose “Upload to Vault”."
+                   FontSize="12.5" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"
+                   HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" />
+
+        <Button Grid.Row="2" Content="Close" Style="{StaticResource PrimaryButton}" Padding="18,7"
+                HorizontalAlignment="Right" Margin="0,14,0,0" Click="Close_Click" IsDefault="True"
+                AutomationProperties.Name="Close" />
+    </Grid>
+</Window>

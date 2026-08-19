@@ -19,6 +19,9 @@ transcoding step.
 - **Cast to a TV.** Discovers DLNA renderers on your network (smart TVs,
   consoles, streaming sticks) and plays to them.
 - **Watch Party.** Watch the same film, in sync, with friends.
+- **A shared library on your own server.** Films kept on the server show up
+  beside the ones in your folder and stream on demand — no copy on your
+  machine, and nobody has to be at their PC for you to watch.
 - **Subtitles and audio tracks**, including sidecar `.srt` files.
 
 ## Watch Party
@@ -40,12 +43,33 @@ countdown so everyone presses play together in the service's own app.
 On a local network nothing extra is needed — the app runs its own rendezvous.
 
 To watch with people elsewhere, deploy `src/Rendezvous` (Dockerfile included)
-somewhere with a public address, and set that address in the app. The server
-only relays: it holds no accounts and stores no media. Connections from both
-host and guests are outbound, so it works behind NAT without port forwarding.
+somewhere with a public address, and set that address in the app. For a party
+the server only relays — it keeps no copy of what passes through. Connections
+from both host and guests are outbound, so it works behind NAT without port
+forwarding.
 
 Bandwidth note: the host uploads a full copy of the film to **each** guest
 simultaneously. The lobby tells you what that adds up to before you start.
+
+## Your library on the server
+
+Watch Party streams a film from whoever is hosting it, which means that person
+has to be at their PC with the file open. The server library is the other way
+round: point the server at a disk of films and they appear in the app for
+everyone signed in, marked **Vault**, ready to play whether or not anyone else
+is around.
+
+They behave like any other film — posters, runtimes, search, sort, resume. A
+film you also own locally is recognised as the same film, so stopping halfway
+through on one and picking it up on the other works.
+
+Setup is one line of config on the server; see
+[`v2/deploy/README.md`](v2/deploy/README.md). Films stream once from the disk
+they sit on rather than being uploaded by a host first, so it costs about half
+the bandwidth of a party — but your connection's upload speed still decides how
+many people can watch at once.
+
+Not yet: hosting a Watch Party straight from the server library, and music.
 
 ## Install
 

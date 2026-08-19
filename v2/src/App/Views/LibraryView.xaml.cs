@@ -28,6 +28,14 @@ public partial class LibraryView : UserControl, IDisposable
 
     private readonly CancellationTokenSource _cts = new();
     private List<MovieItem> _movies = new();
+
+    // The three sources the grid is built from, kept apart so each can be
+    // refreshed on its own: the Vault library arrives over the network long
+    // after the folder has been scanned, and re-scanning the folder to show it
+    // would be both slow and wrong.
+    private List<MovieItem> _folderMovies = new();
+    private List<MovieItem> _serverMovies = new();
+
     private SortMode _sort = SortMode.NameAsc;
     private bool _ready;
 
@@ -66,6 +74,10 @@ public partial class LibraryView : UserControl, IDisposable
         var last = AppServices.Settings.LastFolder;
         if (last is not null && Directory.Exists(last)) LoadFolder(last);
         else LoadShortcutsOnly(); // falls through to the empty state if there are none
+
+        // The server library lands whenever the network answers; the folder is
+        // already on screen by then.
+        _ = LoadServerLibraryAsync();
     }
 
     private void LoadFolder(string folder)
@@ -80,43 +92,25 @@ public partial class LibraryView : UserControl, IDisposable
             var durations = AppServices.Settings.Durations;
             foreach (var movie in movies)
             {
-                if (resume.TryGetValue(movie.Path, out var ms)) movie.ResumeMs = ms;
-                if (counts.TryGetValue(movie.Path, out var c)) movie.WatchCount = c;
+                if (resume.TryGetValue(movie.StoreKey, out var ms)) movie.ResumeMs = ms;
+                if (counts.TryGetValue(movie.StoreKey, out var c)) movie.WatchCount = c;
                 // Cached duration shows runtimes instantly; skips a libVLC re-parse.
                 if (durations.TryGetValue(movie.FilmKey, out var d) && d > 0) movie.DurationMs = d;
             }
             // Overlay anything synced from another machine (matched by film-key).
             AppServices.Account.ApplyTo(movies);
 
-            // Streaming shortcuts sit in the same list so search and sort just work.
-            // They're kept out of `movies` (the local-only list) because the
-            // duration/thumbnail pipeline below would choke on a URL.
-            _movies = movies.Concat(StreamingServices.AsMovieItems(AppServices.Settings.Shortcuts))
-                            .OrderBy(m => m.Name, StringComparer.CurrentCultureIgnoreCase)
-                            .ToList();
+            // Kept separate from the composed list: the duration and thumbnail
+            // pipeline below reads files off disk, and would choke on the URLs
+            // behind shortcuts and server films.
+            _folderMovies = movies;
 
             FolderTitle.Text = Path.GetFileName(folder.TrimEnd(Path.DirectorySeparatorChar)) is { Length: > 0 } n ? n : folder;
-            var shortcutCount = _movies.Count - movies.Count;
-            FolderSubtitle.Text = $"{movies.Count} movie{(movies.Count == 1 ? "" : "s")}"
-                + (shortcutCount > 0 ? $"  ·  {shortcutCount} streaming" : "")
-                + $"  ·  {folder}";
             FolderBtnText.Text = "Change folder";
+            FolderSubtitle.Text = CountsLine() + $"  ·  {folder}";
 
-            if (_movies.Count == 0)
-            {
-                Toolbar.Visibility = Visibility.Collapsed;
-                AllHeader.Visibility = Visibility.Collapsed;
-                MovieList.ItemsSource = null;
-                ShowEmpty("No videos in this folder", "Pick a different folder that contains video files.");
-            }
-            else
-            {
-                Toolbar.Visibility = Visibility.Visible;
-                EmptyState.Visibility = Visibility.Collapsed;
-                RefreshContinueRow();
-                ApplyFilter();
-                _ = RunMetadataPipelineAsync(movies);
-            }
+            Compose("No videos in this folder", "Pick a different folder that contains video files.");
+            if (_movies.Count > 0) _ = RunMetadataPipelineAsync(movies);
 
             AppServices.Settings.LastFolder = folder;
             AppServices.Settings.Save();
@@ -125,6 +119,149 @@ public partial class LibraryView : UserControl, IDisposable
         {
             ShowEmpty("Couldn't read that folder", ex.Message);
         }
+    }
+
+    /// <summary>
+    /// Rebuild the grid from the folder, the streaming shortcuts and the Vault
+    /// library. They share one list on purpose: search, sort and continue-
+    /// watching then work across everything you can watch, rather than making
+    /// you remember which of three places a film came from.
+    /// </summary>
+    private void Compose(string emptyTitle, string emptyText)
+    {
+        _movies = _folderMovies
+            .Concat(StreamingServices.AsMovieItems(AppServices.Settings.Shortcuts))
+            .Concat(PickableServerMovies())
+            .OrderBy(m => m.Name, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+
+        if (_movies.Count == 0)
+        {
+            Toolbar.Visibility = Visibility.Collapsed;
+            AllHeader.Visibility = Visibility.Collapsed;
+            MovieList.ItemsSource = null;
+            ShowEmpty(emptyTitle, emptyText);
+            return;
+        }
+
+        Toolbar.Visibility = Visibility.Visible;
+        EmptyState.Visibility = Visibility.Collapsed;
+        RefreshContinueRow();
+        ApplyFilter();
+    }
+
+    /// <summary>
+    /// Server films are hidden while choosing what to host. A host answers byte
+    /// ranges by reading the film off its own disk, and a server film is a URL,
+    /// not a file — so offering one here would produce a party that cannot
+    /// stream. Hosting straight from the server is the next piece of work.
+    /// </summary>
+    private IEnumerable<MovieItem> PickableServerMovies() =>
+        _onPick is null ? _serverMovies : Enumerable.Empty<MovieItem>();
+
+    /// <summary>The "12 movies · 3 streaming · 40 on Vault" line under the title.</summary>
+    private string CountsLine()
+    {
+        var parts = new List<string>();
+        // "0 movies" is only worth saying when a folder was actually chosen and
+        // turned out to be empty; otherwise it just reads as a complaint.
+        if (_folderMovies.Count > 0 || AppServices.Settings.LastFolder is not null)
+            parts.Add($"{_folderMovies.Count} movie{(_folderMovies.Count == 1 ? "" : "s")}");
+
+        var shortcuts = AppServices.Settings.Shortcuts.Count;
+        if (shortcuts > 0) parts.Add($"{shortcuts} streaming");
+
+        var server = PickableServerMovies().Count();
+        if (server > 0) parts.Add($"{server} on Vault");
+        else if (AppServices.Catalog.ServerScanning) parts.Add("Vault library still indexing");
+
+        return string.Join("  ·  ", parts);
+    }
+
+    /// <summary>
+    /// Pull the server's library in, then fetch its posters. Failure is quiet:
+    /// signed out, offline, or talking to a relay too old to have a catalogue
+    /// all mean the same thing here — there are no server films to show, and
+    /// the folder library is unaffected.
+    /// </summary>
+    private async Task LoadServerLibraryAsync()
+    {
+        var items = await AppServices.Catalog.RefreshAsync(_cts.Token);
+        if (_cts.IsCancellationRequested) return;
+
+        var hadFilms = _serverMovies.Count > 0;
+        _serverMovies = items.ToList();
+
+        // Same overlays the folder films get, so a film streamed from the server
+        // shows its progress and watch count too.
+        var resume = AppServices.Settings.ResumePositions;
+        var counts = AppServices.Settings.WatchCounts;
+        foreach (var movie in _serverMovies)
+        {
+            if (resume.TryGetValue(movie.StoreKey, out var ms)) movie.ResumeMs = ms;
+            if (counts.TryGetValue(movie.StoreKey, out var c)) movie.WatchCount = c;
+        }
+        AppServices.Account.ApplyTo(_serverMovies);
+
+        // Nothing to say and nothing to take away — leave the grid alone. The
+        // `hadFilms` half matters on sign-out: the films are gone from `items`
+        // and the grid still has them on screen.
+        // The refresh button only makes sense once there is a server library to
+        // refresh, and never while choosing a film to host.
+        VaultBtn.Visibility = _serverMovies.Count > 0 && _onPick is null
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
+        if (_serverMovies.Count == 0 && !hadFilms) return;
+
+        RefreshCountsLine();
+        Compose("Nothing to watch yet",
+            "Choose a folder with your films in it, or add some to the Vault server.");
+
+        await AppServices.Catalog.LoadArtAsync(_serverMovies, _cts.Token);
+    }
+
+    /// <summary>
+    /// Ask the server to re-index its disk, then show the result. Adding a film
+    /// to the media disk is otherwise invisible until the server restarts, and
+    /// the person who just copied one over is exactly who wants it now.
+    /// </summary>
+    private async void VaultBtn_Click(object sender, RoutedEventArgs e)
+    {
+        VaultBtn.IsEnabled = false;
+        VaultBtnText.Text = "Refreshing…";
+        try
+        {
+            await AppServices.Catalog.RequestRescanAsync();
+
+            // A sweep of a big library takes a while, and the server does it in
+            // the background. Give it a moment, then show whatever is ready —
+            // the count line says so when indexing is still going.
+            await Task.Delay(2500, _cts.Token);
+            if (_cts.IsCancellationRequested) return;
+            await LoadServerLibraryAsync();
+        }
+        catch (OperationCanceledException)
+        {
+            // Navigated away mid-refresh.
+        }
+        finally
+        {
+            if (!_cts.IsCancellationRequested)
+            {
+                VaultBtnText.Text = "Vault";
+                VaultBtn.IsEnabled = true;
+            }
+        }
+    }
+
+    /// <summary>Refresh just the counts, leaving whatever the loader put in the title.</summary>
+    private void RefreshCountsLine()
+    {
+        var folder = AppServices.Settings.LastFolder;
+        FolderSubtitle.Text = folder is not null && Directory.Exists(folder)
+            ? CountsLine() + $"  ·  {folder}"
+            : CountsLine() + "  ·  no folder selected";
     }
 
     private async Task RunMetadataPipelineAsync(List<MovieItem> movies)
@@ -163,7 +300,7 @@ public partial class LibraryView : UserControl, IDisposable
         var inProgress = _movies
             .Where(m => m.ResumeMs > 5000)
             .Where(m => m.DurationMs is not > 0 || m.ResumeMs < m.DurationMs.Value - 15000)
-            .OrderByDescending(m => watchedAt.TryGetValue(m.Path, out var t) ? t : 0)
+            .OrderByDescending(m => watchedAt.TryGetValue(m.StoreKey, out var t) ? t : 0)
             .ThenByDescending(m => m.ResumeMs)
             .Take(12)
             .ToList();
@@ -213,7 +350,7 @@ public partial class LibraryView : UserControl, IDisposable
         // A film counts as "watched" if it has a timestamp, a saved position, or a
         // completed view — older libraries predate the timestamp, so fall back.
         else if (_sort == SortMode.RecentlyWatched)
-            view = view.Where(m => watchedAt.ContainsKey(m.Path) || m.ResumeMs > 0 || m.WatchCount > 0);
+            view = view.Where(m => watchedAt.ContainsKey(m.StoreKey) || m.ResumeMs > 0 || m.WatchCount > 0);
 
         view = _sort switch
         {
@@ -222,7 +359,7 @@ public partial class LibraryView : UserControl, IDisposable
             SortMode.ShortestFirst => view.OrderBy(m => m.DurationMs ?? long.MaxValue),
             SortMode.MostWatched => view.OrderByDescending(m => m.WatchCount)
                                         .ThenBy(m => m.Name, StringComparer.CurrentCultureIgnoreCase),
-            SortMode.RecentlyWatched => view.OrderByDescending(m => watchedAt.TryGetValue(m.Path, out var t) ? t : 0)
+            SortMode.RecentlyWatched => view.OrderByDescending(m => watchedAt.TryGetValue(m.StoreKey, out var t) ? t : 0)
                                             .ThenBy(m => m.Name, StringComparer.CurrentCultureIgnoreCase),
             _ => view.OrderBy(m => m.Name, StringComparer.CurrentCultureIgnoreCase),
         };
@@ -391,6 +528,41 @@ public partial class LibraryView : UserControl, IDisposable
         ReloadLibrary();
     }
 
+    // ---- Uploading to the server -------------------------------------------
+
+    /// <summary>
+    /// Tailor the card menu to the card: "Upload to Vault" only makes sense on
+    /// a local file, only for the server owner, and only when there's a server
+    /// library to upload into. "Remove shortcut" only on shortcuts.
+    /// </summary>
+    private void CardMenu_Opened(object sender, RoutedEventArgs e)
+    {
+        if (sender is not ContextMenu menu) return;
+        var movie = (menu.PlacementTarget as FrameworkElement)?.Tag as MovieItem
+            ?? (menu.Items[0] as MenuItem)?.Tag as MovieItem;
+        foreach (var item in menu.Items.OfType<MenuItem>())
+        {
+            item.Visibility = (item.Header as string) switch
+            {
+                "Upload to Vault" => movie is { Kind: MovieKind.Local }
+                                     && AppServices.Account is { IsSignedIn: true, IsOwner: true }
+                    ? Visibility.Visible : Visibility.Collapsed,
+                "Remove shortcut" => movie is { IsShortcut: true } ? Visibility.Visible : Visibility.Collapsed,
+                _ => item.Visibility,
+            };
+        }
+    }
+
+    private void UploadToVault_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as MenuItem)?.Tag is not MovieItem movie) return;
+        if (AppServices.Uploads.Enqueue(movie))
+            new UploadsWindow { Owner = Window.GetWindow(this) }.Show();
+        else
+            MessageBox.Show("That film is already queued or uploading.", "Uploads",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
     private void RemoveShortcut_Click(object sender, RoutedEventArgs e)
     {
         if ((sender as MenuItem)?.Tag is not MovieItem movie || !movie.IsShortcut) return;
@@ -413,33 +585,37 @@ public partial class LibraryView : UserControl, IDisposable
         else LoadShortcutsOnly();
     }
 
-    /// <summary>Library view when there are shortcuts but no folder chosen yet.</summary>
+    /// <summary>
+    /// Library view with no folder chosen — shortcuts and the Vault library, if
+    /// either has anything in it. Someone who only ever streams from the server
+    /// never has to point the app at a folder at all.
+    /// </summary>
     private void LoadShortcutsOnly()
     {
-        _movies = StreamingServices.AsMovieItems(AppServices.Settings.Shortcuts)
-                                   .OrderBy(m => m.Name, StringComparer.CurrentCultureIgnoreCase)
-                                   .ToList();
-        if (_movies.Count == 0)
-        {
-            Toolbar.Visibility = Visibility.Collapsed;
-            AllHeader.Visibility = Visibility.Collapsed;
-            MovieList.ItemsSource = null;
-            ShowEmpty("No folder selected",
-                "Choose the folder where your movies live — only video files will be listed.");
-            return;
-        }
-
+        _folderMovies = new List<MovieItem>();
         FolderTitle.Text = "Your movies";
-        FolderSubtitle.Text = $"{_movies.Count} streaming shortcut{(_movies.Count == 1 ? "" : "s")}  ·  no folder selected";
-        Toolbar.Visibility = Visibility.Visible;
-        EmptyState.Visibility = Visibility.Collapsed;
-        RefreshContinueRow();
-        ApplyFilter();
+        FolderSubtitle.Text = CountsLine() + "  ·  no folder selected";
+
+        Compose("No folder selected",
+            "Choose the folder where your movies live — only video files will be listed.");
     }
+
+    /// <summary>Tracks sign-in transitions; this event also fires on every routine sync.</summary>
+    private bool _wasSignedIn = AppServices.Account.IsSignedIn;
 
     /// <summary>When a background sync updates the library, re-overlay and refresh.</summary>
     private void OnAccountChanged() => Dispatcher.Invoke(() =>
     {
+        // Signing in or out changes whether there is a server library at all, so
+        // it has to be re-fetched rather than just re-overlaid. Only on the
+        // transition though: this event also fires after every routine sync, and
+        // re-listing the whole catalogue each time would be pure waste.
+        if (AppServices.Account.IsSignedIn != _wasSignedIn)
+        {
+            _wasSignedIn = AppServices.Account.IsSignedIn;
+            _ = LoadServerLibraryAsync();
+        }
+
         if (_movies.Count == 0) return;
         AppServices.Account.ApplyTo(_movies);
         RefreshContinueRow();

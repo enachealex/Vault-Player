@@ -1,6 +1,6 @@
 # Watch Party rendezvous server
 
-The little coordination + relay server behind Watch Party. It does two jobs:
+The little coordination + relay server behind Watch Party. It does three jobs:
 
 1. **Control relay** — connects one host to its guests over WebSockets and passes
    along play/pause, sync beacons, chat, roster, and pause requests.
@@ -10,6 +10,31 @@ The little coordination + relay server behind Watch Party. It does two jobs:
    guest needs only the **server address + a room code** — the host never has to
    be directly reachable, which is what makes parties work across the internet
    through home routers.
+3. **Library** — films kept on *this machine's* disk, listed to signed-in
+   accounts (`GET /api/v1/catalog`) and streamed on demand
+   (`GET /media/{key}`). The other two jobs move somebody else's bytes; here the
+   server is the origin, so nobody has to be sat at their PC with the file open
+   for someone else to watch it.
+
+## The library
+
+Point `VAULT_MEDIA` at a folder of films (default `/media`) and the server
+indexes it on startup, walking subfolders. It never writes to that folder — the
+mount is read-only in `docker-compose.yml` — and the index is disposable: delete
+the rows and a rescan rebuilds them.
+
+With `ffprobe` and `ffmpeg` on the path (the Docker image installs both) each
+film also gets a runtime, its codecs, and a poster frame. Without them files
+still list and stream, they just show a name and a size.
+
+Playback URLs carry a **signed token** rather than the account's access token,
+because a media player follows a URL and cannot be made to send an
+`Authorization` header. Each token is bound to one film and one account and
+lasts 12 hours, so a link that escapes grants that one film until the end of the
+day and nothing else.
+
+Adding or removing files takes effect on the next `POST /api/v1/catalog/rescan`
+(or a restart).
 
 ## Running it
 
@@ -53,3 +78,7 @@ allowance, or keep parties on the LAN where the relay is effectively free.
 | `WS /ws?role=guest&room=&name=` | guest | control channel for a room |
 | `GET \| HEAD /stream/{room}` | guest player | pulls the movie (Range-aware) |
 | `POST /upload/{reqId}` | host | pushes a requested byte range |
+| `GET /api/v1/catalog` | signed-in app | the server's own film library |
+| `GET /api/v1/catalog/{key}/art` | signed-in app | poster frame |
+| `POST /api/v1/catalog/rescan` | signed-in app | re-index the media disk |
+| `GET \| HEAD /media/{key}?t=` | media player | streams a library film (Range-aware) |

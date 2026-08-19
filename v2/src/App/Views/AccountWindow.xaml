@@ -19,38 +19,87 @@
 
         <!-- Sign in / Register -->
         <StackPanel x:Name="FormPanel">
-            <StackPanel x:Name="NameRow" Visibility="Collapsed">
-                <TextBlock Text="DISPLAY NAME" FontSize="10.5" FontWeight="Bold"
-                           Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,6" />
-                <Border Style="{StaticResource FieldBox}" Margin="0,0,0,14">
-                    <TextBox x:Name="NameBox" Style="{StaticResource FieldText}" MaxLength="30"
-                             AutomationProperties.Name="Display name" />
-                </Border>
-            </StackPanel>
-
-            <TextBlock Text="EMAIL" FontSize="10.5" FontWeight="Bold"
+            <TextBlock Text="USERNAME" FontSize="10.5" FontWeight="Bold"
                        Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,6" />
-            <Border Style="{StaticResource FieldBox}" Margin="0,0,0,14">
-                <TextBox x:Name="EmailBox" Style="{StaticResource FieldText}"
-                         AutomationProperties.Name="Email" />
+            <Border Style="{StaticResource FieldBox}" Margin="0,0,0,4">
+                <TextBox x:Name="UsernameBox" Style="{StaticResource FieldText}" MaxLength="20"
+                         AutomationProperties.Name="Username" />
             </Border>
+            <TextBlock x:Name="UsernameHint" Text="3–20 characters: letters, digits, dots, dashes, underscores."
+                       FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="2,0,0,10"
+                       Visibility="Collapsed" />
 
             <TextBlock Text="PASSWORD" FontSize="10.5" FontWeight="Bold"
-                       Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,6" />
+                       Foreground="{StaticResource TextMutedBrush}" Margin="0,4,0,6" />
             <v:PasswordField x:Name="PassField" FieldName="Password" />
             <TextBlock x:Name="PassHint" Text="At least 8 characters." FontSize="11"
                        Foreground="{StaticResource TextMutedBrush}" Margin="2,6,0,0" Visibility="Collapsed" />
 
-            <!-- Confirm (create-account only) -->
+            <!-- Create-account only -->
             <StackPanel x:Name="ConfirmRow" Visibility="Collapsed" Margin="0,14,0,0">
                 <TextBlock Text="CONFIRM PASSWORD" FontSize="10.5" FontWeight="Bold"
                            Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,6" />
                 <v:PasswordField x:Name="ConfirmField" FieldName="Confirm password" />
             </StackPanel>
 
-            <Button x:Name="ForgotLink" Content="Forgot password?" Style="{StaticResource LinkButton}"
-                    HorizontalAlignment="Left" Margin="0,10,0,0" Click="Forgot_Click"
-                    AutomationProperties.Name="Forgot password" />
+            <StackPanel x:Name="EmailRow" Visibility="Collapsed" Margin="0,14,0,0">
+                <TextBlock Text="EMAIL — OPTIONAL" FontSize="10.5" FontWeight="Bold"
+                           Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,6" />
+                <Border Style="{StaticResource FieldBox}">
+                    <TextBox x:Name="EmailBox" Style="{StaticResource FieldText}"
+                             AutomationProperties.Name="Email (optional)" />
+                </Border>
+                <TextBlock Text="Only used if you ever need to reset your password."
+                           FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="2,6,0,0" />
+            </StackPanel>
+
+            <StackPanel x:Name="InviteRow" Visibility="Collapsed" Margin="0,14,0,0">
+                <TextBlock Text="INVITE CODE — OPTIONAL" FontSize="10.5" FontWeight="Bold"
+                           Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,6" />
+                <Border Style="{StaticResource FieldBox}">
+                    <TextBox x:Name="InviteBox" Style="{StaticResource FieldText}" MaxLength="14"
+                             FontFamily="Consolas" CharacterCasing="Upper"
+                             AutomationProperties.Name="Invite code (optional)" />
+                </Border>
+                <TextBlock Text="Got one from the library owner? It unlocks their films immediately. Without it, you'll wait for their approval."
+                           FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="2,6,0,0"
+                           TextWrapping="Wrap" />
+            </StackPanel>
+
+            <!-- Are-you-human check, drawn by our own server -->
+            <StackPanel x:Name="CaptchaRow" Visibility="Collapsed" Margin="0,14,0,0">
+                <TextBlock Text="TYPE THE CHARACTERS" FontSize="10.5" FontWeight="Bold"
+                           Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,6" />
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Border CornerRadius="8" Height="52" Background="#F4EEE4">
+                        <Image x:Name="CaptchaImage" Stretch="Uniform" Margin="4"
+                               RenderOptions.BitmapScalingMode="NearestNeighbor" />
+                    </Border>
+                    <Button Grid.Column="1" Style="{StaticResource GhostButton}" Padding="10,0"
+                            Margin="8,0,0,0" Click="RefreshCaptcha_Click" ToolTip="Get a different image"
+                            AutomationProperties.Name="New captcha image">
+                        <TextBlock Text="&#xE72C;" FontFamily="Segoe MDL2 Assets" FontSize="14" />
+                    </Button>
+                </Grid>
+                <Border Style="{StaticResource FieldBox}" Margin="0,8,0,0">
+                    <TextBox x:Name="CaptchaBox" Style="{StaticResource FieldText}" MaxLength="5"
+                             FontSize="16" FontFamily="Consolas" CharacterCasing="Upper"
+                             AutomationProperties.Name="Captcha answer" />
+                </Border>
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                <Button x:Name="ForgotLink" Content="Forgot password?" Style="{StaticResource LinkButton}"
+                        HorizontalAlignment="Left" Click="Forgot_Click"
+                        AutomationProperties.Name="Forgot password" />
+                <Button x:Name="PhoneLink" Content="Sign in with your phone" Style="{StaticResource LinkButton}"
+                        HorizontalAlignment="Left" Margin="16,0,0,0" Click="PhoneSignIn_Click"
+                        AutomationProperties.Name="Sign in with your phone" />
+            </StackPanel>
 
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0">
                 <Button x:Name="ToggleBtn" Content="Create account" Style="{StaticResource GhostButton}"
@@ -62,22 +111,28 @@
             </StackPanel>
         </StackPanel>
 
-        <!-- Verify emailed code -->
-        <StackPanel x:Name="VerifyPanel" Visibility="Collapsed">
-            <TextBlock Text="VERIFICATION CODE" FontSize="10.5" FontWeight="Bold"
-                       Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,6" />
-            <Border Style="{StaticResource FieldBox}">
-                <TextBox x:Name="CodeBox" Style="{StaticResource FieldText}" MaxLength="6"
-                         FontSize="20" FontFamily="Consolas" AutomationProperties.Name="Verification code" />
+        <!-- Device-link: scan, sign in on the phone, type the code here -->
+        <StackPanel x:Name="PhonePanel" Visibility="Collapsed">
+            <Border Background="White" CornerRadius="12" Padding="12" HorizontalAlignment="Center">
+                <Image x:Name="LinkQrImage" Width="180" Height="180"
+                       RenderOptions.BitmapScalingMode="NearestNeighbor" />
             </Border>
-            <Button x:Name="ResendLink" Content="Resend code" Style="{StaticResource LinkButton}"
-                    HorizontalAlignment="Left" Margin="0,8,0,0" Click="Resend_Click"
-                    AutomationProperties.Name="Resend code" />
+            <TextBlock x:Name="LinkUrlText" FontSize="11.5" Foreground="{StaticResource TextMutedBrush}"
+                       HorizontalAlignment="Center" Margin="0,8,0,0" />
+            <TextBlock Text="Scan with your phone, sign in there, then type the code it gives you:"
+                       FontSize="12.5" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"
+                       Margin="0,12,0,6" />
+            <Border Style="{StaticResource FieldBox}">
+                <TextBox x:Name="LinkCodeBox" Style="{StaticResource FieldText}" MaxLength="6"
+                         FontSize="20" FontFamily="Consolas" CharacterCasing="Upper"
+                         AutomationProperties.Name="Link code" />
+            </Border>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0">
                 <Button Content="Back" Style="{StaticResource GhostButton}" Padding="12,7" Margin="0,0,10,0"
                         Click="Back_Click" AutomationProperties.Name="Back" />
-                <Button x:Name="VerifyBtn" Content="Verify" Style="{StaticResource PrimaryButton}"
-                        Padding="18,7" Click="Verify_Click" IsDefault="True" AutomationProperties.Name="Verify" />
+                <Button x:Name="LinkClaimBtn" Content="Sign in" Style="{StaticResource PrimaryButton}"
+                        Padding="18,7" Click="LinkClaim_Click" IsDefault="True"
+                        AutomationProperties.Name="Sign in with code" />
             </StackPanel>
         </StackPanel>
 
@@ -89,6 +144,8 @@
                 <TextBox x:Name="ForgotEmailBox" Style="{StaticResource FieldText}"
                          AutomationProperties.Name="Email for reset" />
             </Border>
+            <TextBlock Text="Works only if you added an email to your account."
+                       FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="2,6,0,0" />
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0">
                 <Button Content="Back" Style="{StaticResource GhostButton}" Padding="12,7" Margin="0,0,10,0"
                         Click="Back_Click" AutomationProperties.Name="Back" />
@@ -126,6 +183,8 @@
                                Foreground="{StaticResource TextBrush}" />
                     <TextBlock x:Name="WhoEmail" FontSize="12" Foreground="{StaticResource TextMutedBrush}"
                                Margin="0,2,0,0" />
+                    <TextBlock x:Name="StatusLine" FontSize="12" Foreground="{StaticResource TextMutedBrush}"
+                               Margin="0,6,0,0" TextWrapping="Wrap" Visibility="Collapsed" />
                     <TextBlock x:Name="SyncStatus" FontSize="12" Foreground="{StaticResource AccentWarmBrush}"
                                Margin="0,8,0,0" />
                 </StackPanel>
@@ -137,6 +196,17 @@
                     <TextBlock Text="&#xE716;" FontFamily="Segoe MDL2 Assets" FontSize="14"
                                VerticalAlignment="Center" Margin="0,0,8,0" />
                     <TextBlock x:Name="FriendsBtnLabel" Text="Friends" FontSize="13" />
+                </StackPanel>
+            </Button>
+
+            <!-- Owner only: who may stream the server's films -->
+            <Button x:Name="ManageUsersBtn" Style="{StaticResource GhostButton}" Padding="14,9" Margin="0,8,0,0"
+                    HorizontalAlignment="Stretch" Click="ManageUsers_Click" Visibility="Collapsed"
+                    AutomationProperties.Name="Manage users">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                    <TextBlock Text="&#xE7EF;" FontFamily="Segoe MDL2 Assets" FontSize="14"
+                               VerticalAlignment="Center" Margin="0,0,8,0" />
+                    <TextBlock x:Name="ManageUsersLabel" Text="Manage users" FontSize="13" />
                 </StackPanel>
             </Button>
 
