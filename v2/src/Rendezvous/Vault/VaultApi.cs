@@ -338,6 +338,12 @@ public static class VaultApi
                 });
 
             db.LibraryItems.RemoveRange(db.LibraryItems.Where(x => x.UserId == uid));
+            // Shelves belong to the account, so they go with it. The members
+            // are removed by hand because nothing in this schema has a foreign
+            // key to cascade through.
+            var shelfIds = db.Collections.Where(x => x.UserId == uid).Select(x => x.Id).ToList();
+            db.CollectionItems.RemoveRange(db.CollectionItems.Where(x => shelfIds.Contains(x.CollectionId)));
+            db.Collections.RemoveRange(db.Collections.Where(x => x.UserId == uid));
             db.RefreshTokens.RemoveRange(db.RefreshTokens.Where(x => x.UserId == uid));
             db.Friendships.RemoveRange(db.Friendships.Where(x => x.RequesterId == uid || x.AddresseeId == uid));
             db.PartyInvites.RemoveRange(db.PartyInvites.Where(x => x.FromUserId == uid || x.ToUserId == uid));
@@ -473,6 +479,12 @@ public static class VaultApi
             // Same cleanup the self-service delete does.
             var uid = target.Id;
             db.LibraryItems.RemoveRange(db.LibraryItems.Where(x => x.UserId == uid));
+            // Shelves belong to the account, so they go with it. The members
+            // are removed by hand because nothing in this schema has a foreign
+            // key to cascade through.
+            var shelfIds = db.Collections.Where(x => x.UserId == uid).Select(x => x.Id).ToList();
+            db.CollectionItems.RemoveRange(db.CollectionItems.Where(x => shelfIds.Contains(x.CollectionId)));
+            db.Collections.RemoveRange(db.Collections.Where(x => x.UserId == uid));
             db.RefreshTokens.RemoveRange(db.RefreshTokens.Where(x => x.UserId == uid));
             db.Friendships.RemoveRange(db.Friendships.Where(x => x.RequesterId == uid || x.AddresseeId == uid));
             db.PartyInvites.RemoveRange(db.PartyInvites.Where(x => x.FromUserId == uid || x.ToUserId == uid));

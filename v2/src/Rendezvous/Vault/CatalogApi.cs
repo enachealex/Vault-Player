@@ -33,7 +33,14 @@ public record CatalogItemDto(string ItemKey, string Name, long SizeBytes, long? 
 /// <summary>Where a film's web copy stands. See <see cref="HlsRemuxer"/>.</summary>
 public record HlsStatusDto(string State, int Percent, bool Ready, string? Error, string? PlaylistUrl);
 
-public record CatalogDto(CatalogItemDto[] Items, bool Scanning, long LastScanAt, bool MediaRootPresent);
+/// <param name="Collections">
+/// The caller's own shelves, sent alongside the library so a client needs one
+/// round trip rather than two. Appended rather than folded into each item: a
+/// film can sit on several shelves, and CatalogItemDto is a positional record
+/// whose shape the desktop client mirrors by hand.
+/// </param>
+public record CatalogDto(CatalogItemDto[] Items, bool Scanning, long LastScanAt, bool MediaRootPresent,
+    CollectionDto[] Collections);
 
 /// <summary>
 /// Signs the short-lived URLs that let a player fetch a film.
@@ -122,7 +129,12 @@ public static class CatalogApi
     /// an account — an account exists the moment someone passes the sign-up
     /// captcha, and that must not be worth anything by itself.
     /// </summary>
-    private static async Task<bool> ApprovedAsync(VaultDbContext db, string? uid)
+    /// <remarks>
+    /// internal rather than private so CollectionsApi shares this exact gate.
+    /// There are already three near-identical approval/owner checks in this
+    /// codebase; a fourth copy is how one of them ends up subtly different.
+    /// </remarks>
+    internal static async Task<bool> ApprovedAsync(VaultDbContext db, string? uid)
     {
         if (uid is null) return false;
         var user = await db.Users.FindAsync(uid);
@@ -166,7 +178,8 @@ public static class CatalogApi
             }).ToArray();
 
             return Results.Ok(new CatalogDto(dtos, scanner.IsScanning, scanner.LastScanAt,
-                Directory.Exists(CatalogScanner.MediaRoot)));
+                Directory.Exists(CatalogScanner.MediaRoot),
+                await CollectionsApi.LoadAllAsync(db, uid)));
         }).RequireAuthorization();
 
         // Posters go over the ordinary authorised API, because the app fetches

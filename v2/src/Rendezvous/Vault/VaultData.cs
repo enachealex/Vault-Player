@@ -57,6 +57,66 @@ public class LibraryItem
     public long UpdatedAt { get; set; }
 }
 
+/// <summary>
+/// One of a person's own shelves — "Pixar", "Christmas", "Watch with Dad".
+///
+/// Deliberately NOT the word "library": in this codebase a library is already a
+/// person's resume and watch state (<see cref="LibraryItem"/>, /api/v1/library,
+/// LibraryView), which is close enough to be confusing and means the opposite
+/// thing. These are Plex's Collections, minus Plex's rule that only the server
+/// owner may make them.
+///
+/// Belongs to the ACCOUNT, not to a person or a device. Everyone signed in with
+/// the same account — a desktop, a phone, a television that took a six-character
+/// code — sees the same shelves, and nobody else's.
+/// </summary>
+public class Collection
+{
+    public long Id { get; set; }
+    public string UserId { get; set; } = "";
+    public string Name { get; set; } = "";
+
+    /// <summary>
+    /// Which member film's poster stands for the shelf. Held as a FilmKey for
+    /// the same reason membership is; null means "use the first member".
+    /// </summary>
+    public string? ArtFilmKey { get; set; }
+
+    /// <summary>Where this shelf sits in the person's own ordering.</summary>
+    public int SortOrder { get; set; }
+
+    public long CreatedAt { get; set; }
+
+    /// <summary>Last write, unix ms. Last-writer-wins across devices.</summary>
+    public long UpdatedAt { get; set; }
+}
+
+/// <summary>
+/// One film on one shelf.
+///
+/// Keyed by FilmKey — "name|size" — and never by CatalogItem.ItemKey. ItemKey is
+/// a hash of the file's path, and the scanner deletes rows whose ItemKey it did
+/// not see this sweep, so renaming a film or moving it between folders is a
+/// delete and an insert. Membership keyed on ItemKey would quietly empty itself
+/// every time somebody tidied their folders. FilmKey survives that, and is
+/// already what resume follows for exactly the same reason.
+/// </summary>
+public class CollectionItem
+{
+    public long Id { get; set; }
+    public long CollectionId { get; set; }
+    public string FilmKey { get; set; } = "";
+
+    /// <summary>
+    /// Denormalised so a film that has left the server still shows as a named,
+    /// greyed-out entry the owner can remove, rather than silently vanishing.
+    /// </summary>
+    public string Name { get; set; } = "";
+
+    public int SortOrder { get; set; }
+    public long AddedAt { get; set; }
+}
+
 /// <summary>A long-lived refresh token, stored so it can be revoked.</summary>
 public class RefreshToken
 {
@@ -236,6 +296,8 @@ public class VaultDbContext(DbContextOptions<VaultDbContext> options)
     public DbSet<ConsumedJti> ConsumedJtis => Set<ConsumedJti>();
     public DbSet<CatalogItem> CatalogItems => Set<CatalogItem>();
     public DbSet<InviteCode> InviteCodes => Set<InviteCode>();
+    public DbSet<Collection> Collections => Set<Collection>();
+    public DbSet<CollectionItem> CollectionItems => Set<CollectionItem>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -255,5 +317,10 @@ public class VaultDbContext(DbContextOptions<VaultDbContext> options)
         b.Entity<CatalogItem>().HasIndex(x => x.ItemKey).IsUnique();
         b.Entity<CatalogItem>().HasIndex(x => x.Kind);
         b.Entity<InviteCode>().HasIndex(x => x.Code).IsUnique();
+        // Every read is "this account's shelves", so that is the index.
+        b.Entity<Collection>().HasIndex(x => x.UserId);
+        // A film appears on a shelf once. The unique pair also makes "add"
+        // idempotent, so a double-click cannot produce two identical entries.
+        b.Entity<CollectionItem>().HasIndex(x => new { x.CollectionId, x.FilmKey }).IsUnique();
     }
 }

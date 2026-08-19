@@ -198,12 +198,33 @@ using (var scope = app.Services.CreateScope())
             "UsedAt" INTEGER NOT NULL DEFAULT 0
         );
         CREATE UNIQUE INDEX IF NOT EXISTS "IX_InviteCodes_Code" ON "InviteCodes" ("Code");
+        CREATE TABLE IF NOT EXISTS "Collections" (
+            "Id" INTEGER NOT NULL CONSTRAINT "PK_Collections" PRIMARY KEY AUTOINCREMENT,
+            "UserId" TEXT NOT NULL,
+            "Name" TEXT NOT NULL,
+            "ArtFilmKey" TEXT NULL,
+            "SortOrder" INTEGER NOT NULL,
+            "CreatedAt" INTEGER NOT NULL,
+            "UpdatedAt" INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS "IX_Collections_UserId" ON "Collections" ("UserId");
+        CREATE TABLE IF NOT EXISTS "CollectionItems" (
+            "Id" INTEGER NOT NULL CONSTRAINT "PK_CollectionItems" PRIMARY KEY AUTOINCREMENT,
+            "CollectionId" INTEGER NOT NULL,
+            "FilmKey" TEXT NOT NULL,
+            "Name" TEXT NOT NULL,
+            "SortOrder" INTEGER NOT NULL,
+            "AddedAt" INTEGER NOT NULL
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS "IX_CollectionItems_CollectionId_FilmKey"
+            ON "CollectionItems" ("CollectionId", "FilmKey");
         """);
 }
 
 app.MapVaultApi();
 
 app.MapCatalogApi();
+app.MapCollectionsApi();
 app.MapUploadApi();
 app.MapLinkApi();
 
