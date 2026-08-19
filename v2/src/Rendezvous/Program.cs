@@ -77,6 +77,7 @@ builder.Services.AddSingleton<VaultTokens>();
 // scanner holds the "am I already sweeping" gate.
 builder.Services.AddSingleton<CatalogScanner>();
 builder.Services.AddSingleton<MediaTokens>();
+builder.Services.AddSingleton<HlsRemuxer>();
 // Sign-up CAPTCHA challenges; in memory on purpose — a restart voiding open
 // challenges costs a registrant one refresh.
 builder.Services.AddSingleton<CaptchaStore>();
@@ -205,6 +206,11 @@ app.MapVaultApi();
 app.MapCatalogApi();
 app.MapUploadApi();
 app.MapLinkApi();
+
+// Throw away any web copy left half-written by a previous run, before anything
+// can start writing a new one. Synchronous and first: it is the one moment when
+// nothing in this process is touching the cache.
+app.Services.GetRequiredService<HlsRemuxer>().SweepPartials();
 
 // Index the media disk in the background. Not awaited: a first sweep of a large
 // library probes and extracts a poster for every file, and the relay must be

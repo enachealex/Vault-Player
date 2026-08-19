@@ -117,6 +117,15 @@ public static class TvPage
   .track i { display:block; height:100%; background:var(--accent); }
   #hint { position:absolute; top:2.6rem; right:4rem; color:var(--muted); font-size:1.05rem; }
   .center { text-align:center; color:var(--muted); font-size:1.4rem; padding-top:6rem; }
+
+  /* Shown while the server repackages a film the television cannot open as it
+     stands. Absolutely positioned rather than flex-centred: this has to lay out
+     the same on a 2018 set as on a current one. */
+  #prep { display:none; position:absolute; left:0; right:0; top:38%; text-align:center; }
+  #prep.on { display:block; }
+  #prep .pt { font-size:1.9rem; font-weight:700; }
+  #prep .pp { font-size:3.2rem; font-weight:700; color:var(--accent); margin:1.4rem 0 1rem; }
+  #prep .ps { font-size:1.2rem; color:var(--muted); }
 </style>
 </head>
 <body>
@@ -150,7 +159,10 @@ public static class TvPage
 
 <section id="player" class="screen">
   <video id="v" playsinline preload="auto"></video>
-  <div id="hint">OK pause &middot; &#9664; &#9654; skip &middot; Back exit</div>
+  <div id="prep"><div class="pt">Preparing this film for your television</div>
+    <div class="pp" id="prepPct">Starting&hellip;</div>
+    <div class="ps">This happens once. Next time it starts straight away.</div></div>
+  <div id="hint">OK pause &middot; &#9664; &#9654; skip 10s &middot; Back exit</div>
   <div id="hud">
     <div class="t" id="pTitle"></div>
     <div class="times"><span id="pAt">0:00</span><span class="right" id="pLeft"></span></div>
@@ -165,6 +177,45 @@ public static class TvPage
   var LS = 'vault.tv.rt';
 
   var S = { access:null, refresh:null, me:null, items:[], resume:{}, film:null, screen:'signin', memoryOnly:false };
+
+  // What this particular television can decode.
+  //
+  // Asked of a <video> element, deliberately, and not of MediaSource: these are
+  // native HLS playbacks, and MediaSource.isTypeSupported answers a question
+  // about Media Source Extensions instead — it reports false for plenty a set
+  // plays perfectly well, which would strand half the library for no reason.
+  //
+  // canPlayType is vague by design ('probably', 'maybe', ''), so both of the
+  // non-empty answers are taken as yes. A wrong yes costs a viewer an error
+  // message; a wrong no costs them the film.
+  var CAN = (function () {
+    var t = document.createElement('video');
+    function ok(type) {
+      var r = '';
+      try { r = t.canPlayType(type); } catch (e) {}
+      return r === 'probably' || r === 'maybe';
+    }
+    return {
+      hls:  ok('application/vnd.apple.mpegurl') || ok('application/x-mpegURL'),
+      h264: ok('video/mp4; codecs="avc1.42E01E"'),
+      // Both tags of the same codec. Sets differ on which they admit to, and a
+      // set that claims either will play the hvc1 the server writes.
+      hevc: ok('video/mp4; codecs="hvc1.1.6.L93.B0"') || ok('video/mp4; codecs="hev1.1.6.L93.B0"'),
+      av1:  ok('video/mp4; codecs="av01.0.05M.08"')
+    };
+  })();
+
+  // How this television would play a given film, or null if it cannot.
+  //   'direct' — the file itself opens in a browser
+  //   'hls'    — the server repackages it first
+  function routeFor(it) {
+    if (it.webPlayable) return 'direct';
+    if (!it.hlsAvailable || !CAN.hls) return null;
+    if (it.hlsVideoCodec === 'h264' && CAN.h264) return 'hls';
+    if (it.hlsVideoCodec === 'hevc' && CAN.hevc) return 'hls';
+    if (it.hlsVideoCodec === 'av1' && CAN.av1) return 'hls';
+    return null;
+  }
   var entry = '';
 
   function $(id) { return document.getElementById(id); }
@@ -247,10 +298,15 @@ public static class TvPage
   var BACK = [8, 27, 10009 /* Tizen */, 461 /* webOS */];
   document.addEventListener('keydown', function (e) {
     var k = e.key, c = e.keyCode, handled = true;
-    if (k === 'ArrowLeft' || c === 37) move(-1, 0);
-    else if (k === 'ArrowRight' || c === 39) move(1, 0);
-    else if (k === 'ArrowUp' || c === 38) move(0, -1);
-    else if (k === 'ArrowDown' || c === 40) move(0, 1);
+    // While a film is up there is nothing to focus, so sideways means seek.
+    // Plenty of remotes send only the arrows during playback and never the
+    // dedicated transport keys, so without this the hint on screen would be
+    // promising something a lot of sets could not do.
+    var playing = S.screen === 'player';
+    if (k === 'ArrowLeft' || c === 37) { if (playing) seekBy(-10); else move(-1, 0); }
+    else if (k === 'ArrowRight' || c === 39) { if (playing) seekBy(10); else move(1, 0); }
+    else if (k === 'ArrowUp' || c === 38) { if (!playing) move(0, -1); }
+    else if (k === 'ArrowDown' || c === 40) { if (!playing) move(0, 1); }
     else if (k === 'Enter' || c === 13) activate();
     else if (BACK.indexOf(c) >= 0 || k === 'Backspace' || k === 'Escape' || k === 'GoBack') back();
     else if (c === 415 || c === 19 || c === 179 || k === 'MediaPlayPause') { if (S.screen === 'player') togglePlay(); }
@@ -430,7 +486,7 @@ public static class TvPage
         if (idx === 0) b.setAttribute('data-first', '');
         b.innerHTML =
           '<div class="thumb"><span class="glyph">&#127916;</span>' +
-            (it.webPlayable ? '' : '<span class="badge">APP ONLY</span>') +
+            (routeFor(it) ? '' : '<span class="badge">APP ONLY</span>') +
             (pct > 1 ? '<span class="resume"><i style="width:' + pct + '%"></i></span>' : '') +
           '</div><div class="name"></div><div class="meta">' +
           (it.durationMs ? fmt(it.durationMs) : '') + '</div>';
@@ -465,18 +521,30 @@ public static class TvPage
     if (it.sizeBytes) bits.push((it.sizeBytes / 1073741824).toFixed(1) + ' GB');
     $('dMeta').textContent = bits.join('   ·   ');
 
+    var route = routeFor(it);
     var mkv = it.contentType && it.contentType.indexOf('matroska') >= 0;
-    $('dWarn').textContent = it.webPlayable ? '' :
-      (mkv ? 'This is an MKV, which television browsers can\'t open.'
-           : 'This television\'s browser won\'t decode ' + (it.videoCodec || 'this format') + '.') +
+    $('dWarn').textContent =
+      route === 'direct' ? '' :
+      // The server can fix this one, so say what will happen rather than warn.
+      route === 'hls' ?
+        (mkv ? 'This is an MKV, which no television browser opens. '
+             : 'This film needs repackaging before it will play here. ') +
+        'The server prepares it the first time you press Play; after that it starts straight away.' :
+      // Nothing to be done from here — explain which of the three walls was hit.
+      (!it.hlsAvailable
+         ? 'This film\'s video can\'t be repackaged for a browser.'
+         : !CAN.hls
+           ? 'This television\'s browser can\'t play a streamed film.'
+           : 'This television won\'t decode ' +
+             String(it.hlsVideoCodec || 'this format').toUpperCase() + ' video.') +
       ' Watch it in the Vault Movies desktop app, which plays anything.';
 
     var seen = S.resume[it.filmKey];
-    var canResume = it.webPlayable && seen && seen.resumeMs > 15000 &&
+    var canResume = !!route && seen && seen.resumeMs > 15000 &&
                     (!it.durationMs || seen.resumeMs < it.durationMs - 30000);
     var row = $('dRow'); row.innerHTML = '';
     if (canResume) row.appendChild(mkBtn('Resume ' + fmt(seen.resumeMs), function () { play(it, seen.resumeMs); }, true));
-    row.appendChild(mkBtn(canResume ? 'Start again' : 'Play', function () { play(it, 0); }, !canResume, !it.webPlayable));
+    row.appendChild(mkBtn(canResume ? 'Start again' : 'Play', function () { play(it, 0); }, !canResume, !route));
     row.appendChild(mkBtn('Back', function () { show('library'); }, false, false, true));
     show('detail');
   }
@@ -492,11 +560,54 @@ public static class TvPage
 
   // ---- player -----------------------------------------------------------
   var v = $('v'), hudTimer = null, saveTimer = null;
+  var prepTimer = null;
   function play(it, startMs) {
     S.film = it;
     show('player');
     $('pTitle').textContent = it.name;
-    v.src = it.streamUrl;              // relative; the signed token rides in the query
+    // Relative URLs throughout; the signed token rides in the query string,
+    // because a <video> attaches no headers of its own.
+    if (routeFor(it) === 'hls') prepare(it, startMs);
+    else begin(it.streamUrl, startMs);
+  }
+
+  // Ask the server for the film's web copy and wait for it to be worth opening.
+  // It reports ready well before it is finished — a viewer only needs the front
+  // of the film to start, and the rest is written faster than it is watched.
+  function prepare(it, startMs) {
+    $('prep').className = 'on';
+    $('prepPct').textContent = 'Starting…';
+    // Reset the sub-line: a previous attempt may have left a failure on it.
+    $('prep').getElementsByClassName('ps')[0].textContent =
+      'This happens once. Next time it starts straight away.';
+    poll();
+
+    function poll() {
+      api(it.hlsUrl).then(function (r) {
+        return r.ok ? r.json() : r.json()['catch'](function () { return null; });
+      }).then(function (j) {
+        if (S.screen !== 'player' || S.film !== it) return;   // viewer left
+        if (!j || j.error || j.state === 'failed' || j.state === 'unsupported') {
+          $('prepPct').textContent = 'Couldn\'t prepare this film';
+          $('prep').getElementsByClassName('ps')[0].textContent =
+            'Press Back, and watch it in the Vault Movies desktop app instead.';
+          return;
+        }
+        if (j.ready && j.playlistUrl) {
+          $('prep').className = '';
+          begin(j.playlistUrl, startMs);
+          return;
+        }
+        $('prepPct').textContent = j.percent > 0 ? j.percent + '%' : 'Starting…';
+        prepTimer = setTimeout(poll, 2000);
+      })['catch'](function () {
+        if (S.screen === 'player' && S.film === it) prepTimer = setTimeout(poll, 4000);
+      });
+    }
+  }
+
+  function begin(src, startMs) {
+    v.src = src;
     v.addEventListener('loadedmetadata', function once() {
       v.removeEventListener('loadedmetadata', once);
       if (startMs > 0) { try { v.currentTime = startMs / 1000; } catch (e) {} }
@@ -511,9 +622,24 @@ public static class TvPage
     else v.pause();
     bumpHud();
   }
+  // How long the film runs, in seconds.
+  //
+  // Not simply v.duration: an HLS film still being prepared is served as an
+  // EVENT playlist, and a player reads that as open-ended and answers Infinity.
+  // Everything that needs a length — seeking, the scrub bar, saving a resume
+  // point — would quietly switch itself off for exactly the films this route
+  // exists to carry. The catalogue knows the real length, so fall back to it.
+  function filmDuration() {
+    if (isFinite(v.duration) && v.duration > 0) return v.duration;
+    if (S.film && S.film.durationMs) return S.film.durationMs / 1000;
+    return 0;
+  }
+
   function seekBy(sec) {
-    if (S.screen !== 'player' || !isFinite(v.duration)) return;
-    v.currentTime = Math.max(0, Math.min(v.duration - 1, v.currentTime + sec));
+    if (S.screen !== 'player') return;
+    var d = filmDuration();
+    if (!d) return;
+    v.currentTime = Math.max(0, Math.min(d - 1, v.currentTime + sec));
     bumpHud();
   }
   function bumpHud() {
@@ -522,15 +648,16 @@ public static class TvPage
     hudTimer = setTimeout(function () { if (!v.paused) $('hud').className = 'hide'; }, 4000);
   }
   v.addEventListener('timeupdate', function () {
-    if (!isFinite(v.duration)) return;
+    var d = filmDuration();
+    if (!d) return;
     $('pAt').textContent = fmt(v.currentTime * 1000);
-    $('pLeft').textContent = '-' + fmt((v.duration - v.currentTime) * 1000);
-    $('pBar').style.width = (v.currentTime / v.duration * 100) + '%';
+    $('pLeft').textContent = '-' + fmt(Math.max(0, d - v.currentTime) * 1000);
+    $('pBar').style.width = Math.min(100, v.currentTime / d * 100) + '%';
   });
   v.addEventListener('ended', function () { pushResume(true); stopPlayback(); });
 
   function pushResume(finished) {
-    if (!S.film || !isFinite(v.duration)) return;
+    if (!S.film || !filmDuration()) return;
     var it = S.film, prev = S.resume[it.filmKey] || { watchCount:0 };
     var row = {
       filmKey: it.filmKey, name: it.name,
@@ -550,6 +677,10 @@ public static class TvPage
   }
   function stopPlayback() {
     if (saveTimer) { clearInterval(saveTimer); saveTimer = null; }
+    // Leaving while a film was still being prepared: stop asking. The remux
+    // itself carries on server-side, so coming back finds it further along.
+    if (prepTimer) { clearTimeout(prepTimer); prepTimer = null; }
+    $('prep').className = '';
     pushResume(false);
     v.pause(); v.removeAttribute('src'); v.load();
     try { if (document.exitFullscreen && document.fullscreenElement) document.exitFullscreen(); } catch (e) {}

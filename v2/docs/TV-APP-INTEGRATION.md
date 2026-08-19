@@ -67,7 +67,10 @@ Authorization: Bearer <accessToken>
     "audioCodec": "aac",
     "streamUrl":  "/media/1b106a…?t=…",   // RELATIVE — prefix the base URL
     "artUrl":     "/api/v1/catalog/1b106a…/art",  // relative too
-    "addedAt":    1787021644056
+    "addedAt":    1787021644056,
+    "hlsAvailable":  true,         // can the server repackage it? (see §4b)
+    "hlsVideoCodec": "hevc",       // what the repackaged stream will contain
+    "hlsUrl":     "/api/v1/catalog/1b106a…/hls"   // relative too
   } ],
   "scanning":  false,   // true = server still indexing; show "still loading"
   "lastScanAt": 1787021644410,
@@ -90,10 +93,51 @@ Authorization: Bearer <accessToken>
 absolute URL to the platform's player.
 
 Codec reality: `webPlayable: true` means h264 + aac in an MP4-family container
-and will play anywhere. The rest (HEVC/DTS/TrueHD in MKV) plays only if the
-TV's decoder handles it natively — **the server does not transcode**. Check
-`videoCodec`/`audioCodec` against the device's capabilities and be honest in
-the UI about a film the device can't decode.
+and will play anywhere. Use this path when you can — it is a plain file with no
+preparation and no second copy on disk.
+
+## 4b. Playback of everything else (HLS)
+
+Most of a real library is HEVC or DTS inside an MKV, which no browser opens.
+For those, the server repackages on demand: the video is **copied**, never
+re-encoded, and only the audio is converted when it has to be. The picture is
+the original, and a two-hour film is ready to start within seconds.
+
+```
+GET <base><hlsUrl>          Authorization: Bearer <access>
+200 {"state":"running","percent":12,"ready":true,
+     "error":null,"playlistUrl":"/hls/1b106a…/index.m3u8?t=…"}
+409 → this film's video cannot be repackaged at all; send them to the app
+```
+
+`state` is `idle` → `starting` → `running` → `ready`; `failed` if it broke.
+**Poll every ~2s until `ready` is true**, then hand `playlistUrl` (prefixed with
+the base URL) to the platform's player. `ready` turns true well before
+`percent` reaches 100 — the front of the film is enough to start, and the rest
+is written faster than anyone watches it. Only the first viewer ever waits; the
+result is cached and shared by every device afterwards.
+
+The playlist and its segments carry their own signed tokens, so a bare player
+needs no headers. Segments are fMP4; HEVC is tagged `hvc1` so Apple platforms
+accept it.
+
+Decide playability like this, in order:
+
+1. `webPlayable` → play `streamUrl` directly.
+2. `hlsAvailable` **and** the device decodes `hlsVideoCodec` **and** it plays
+   HLS → prepare and play the playlist.
+3. Otherwise say plainly that this film needs the desktop app.
+
+Ask the device with `video.canPlayType(…)`, **not**
+`MediaSource.isTypeSupported(…)` — the latter answers a Media Source Extensions
+question and returns false for types the element plays perfectly well, which
+would strand films for no reason.
+
+One trap worth knowing: while a film is still being prepared its playlist is an
+EVENT playlist, and players report `duration` as `Infinity`. Anything gated on
+a finite duration — seeking, a scrub bar, saving a resume point — will silently
+switch itself off. Use `durationMs` from the catalogue instead. Once the remux
+finishes the playlist is served as VOD and `duration` becomes real.
 
 ## 5. Resume across devices
 
