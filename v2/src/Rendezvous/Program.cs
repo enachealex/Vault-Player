@@ -222,6 +222,15 @@ app.MapGet("/health", () => "ok");
 // installer to anyone who doesn't have it. ?server= carries a non-default relay
 // (e.g. a LAN host) through to the app.
 
+// ---- Television app ---------------------------------------------------------
+// Served to the TV's own browser rather than shipped as a store package: the
+// certification cost of webOS/Tizen/Android TV buys nothing a page cannot do.
+app.MapGet("/tv", (HttpContext ctx) =>
+    Results.Content(
+        VideoPlayer.Rendezvous.TvPage.Render(
+            $"{ctx.Request.Scheme}://{ctx.Request.Host}/link", $"{ctx.Request.Host}/link"),
+        "text/html; charset=utf-8"));
+
 app.MapGet("/join/{code}", (string code, HttpContext ctx) =>
 {
     code = code.Trim().ToUpperInvariant();
