@@ -683,6 +683,29 @@ public partial class PlayerView : UserControl, IDisposable
 
     // ---- Seek bar ----------------------------------------------------------
 
+    /// <summary>
+    /// Jump to a proportion of the film.
+    ///
+    /// Goes through the slider rather than straight at the player, so it
+    /// inherits the two cases ApplySeek already handles: a party guest does not
+    /// own the timeline, and a film playing on a television is seeked over the
+    /// network rather than locally.
+    /// </summary>
+    private void SeekToFraction(double fraction)
+    {
+        if (PartyGuest) return;
+        Seek.Value = Math.Clamp(fraction, 0, 1) * Seek.Maximum;
+        ApplySeek();
+    }
+
+    /// <summary>Show or hide the list of keyboard shortcuts.</summary>
+    private void ToggleShortcutHelp()
+    {
+        ShortcutHelp.Visibility = ShortcutHelp.Visibility == Visibility.Visible
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+    }
+
     private void ApplySeek()
     {
         if (PartyGuest) return; // host owns the timeline
@@ -790,6 +813,25 @@ public partial class PlayerView : UserControl, IDisposable
 
     private void UpdateRateUi() =>
         RateText.Text = $"{AppServices.Settings.Rate}×";
+
+    /// <summary>Move one step along the same rates the menu offers.</summary>
+    private void StepRate(int direction)
+    {
+        var current = Array.FindIndex(Rates, r => Math.Abs(r - AppServices.Settings.Rate) < 0.01);
+        if (current < 0) current = Array.IndexOf(Rates, 1.0);
+        var next = Math.Clamp(current + direction, 0, Rates.Length - 1);
+        ApplyRate(Rates[next]);
+    }
+
+    private void ResetRate() => ApplyRate(1.0);
+
+    private void ApplyRate(double rate)
+    {
+        AppServices.Settings.Rate = rate;
+        AppServices.Settings.Save();
+        _player?.SetRate((float)rate);
+        UpdateRateUi();
+    }
 
     // ---- Volume ------------------------------------------------------------
     //
@@ -1015,6 +1057,7 @@ public partial class PlayerView : UserControl, IDisposable
         else if (e.ClickCount == 1) TogglePlay();
     }
 
+
     private void ToggleFullscreen()
     {
         // A fullscreen switch restyles the window, and libVLC is rebuilding its
@@ -1086,6 +1129,7 @@ public partial class PlayerView : UserControl, IDisposable
         // Keyboard counts as being present, not just the mouse — otherwise
         // seeking with the arrow keys happens behind hidden controls.
         NoteActivity();
+        var ctrl = (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control;
         var handled = true;
         switch (e.Key)
         {
@@ -1100,6 +1144,38 @@ public partial class PlayerView : UserControl, IDisposable
             case Key.F or Key.F11: ToggleFullscreen(); break;
             case Key.N: NextBtn_Click(this, null!); break;
             case Key.P: PrevBtn_Click(this, null!); break;
+
+            // Bigger jumps, and the two ends of the film.
+            case Key.PageUp: SeekBy(-60_000); break;
+            case Key.PageDown: SeekBy(60_000); break;
+            case Key.Home: SeekToFraction(0); break;
+            case Key.End: SeekToFraction(0.99); break;
+
+            // Speed, on the keys every other player uses for it.
+            case Key.OemComma when ctrl: StepRate(-1); break;
+            case Key.OemPeriod when ctrl: StepRate(1); break;
+            case Key.OemOpenBrackets: StepRate(-1); break;
+            case Key.OemCloseBrackets: StepRate(1); break;
+            case Key.D0 when ctrl: ResetRate(); break;
+
+            // Tracks.
+            case Key.C or Key.V: SubsBtn_Click(this, null!); break;
+            case Key.A: AudioBtn_Click(this, null!); break;
+
+            // Pin the window above everything else.
+            case Key.T when ctrl: MainWindow.Instance.ToggleAlwaysOnTop(); break;
+
+            // The list of all of this, for anyone who has not memorised it.
+            case Key.OemQuestion or Key.F1: ToggleShortcutHelp(); break;
+
+            // Jump to a tenth of the film, as on every video site. Digits are
+            // only this when unmodified — Ctrl+0 above resets the speed.
+            case >= Key.D0 and <= Key.D9 when !ctrl:
+                SeekToFraction((e.Key - Key.D0) / 10.0);
+                break;
+            case >= Key.NumPad0 and <= Key.NumPad9 when !ctrl:
+                SeekToFraction((e.Key - Key.NumPad0) / 10.0);
+                break;
             case Key.Escape:
                 if (_fullscreen) ExitFullscreen();
                 else MainWindow.Instance.Navigate(new LibraryView());

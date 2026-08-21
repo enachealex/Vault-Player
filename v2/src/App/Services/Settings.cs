@@ -130,6 +130,13 @@ public class Settings
     /// <summary>Host parties as private (signed-in, approved guests only). Applies when signed in.</summary>
     public bool PrivateParties { get; set; }
 
+    /// <summary>
+    /// Keep the window above every other application. Remembered, because
+    /// somebody who wants a film in the corner of the screen while they work
+    /// wants it there every time, not once.
+    /// </summary>
+    public bool AlwaysOnTop { get; set; }
+
     private static string FilePath =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "VideoPlayerV2", "settings.json");

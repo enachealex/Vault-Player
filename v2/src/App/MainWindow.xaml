@@ -57,6 +57,10 @@
                                TextTrimming="CharacterEllipsis" />
 
                     <StackPanel Grid.Column="2" Orientation="Horizontal">
+                        <Button x:Name="PinBtn" Style="{StaticResource CaptionButton}"
+                                Click="PinBtn_Click" Content="&#xE718;" FontSize="15"
+                                ToolTip="Keep this window on top of other apps (Ctrl+T)"
+                                AutomationProperties.Name="Keep on top" />
                         <Button x:Name="SettingsBtn" Style="{StaticResource CaptionButton}"
                                 Click="SettingsBtn_Click" Content="&#xE713;" FontSize="16"
                                 ToolTip="Settings" AutomationProperties.Name="Settings" />

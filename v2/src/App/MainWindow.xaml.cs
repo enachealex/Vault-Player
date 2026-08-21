@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Shell;
+using VideoPlayer.App.Services;
 using VideoPlayer.App.Views;
 
 namespace VideoPlayer.App;
@@ -26,6 +27,9 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         Instance = this;
+        // Restore the pin before anything is shown, so a window the viewer left
+        // on top comes back on top rather than behind whatever they opened next.
+        SetAlwaysOnTop(AppServices.Settings.AlwaysOnTop);
         Navigate(new HomeView());
         Closed += (_, _) => (Host.Content as IDisposable)?.Dispose();
     }
@@ -68,6 +72,34 @@ public partial class MainWindow : Window
 
     private void SettingsBtn_Click(object sender, RoutedEventArgs e) =>
         new Views.SettingsWindow { Owner = this }.ShowDialog();
+
+    // ---- Keep on top -------------------------------------------------------
+
+    /// <summary>
+    /// Pin the window above every other application, or let it go again.
+    ///
+    /// Deliberately not touched by the fullscreen switch: fullscreen restyles
+    /// this window and reorders it, and a viewer who asked for the film to stay
+    /// on top means it in both states. Topmost survives that on its own, so the
+    /// only thing needed is to leave it alone.
+    /// </summary>
+    public void SetAlwaysOnTop(bool on)
+    {
+        Topmost = on;
+        PinBtn.Opacity = on ? 1.0 : 0.55;
+        PinBtn.ToolTip = on
+            ? "This window stays on top of other apps (Ctrl+T)"
+            : "Keep this window on top of other apps (Ctrl+T)";
+        // Filled pin when on, outline when off — the glyph carries the state
+        // for anyone who cannot see the opacity difference.
+        PinBtn.Content = on ? "" : "";
+        AppServices.Settings.AlwaysOnTop = on;
+        AppServices.Settings.Save();
+    }
+
+    public void ToggleAlwaysOnTop() => SetAlwaysOnTop(!Topmost);
+
+    private void PinBtn_Click(object sender, RoutedEventArgs e) => ToggleAlwaysOnTop();
 
     private void MinBtn_Click(object sender, RoutedEventArgs e) =>
         WindowState = WindowState.Minimized;
