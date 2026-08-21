@@ -75,6 +75,21 @@ public static class TvPage
   /* ---- library ---- */
   .bar { flex:none; margin-bottom:1.2rem; }
   .bar .who { float:right; color:var(--muted); font-size:1.2rem; padding-top:1rem; }
+  /* Collections. inline-block chips rather than flex, for the same reason the
+     grid uses them: `gap` collapses to nothing on the sets this has to run on.
+     Hidden entirely until a shelf exists, so a library nobody has organised
+     keeps the layout it had — and, more importantly, so Up from the first row
+     of films does not land on an invisible row of nothing. */
+  .rail { margin-top:1rem; display:none; }
+  .rail.on { display:block; }
+  .chip {
+    display:inline-block; margin:0 .6rem .6rem 0; padding:.6rem 1.3rem;
+    background:var(--surface); border:1px solid var(--line); border-radius:1.4rem;
+    font-size:1.15rem; font-weight:600; color:var(--muted);
+    font-family:inherit; vertical-align:top;
+  }
+  .chip.sel { background:var(--accent); border-color:var(--accent); color:#fff; }
+
   .grid { flex:1; min-height:0; overflow-y:auto; overflow-x:hidden; }
   .grid::-webkit-scrollbar { display:none; }
   .card {
@@ -115,7 +130,9 @@ public static class TvPage
   #hud .times .right { float:right; }
   .track { height:.4rem; background:rgba(255,255,255,.22); border-radius:.2rem; overflow:hidden; clear:both; }
   .track i { display:block; height:100%; background:var(--accent); }
-  #hint { position:absolute; top:2.6rem; right:4rem; color:var(--muted); font-size:1.05rem; }
+  /* Positioned against #hud, its parent, so it fades with the rest of the HUD
+     instead of sitting over the picture for the whole film. */
+  #hint { position:absolute; top:.7rem; right:4rem; color:var(--muted); font-size:1.05rem; }
   .center { text-align:center; color:var(--muted); font-size:1.4rem; padding-top:6rem; }
 
   /* Shown while the server repackages a film the television cannot open as it
@@ -146,7 +163,8 @@ public static class TvPage
 </div></section>
 
 <section id="library" class="screen"><div class="col">
-  <div class="bar"><span class="who" id="who"></span><h1>Your library</h1></div>
+  <div class="bar"><span class="who" id="who"></span><h1>Your library</h1>
+    <div class="rail" id="rail"></div></div>
   <div class="grid" id="grid"></div>
 </div></section>
 
@@ -162,8 +180,10 @@ public static class TvPage
   <div id="prep"><div class="pt">Preparing this film for your television</div>
     <div class="pp" id="prepPct">Starting&hellip;</div>
     <div class="ps">This happens once. Next time it starts straight away.</div></div>
-  <div id="hint">OK pause &middot; &#9664; &#9654; skip 10s &middot; Back exit</div>
   <div id="hud">
+    <!-- Inside the HUD, not beside it: bumpHud only fades #hud, so a sibling
+         would sit over the picture for the whole film. -->
+    <div id="hint">OK pause &middot; &#9664; &#9654; skip 10s &middot; Back exit</div>
     <div class="t" id="pTitle"></div>
     <div class="times"><span id="pAt">0:00</span><span class="right" id="pLeft"></span></div>
     <div class="track"><i id="pBar" style="width:0"></i></div>
@@ -176,7 +196,8 @@ public static class TvPage
   var ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // no I/L/O/0/1 — unreadable across a room
   var LS = 'vault.tv.rt';
 
-  var S = { access:null, refresh:null, me:null, items:[], resume:{}, film:null, screen:'signin', memoryOnly:false };
+  var S = { access:null, refresh:null, me:null, items:[], resume:{}, film:null, screen:'signin',
+            memoryOnly:false, collections:[], shelf:null };
 
   // What this particular television can decode.
   //
@@ -364,6 +385,11 @@ public static class TvPage
     })['catch'](function () { return false; });
   }
   function signOut() {
+    // A session can end while a film is on screen — a password reset revokes
+    // the refresh token, and the next 401 lands here. Hiding the player without
+    // stopping it leaves a film playing that no key can reach, because every
+    // transport key gates on S.screen, which is now 'signin'.
+    if (S.screen === 'player') stopPlayback();
     S.access = S.refresh = S.me = null;
     try { localStorage.removeItem(LS); } catch (e) {}
     entry = ''; renderEntry();
@@ -457,6 +483,19 @@ public static class TvPage
     }).then(function (cat) {
       if (!cat) return;
       S.items = cat.items || [];
+      // Shelves ride along with the catalogue, so this is one round trip.
+      // An older relay omits the field entirely; treat that as "none".
+      S.collections = cat.collections || [];
+      // A shelf held from a previous refresh may have been renamed or deleted
+      // on another device. Re-point it by id, and fall back to the whole
+      // library rather than filtering against something that no longer exists.
+      if (S.shelf) {
+        var still = null;
+        for (var c = 0; c < S.collections.length; c++)
+          if (S.collections[c].id === S.shelf.id) { still = S.collections[c]; break; }
+        S.shelf = still;
+      }
+      renderRail();
       return api('/api/v1/library').then(function (r) { return r.ok ? r.json() : []; })
         ['catch'](function () { return []; })
         .then(function (lib) {
@@ -468,15 +507,90 @@ public static class TvPage
     });
   }
 
-  function renderGrid(cat) {
+  // ---- collections ------------------------------------------------------
+
+  // The films the chosen shelf holds, or everything. Membership arrives as
+  // FilmKeys and is matched against the catalogue here rather than being
+  // resolved server-side, so one cached /catalog response serves every shelf —
+  // that endpoint mints a signed media token per film on every call, and
+  // re-fetching it per shelf would re-sign the whole library on each keypress.
+  function visibleItems() {
+    if (!S.shelf) return S.items;
+    var keys = {};
+    for (var i = 0; i < S.shelf.items.length; i++) keys[S.shelf.items[i].filmKey] = true;
+    var out = [];
+    for (var j = 0; j < S.items.length; j++) if (keys[S.items[j].filmKey]) out.push(S.items[j]);
+    return out;
+  }
+
+  function renderRail() {
+    var rail = $('rail');
+    rail.innerHTML = '';
+    if (!S.collections.length) { rail.className = 'rail'; return; }
+    rail.className = 'rail on';
+
+    function chip(label, shelf) {
+      var b = document.createElement('button');
+      b.className = 'chip' + (S.shelf === shelf ? ' sel' : '');
+      b.setAttribute('data-f', '');
+      b.textContent = label;
+      b.addEventListener('click', function () {
+        S.shelf = shelf;
+        // Redraw both, then put focus back on this chip. renderGrid forces
+        // focus to the first card, which would snatch it away mid-browse and
+        // read as the remote fighting you.
+        renderRail();
+        renderGrid(null, true);
+        var chips = rail.getElementsByClassName('chip');
+        for (var k = 0; k < chips.length; k++)
+          if (chips[k].textContent === label) { setFocus(chips[k]); break; }
+      });
+      return b;
+    }
+
+    rail.appendChild(chip('All films', null));
+    for (var i = 0; i < S.collections.length; i++) {
+      var c = S.collections[i];
+      rail.appendChild(chip(c.name + '  ' + c.items.length, c));
+    }
+  }
+
+  function renderGrid(cat, keepFocus) {
     var g = $('grid');
     if (!S.items.length) {
       g.innerHTML = '<div class="center">' +
         (cat && cat.scanning ? 'Still indexing the library…' : 'No films on the server yet.') + '</div>';
       return;
     }
+
+    var items = visibleItems();
+    if (!items.length) {
+      // An empty shelf must still leave something to press. The library screen
+      // deliberately swallows Back — letting it bubble closes the whole app on
+      // webOS and Tizen — so a screen with nothing focusable is a set that has
+      // to be power-cycled.
+      g.innerHTML = '';
+      var msg = document.createElement('div');
+      msg.className = 'center';
+      msg.textContent = 'Nothing on this shelf yet.';
+      g.appendChild(msg);
+      var out = document.createElement('button');
+      out.className = 'btn';
+      out.setAttribute('data-f', '');
+      out.setAttribute('data-first', '');
+      out.style.display = 'block';
+      out.style.margin = '1.6rem auto 0';
+      out.textContent = 'Show all films';
+      out.addEventListener('click', function () {
+        S.shelf = null; renderRail(); renderGrid(null);
+      });
+      g.appendChild(out);
+      if (!keepFocus) focusFirst(true);
+      return;
+    }
+
     g.innerHTML = '';
-    for (var i = 0; i < S.items.length; i++) {
+    for (var i = 0; i < items.length; i++) {
       (function (it, idx) {
         var seen = S.resume[it.filmKey];
         var pct = (seen && it.durationMs) ? Math.min(100, seen.resumeMs / it.durationMs * 100) : 0;
@@ -494,18 +608,34 @@ public static class TvPage
         b.addEventListener('click', function () { openDetail(it); });
         g.appendChild(b);
         if (it.artUrl) loadArt(b.getElementsByClassName('thumb')[0], it.artUrl);
-      })(S.items[i], i);
+      })(items[i], i);
     }
-    focusFirst(true);
+    if (!keepFocus) focusFirst(true);
   }
 
   // Posters need an Authorization header and an <img> cannot send one, so fetch
   // the bytes and hand the element an object URL instead.
+  //
+  // Cached by URL, and deliberately never revoked. Before the collections rail
+  // the grid was drawn about twice in a session, so fetching every poster afresh
+  // each time cost nothing; now a shelf can be picked with the remote and the
+  // grid redraws on a keypress. Without this, every press would re-fetch the
+  // whole library over an authenticated connection and mint a fresh blob for
+  // every card, none ever released — on a television with a few hundred
+  // megabytes to play with, that is a browser that dies after a few minutes of
+  // browsing. One blob per film for the life of the page is the whole cost.
+  var artCache = {};
   function loadArt(el, url) {
+    var gl = el.getElementsByClassName('glyph')[0];
+    if (artCache[url]) {
+      el.style.backgroundImage = 'url("' + artCache[url] + '")';
+      if (gl) gl.style.display = 'none';
+      return;
+    }
     api(url).then(function (r) { return r.ok ? r.blob() : null; }).then(function (b) {
       if (!b) return;
-      el.style.backgroundImage = 'url("' + URL.createObjectURL(b) + '")';
-      var gl = el.getElementsByClassName('glyph')[0];
+      artCache[url] = URL.createObjectURL(b);
+      el.style.backgroundImage = 'url("' + artCache[url] + '")';
       if (gl) gl.style.display = 'none';
     })['catch'](function () {});
   }
@@ -560,6 +690,8 @@ public static class TvPage
 
   // ---- player -----------------------------------------------------------
   var v = $('v'), hudTimer = null, saveTimer = null;
+  // Whether this film actually started, and the pending seek-on-load.
+  var began = false, seekOnLoad = null;
   var prepTimer = null;
   function play(it, startMs) {
     S.film = it;
@@ -608,10 +740,17 @@ public static class TvPage
 
   function begin(src, startMs) {
     v.src = src;
-    v.addEventListener('loadedmetadata', function once() {
-      v.removeEventListener('loadedmetadata', once);
+    began = true;
+    // Held so it can be taken off again. A listener that only removes itself
+    // when it fires survives a viewer who backs out before the film loads, and
+    // then seeks the NEXT film to this one's position — which the periodic save
+    // promptly writes back as that film's bookmark.
+    seekOnLoad = function () {
+      v.removeEventListener('loadedmetadata', seekOnLoad);
+      seekOnLoad = null;
       if (startMs > 0) { try { v.currentTime = startMs / 1000; } catch (e) {} }
-    });
+    };
+    v.addEventListener('loadedmetadata', seekOnLoad);
     var p = v.play(); if (p && p['catch']) p['catch'](function () {});
     try { if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen(); } catch (e) {}
     bumpHud();
@@ -680,8 +819,18 @@ public static class TvPage
     // Leaving while a film was still being prepared: stop asking. The remux
     // itself carries on server-side, so coming back finds it further along.
     if (prepTimer) { clearTimeout(prepTimer); prepTimer = null; }
+    if (seekOnLoad) { v.removeEventListener('loadedmetadata', seekOnLoad); seekOnLoad = null; }
     $('prep').className = '';
-    pushResume(false);
+
+    // Only write a bookmark if the film actually started. Backing out of the
+    // "Preparing this film" screen leaves currentTime at 0 while the length is
+    // known from the catalogue, so the guard inside pushResume is satisfied and
+    // a perfectly good position an hour into a film gets overwritten with zero.
+    // The failure screen tells the viewer to press Back, so this was the
+    // expected way out of it.
+    if (began) pushResume(false);
+    began = false;
+
     v.pause(); v.removeAttribute('src'); v.load();
     try { if (document.exitFullscreen && document.fullscreenElement) document.exitFullscreen(); } catch (e) {}
     show('library');

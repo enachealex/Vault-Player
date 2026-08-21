@@ -193,7 +193,13 @@ public class CatalogScanner(IServiceScopeFactory scopes, ILogger<CatalogScanner>
                 // Probing is the slow part, so it only runs for rows never probed
                 // or whose file changed underneath us.
                 if (row.DurationMs is null) await ProbeAsync(row, file, ct);
-                if (row.ArtFile is null || !File.Exists(Path.Combine(ArtRoot, row.ArtFile)))
+                // Regenerate when there is no poster, when the file has gone —
+                // and when the one on disk predates the current poster
+                // generation, which is how a quality change reaches a library
+                // that already has a full set of the old ones.
+                if (row.ArtFile is null
+                    || !row.ArtFile.EndsWith(ArtGeneration, StringComparison.Ordinal)
+                    || !File.Exists(Path.Combine(ArtRoot, row.ArtFile)))
                     await ExtractArtAsync(row, file, ct);
             }
 
@@ -321,6 +327,14 @@ public class CatalogScanner(IServiceScopeFactory scopes, ILogger<CatalogScanner>
     }
 
     /// <summary>Grab a poster frame a little way in, so it is not a black title card.</summary>
+    /// <summary>
+    /// Suffix stamped on every poster, bumped whenever the way they are made
+    /// changes. A poster is only cut when one is missing, so without a marker in
+    /// the name a quality improvement would only ever reach films added after
+    /// it — every existing library would keep the old ones forever.
+    /// </summary>
+    private const string ArtGeneration = "-p2.jpg";
+
     private async Task ExtractArtAsync(CatalogItem row, string file, CancellationToken ct)
     {
         if (!Have("ffmpeg", ref _haveFfmpeg)) return;
@@ -332,14 +346,28 @@ public class CatalogScanner(IServiceScopeFactory scopes, ILogger<CatalogScanner>
         // end: without ffprobe there is no duration to aim by, and a short item
         // (an extra, a home video) would otherwise never get a poster at all.
         var at = row.DurationMs is > 0 ? row.DurationMs.Value / 5000.0 : 120.0;
-        var name = row.ItemKey + ".jpg";
+
+        // The suffix is a generation marker. Posters are only made when one is
+        // missing, so raising the quality would otherwise never reach a library
+        // that already has a full set of the old blurry ones — changing the name
+        // is what makes every film regenerate exactly once.
+        var name = row.ItemKey + ArtGeneration;
         var output = Path.Combine(ArtRoot, name);
         try
         {
             if (!await GrabFrameAsync(file, at, output, ct) && at > 3)
                 await GrabFrameAsync(file, 3, output, ct);
 
-            if (File.Exists(output) && new FileInfo(output).Length > 0) row.ArtFile = name;
+            if (File.Exists(output) && new FileInfo(output).Length > 0)
+            {
+                // Take the superseded one with us rather than leaving a full
+                // second set of posters on the disk forever.
+                if (row.ArtFile is { Length: > 0 } old && old != name)
+                {
+                    try { File.Delete(Path.Combine(ArtRoot, old)); } catch { }
+                }
+                row.ArtFile = name;
+            }
         }
         catch (Exception ex)
         {
@@ -356,8 +384,20 @@ public class CatalogScanner(IServiceScopeFactory scopes, ILogger<CatalogScanner>
         {
             "-nostdin", "-v", "quiet", "-y",
             "-ss", seconds.ToString("0.###", CultureInfo.InvariantCulture),
-            "-i", file, "-frames:v", "1", "-vf", "scale=480:-2", "-q:v", "4", output,
-        }, TimeSpan.FromSeconds(45), ct);
+            "-i", file, "-frames:v", "1",
+            // 1280 wide, not 480. These are shown in a 2:3 portrait card, so a
+            // 16:9 frame gets most of its width cropped away — at 480 that left
+            // roughly 180x270 of real picture to fill a card three times that
+            // size, which is why they looked soft. 1280 leaves about 480x720
+            // after the crop, which is sharp on a television and still only a
+            // couple of hundred kilobytes.
+            //
+            // thumbnail= picks the most representative frame out of the next
+            // hundred instead of taking whatever the seek happened to land on,
+            // so posters stop being fades, black frames and motion blur.
+            "-vf", "thumbnail=100,scale=1280:-2",
+            "-q:v", "3", output,
+        }, TimeSpan.FromSeconds(60), ct);
 
         // Judge by the file, not the exit code: ffmpeg reports success while
         // writing an empty jpg when the seek lands past the last frame.

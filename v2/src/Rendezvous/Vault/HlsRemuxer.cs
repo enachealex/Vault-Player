@@ -147,12 +147,14 @@ public class HlsRemuxer
         if (File.Exists(Path.Combine(DirFor(item.ItemKey), ".done"))) return;
         if (!CanRemux(item)) return;
 
-        _jobs.GetOrAdd(item.ItemKey, _ =>
-        {
-            var job = new Job();
-            job.Task = Task.Run(() => RunAsync(item, sourcePath, job));
-            return job;
-        });
+        // GetOrAdd's factory can run on two threads at once and only one result
+        // is kept — so starting ffmpeg inside it would let a losing thread leave
+        // a second process writing into the same folder, which then finishes and
+        // tears down the winner's output. Add first, and only the thread whose
+        // job was actually stored does any work.
+        var job = new Job();
+        if (!_jobs.TryAdd(item.ItemKey, job)) return;
+        job.Task = Task.Run(() => RunAsync(item, sourcePath, job));
     }
 
     /// <summary>
@@ -396,7 +398,9 @@ public class HlsRemuxer
             // Keep a failure around briefly so the client can report why, then
             // let a later request try again.
             if (job.Error is not null) await Task.Delay(TimeSpan.FromMinutes(2));
-            _jobs.TryRemove(item.ItemKey, out _);
+            // Key AND value: removing by key alone would let a job that has
+            // already been superseded delete its successor's entry.
+            _jobs.TryRemove(new KeyValuePair<string, Job>(item.ItemKey, job));
         }
     }
 
@@ -473,7 +477,22 @@ public class HlsRemuxer
         });
         var stderr = proc.StandardError.ReadToEndAsync();
 
-        await proc.WaitForExitAsync();
+        // A remux that stops making progress must not hold the film hostage. A
+        // whole feature copies in minutes, so an hour is generous even for 4K on
+        // a slow disk; past that it is stuck, and the film is better freed to be
+        // tried again than left permanently "starting".
+        using (var cap = new CancellationTokenSource(TimeSpan.FromHours(1)))
+        {
+            try
+            {
+                await proc.WaitForExitAsync(cap.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                try { proc.Kill(entireProcessTree: true); } catch { }
+                throw new InvalidOperationException("ffmpeg stopped responding and was stopped.");
+            }
+        }
         await progress;
         var errors = await stderr;
 

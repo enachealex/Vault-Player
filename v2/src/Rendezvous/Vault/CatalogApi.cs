@@ -296,6 +296,14 @@ public static class CatalogApi
             var path = HlsRemuxer.ResolveCached(key, file);
             if (path is null) return Results.NotFound();
 
+            // Mark the film as in use on every segment, not merely when playback
+            // was requested. A two-hour film asks for its status once and then
+            // pulls segments for two hours; without this its place in the
+            // least-recently-used order stops moving the moment it starts, and a
+            // remux started later can evict the film somebody is watching — which
+            // surfaces as the picture stopping dead partway through.
+            HlsRemuxer.Touch(key);
+
             // The playlist is rewritten on the way out so each segment carries
             // the same grant, and it grows while the film is still being
             // written, so it must never be cached. Segments never change.
