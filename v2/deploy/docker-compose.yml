@@ -45,11 +45,17 @@ services:
       # Where owner uploads land: the films directory alone, writable.
       - VAULT_UPLOADS=/uploads
       # Phones and televisions cannot open an MKV, so those films are repackaged
-      # into HLS on first play and the result is cached under /data — on the
-      # vault_data volume, NOT on the read-only media disk. A cached film is
-      # roughly the size of the original, so a handful of 4K titles will reach
-      # this limit; past it, the least recently watched one is dropped and
-      # remade on demand. Raise it if /data has room, lower it if it does not.
+      # into HLS on first play and the result is cached.
+      #
+      # Deliberately NOT under /data. The database volume is sized for a
+      # database — a few hundred kilobytes — and typically lives on whichever
+      # disk was chosen for the application itself, while a cached film is
+      # roughly the size of the original. Left on /data, a handful of 4K titles
+      # would fill the disk the rest of the box is running from.
+      - VAULT_HLS_CACHE=/hls
+      # Past this, the least recently watched film is dropped and remade on
+      # demand. Nothing is ever lost: every cached film is only a second copy of
+      # something still on the media disk.
       - VAULT_HLS_CACHE_GB=50
     # Account secrets (JWT signing key + SMTP credentials) come from
     # deploy/vault.env, which is gitignored. See deploy/README.md.
@@ -68,6 +74,9 @@ services:
       # nowhere else. Music and the rest of the disk stay structurally
       # untouchable even from the upload path.
       - ${MEDIA_DIR:-/srv/vault-media}/films:/uploads
+      # The repackaged copies. Point HLS_CACHE_DIR at a disk with room to spare;
+      # it wants tens of gigabytes and none of it is precious.
+      - ${HLS_CACHE_DIR:-/srv/vault-hls}:/hls
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:5555/health || exit 1"]
       interval: 30s

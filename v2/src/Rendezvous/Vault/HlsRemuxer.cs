@@ -81,11 +81,18 @@ public class HlsRemuxer
     private static bool? _haveFfmpeg;
 
     /// <summary>
-    /// Where segments are cached: beside the poster art, which is already on the
-    /// writable volume. The media disk itself is mounted read-only.
+    /// Where segments are cached.
+    ///
+    /// Defaults to sitting beside the poster art, which is already on the
+    /// writable volume — but this is the one directory here that grows to tens
+    /// of gigabytes, and the volume holding the database is usually a small fast
+    /// disk chosen for the database rather than for bulk. VAULT_HLS_CACHE points
+    /// it at a large disk without moving anything else.
     /// </summary>
     public static string CacheRoot =>
-        Path.Combine(Path.GetDirectoryName(CatalogScanner.ArtRoot) ?? AppContext.BaseDirectory, "hls");
+        Environment.GetEnvironmentVariable("VAULT_HLS_CACHE") is { Length: > 0 } custom
+            ? custom
+            : Path.Combine(Path.GetDirectoryName(CatalogScanner.ArtRoot) ?? AppContext.BaseDirectory, "hls");
 
     /// <summary>
     /// How large the segment cache may grow before the least recently watched

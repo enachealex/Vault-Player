@@ -390,7 +390,23 @@ public static class TvPage
     // stopping it leaves a film playing that no key can reach, because every
     // transport key gates on S.screen, which is now 'signin'.
     if (S.screen === 'player') stopPlayback();
+
+    // Tell the server too. Clearing local storage alone leaves the refresh
+    // token valid for its full sixty days, so a television handed on or sold
+    // could be signed back in from its own storage; and the person pressing
+    // this reasonably believes the set has been disconnected from their account.
+    if (S.refresh) {
+      try {
+        fetch('/api/v1/logout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken: S.refresh })
+        })['catch'](function () {});
+      } catch (e) {}
+    }
+
     S.access = S.refresh = S.me = null;
+    S.items = []; S.collections = []; S.shelf = null; S.resume = {};
     try { localStorage.removeItem(LS); } catch (e) {}
     entry = ''; renderEntry();
     show('signin');
@@ -471,11 +487,14 @@ public static class TvPage
   // status check, so a blocked account refreshes 200 forever.
   function enter(quiet) {
     if (!quiet) { show('library'); $('grid').innerHTML = '<div class="center">Loading your library…</div>'; }
-    $('who').textContent = S.me ? S.me.displayName : '';
+    renderWho();
     api('/api/v1/catalog').then(function (r) {
       return r.json()['catch'](function () { return {}; }).then(function (j) {
         if (r.status === 403) { showGate(j.error || 'Your account is waiting for the owner\'s approval.'); return null; }
-        if (!r.ok) { $('grid').innerHTML = '<div class="center">' + (j.error || 'The library is not available.') + '</div>'; return null; }
+        if (!r.ok) {
+          centerMessage(j.error || 'The library is not available.', 'Try again', function () { enter(true); });
+          return null;
+        }
         if (gateTimer) { clearInterval(gateTimer); gateTimer = null; }
         if (S.screen !== 'library') show('library');
         return j;
@@ -503,7 +522,7 @@ public static class TvPage
           renderGrid(cat);
         });
     })['catch'](function () {
-      $('grid').innerHTML = '<div class="center">Could not reach the server.</div>';
+      centerMessage('Could not reach the server.', 'Try again', function () { enter(true); });
     });
   }
 
@@ -521,6 +540,25 @@ public static class TvPage
     var out = [];
     for (var j = 0; j < S.items.length; j++) if (keys[S.items[j].filmKey]) out.push(S.items[j]);
     return out;
+  }
+
+  // Who is signed in, and the only way to stop being signed in. Without this
+  // the sole signOut control lives on the approval gate, which an approved
+  // account never sees again — so a set stays bound to whoever linked it first,
+  // with no way to switch accounts or hand the television on.
+  function renderWho() {
+    var who = $('who');
+    who.innerHTML = '';
+    if (!S.me) return;
+    var name = document.createElement('span');
+    name.textContent = S.me.displayName + '  ';
+    who.appendChild(name);
+    var out = document.createElement('button');
+    out.className = 'chip';
+    out.setAttribute('data-f', '');
+    out.textContent = 'Sign out';
+    out.addEventListener('click', signOut);
+    who.appendChild(out);
   }
 
   function renderRail() {
@@ -555,11 +593,47 @@ public static class TvPage
     }
   }
 
+  // Every terminal screen in the library must leave at least one thing to
+  // press. Back is deliberately a no-op here — letting it bubble closes the
+  // whole app on webOS and Tizen — so a screen with no [data-f] is a set that
+  // has to be power-cycled to escape. This is the only way to draw one.
+  function centerMessage(text, label, fn) {
+    var g = $('grid');
+    g.innerHTML = '';
+    var msg = document.createElement('div');
+    msg.className = 'center';
+    msg.textContent = text;
+    g.appendChild(msg);
+    var b = document.createElement('button');
+    b.className = 'btn';
+    b.setAttribute('data-f', '');
+    b.setAttribute('data-first', '');
+    b.style.display = 'block';
+    b.style.margin = '1.6rem auto 0';
+    b.textContent = label;
+    b.addEventListener('click', fn);
+    g.appendChild(b);
+    var out = document.createElement('button');
+    out.className = 'btn ghost';
+    out.setAttribute('data-f', '');
+    out.style.display = 'block';
+    out.style.margin = '.8rem auto 0';
+    out.textContent = 'Sign out of this TV';
+    out.addEventListener('click', signOut);
+    g.appendChild(out);
+    focusFirst(true);
+  }
+
   function renderGrid(cat, keepFocus) {
     var g = $('grid');
     if (!S.items.length) {
-      g.innerHTML = '<div class="center">' +
-        (cat && cat.scanning ? 'Still indexing the library…' : 'No films on the server yet.') + '</div>';
+      // A library still being indexed is not a permanent state, so this offers
+      // the re-check that nothing else would ever perform — once the grid is
+      // painted, nothing re-enters enter() on its own.
+      centerMessage(
+        cat && cat.scanning ? 'Still indexing the library…' : 'No films on the server yet.',
+        cat && cat.scanning ? 'Check again' : 'Refresh',
+        function () { enter(true); });
       return;
     }
 
