@@ -4,7 +4,8 @@
     <Grid>
         <!-- Account chip: sign in, or show who's signed in. Optional — the app
              works fully signed out; this only enables cross-device sync. -->
-        <Button x:Name="AccountBtn" Style="{StaticResource GhostButton}" Padding="12,8"
+        <Button x:Name="AccountBtn" ToolTip="Sign in to sync your library and watch with friends"
+                Style="{StaticResource GhostButton}" Padding="12,8"
                 HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,14,16,0"
                 Click="AccountBtn_Click" AutomationProperties.Name="Account">
             <StackPanel Orientation="Horizontal">
@@ -30,7 +31,7 @@
 
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                 <Button x:Name="SoloBtn" Style="{StaticResource ChoiceCard}" Margin="0,0,20,0"
-                        Click="SoloBtn_Click" AutomationProperties.Name="Watch Solo">
+                        Click="SoloBtn_Click" ToolTip="Browse your folder and the Vault server, and play anything" AutomationProperties.Name="Watch Solo">
                     <StackPanel>
                         <TextBlock Text="&#xE714;" FontFamily="Segoe MDL2 Assets" FontSize="34"
                                    Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" />
@@ -43,7 +44,7 @@
                 </Button>
 
                 <Button x:Name="PartyBtn" Style="{StaticResource ChoiceCard}"
-                        Click="PartyBtn_Click" AutomationProperties.Name="Watch Party">
+                        Click="PartyBtn_Click" ToolTip="Host a room and watch the same film together, in sync" AutomationProperties.Name="Watch Party">
                     <StackPanel>
                         <TextBlock Text="&#xE716;" FontFamily="Segoe MDL2 Assets" FontSize="34"
                                    Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" />

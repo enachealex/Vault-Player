@@ -26,10 +26,10 @@
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                     <Button Style="{StaticResource PrimaryButton}" Content="Return to party"
                             FontSize="12.5" Padding="14,6" Click="ReturnToParty_Click"
-                            AutomationProperties.Name="Return to party" />
+                            ToolTip="Go back to the film your party is watching" AutomationProperties.Name="Return to party" />
                     <Button Style="{StaticResource GhostButton}" Content="Leave party"
                             FontSize="12.5" Padding="12,6" Margin="8,0,0,0" Click="LeaveParty_Click"
-                            AutomationProperties.Name="Leave party" />
+                            ToolTip="End your party and stop sharing" AutomationProperties.Name="Leave party" />
                 </StackPanel>
             </Grid>
         </Border>
@@ -58,7 +58,7 @@
             </Grid.ColumnDefinitions>
 
             <Button Grid.Column="0" Style="{StaticResource GhostButton}" Click="HomeBtn_Click"
-                    AutomationProperties.Name="Home" Padding="12,8">
+                    ToolTip="Back to the start screen" AutomationProperties.Name="Home" Padding="12,8">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="&#xE72B;" FontFamily="Segoe MDL2 Assets" FontSize="14"
                                VerticalAlignment="Center" Margin="0,0,8,0" />
@@ -75,7 +75,7 @@
             </StackPanel>
 
             <Button Grid.Column="2" Style="{StaticResource PrimaryButton}" Click="ChangeFolderBtn_Click"
-                    AutomationProperties.Name="Choose folder">
+                    ToolTip="Pick the folder your films are kept in" AutomationProperties.Name="Choose folder">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="&#xE8B7;" FontFamily="Segoe MDL2 Assets" FontSize="14"
                                VerticalAlignment="Center" Margin="0,0,8,0" />
@@ -112,7 +112,7 @@
                                    Foreground="{StaticResource TextMutedBrush}" IsHitTestVisible="False"
                                    VerticalAlignment="Center" Margin="2,0,0,0" />
                     </Grid>
-                    <Button x:Name="ClearSearchBtn" Grid.Column="2" Style="{StaticResource GhostButton}"
+                    <Button x:Name="ClearSearchBtn" ToolTip="Clear the search and show everything again" Grid.Column="2" Style="{StaticResource GhostButton}"
                             Padding="8,4" Margin="4,4,6,4" Visibility="Collapsed" Click="ClearSearch_Click"
                             AutomationProperties.Name="Clear search">
                         <TextBlock Text="&#xE711;" FontFamily="Segoe MDL2 Assets" FontSize="11" />
@@ -150,13 +150,13 @@
                 <TextBlock x:Name="CollectionIcon" Text="&#xE8B7;" FontFamily="Segoe MDL2 Assets" FontSize="13"
                            Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center"
                            Margin="0,0,8,0" Visibility="Collapsed" />
-                <ComboBox x:Name="CollectionBox" Width="170" Margin="0,0,14,0" Visibility="Collapsed"
+                <ComboBox x:Name="CollectionBox" ToolTip="Show only the films on one of your collections" Width="170" Margin="0,0,14,0" Visibility="Collapsed"
                           SelectionChanged="CollectionBox_SelectionChanged"
                           AutomationProperties.Name="Collection" />
                 <TextBlock Text="&#xE8CB;" FontFamily="Segoe MDL2 Assets" FontSize="13"
                            Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center"
                            Margin="0,0,8,0" />
-                <ComboBox x:Name="SortBox" Width="180" SelectionChanged="SortBox_SelectionChanged"
+                <ComboBox x:Name="SortBox" ToolTip="Change the order films are listed in" Width="180" SelectionChanged="SortBox_SelectionChanged"
                           AutomationProperties.Name="Sort order" />
             </StackPanel>
         </Grid>

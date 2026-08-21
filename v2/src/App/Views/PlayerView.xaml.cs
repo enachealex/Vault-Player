@@ -1335,6 +1335,9 @@ public partial class PlayerView : UserControl, IDisposable
         if (DlnaActive)
         {
             PlayGlyph.Text = _dlnaPaused ? "\uE768" : "\uE769";
+            // The tooltip follows the glyph: a button showing a pause icon
+            // should not claim it is going to play something.
+            PlayBtn.ToolTip = _dlnaPaused ? "Play (Space)" : "Pause (Space)";
             if (_tick % 2 == 0 && !_dlnaPollBusy) _ = PollDlnaAsync();
             if (_dlnaDur > TimeSpan.Zero && _seekDrag?.IsDragging != true)
                 Seek.Value = _dlnaPos.TotalMilliseconds / _dlnaDur.TotalMilliseconds * Seek.Maximum;
@@ -1347,6 +1350,7 @@ public partial class PlayerView : UserControl, IDisposable
 
         if (_player is null) return;
         PlayGlyph.Text = _player.IsPlaying ? "\uE769" : "\uE768";
+        PlayBtn.ToolTip = _player.IsPlaying ? "Pause (Space)" : "Play (Space)";
 
         // Re-select the subtitle track that was on before a caption-style reload,
         // once the tracks exist again. One-shot: clears itself when done.

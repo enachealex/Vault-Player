@@ -187,6 +187,7 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <Button Grid.Column="0" Style="{StaticResource GhostButton}" Click="BackBtn_Click"
+                            ToolTip="Back to your library (Esc)"
                             AutomationProperties.Name="Back to library" Margin="12,10" Padding="12,8">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="&#xE72B;" FontFamily="Segoe MDL2 Assets" FontSize="14"
@@ -214,7 +215,7 @@
                     <StackPanel Grid.Column="2" Orientation="Horizontal">
                         <!-- Chat lives up here with Autoplay: both are about the session
                              rather than the playhead, unlike everything in the bottom bar. -->
-                        <Button x:Name="ChatBtn" Style="{StaticResource GhostButton}"
+                        <Button x:Name="ChatBtn" ToolTip="Show or hide the party chat" Style="{StaticResource GhostButton}"
                                 Click="ChatBtn_Click" AutomationProperties.Name="Party chat"
                                 Visibility="Collapsed" Margin="0,10,8,10" Padding="12,8">
                             <StackPanel Orientation="Horizontal">
@@ -223,7 +224,7 @@
                                 <TextBlock Text="Chat" />
                             </StackPanel>
                         </Button>
-                        <Button x:Name="AutoplayBtn" Style="{StaticResource GhostButton}"
+                        <Button x:Name="AutoplayBtn" ToolTip="When a film ends, start the next one in this folder automatically" Style="{StaticResource GhostButton}"
                                 Click="AutoplayBtn_Click" AutomationProperties.Name="Autoplay"
                                 Margin="0,10,8,10" Padding="12,8">
                             <StackPanel Orientation="Horizontal">
@@ -235,7 +236,7 @@
                     </StackPanel>
                     <!-- Casting is broken and hidden until it is fixed. The code behind
                          it is untouched, so restoring this is a one-line change. -->
-                    <Button x:Name="CastBtn" Grid.Column="3" Style="{StaticResource GhostButton}" Click="CastBtn_Click"
+                    <Button x:Name="CastBtn" ToolTip="Play this on a TV or speaker on your network instead" Grid.Column="3" Style="{StaticResource GhostButton}" Click="CastBtn_Click"
                             AutomationProperties.Name="Cast to device" Visibility="Collapsed"
                             Margin="0,10,12,10" Padding="12,8">
                         <StackPanel Orientation="Horizontal">
@@ -261,7 +262,7 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock x:Name="TimeText" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0"
                                    FontFamily="Consolas" FontSize="13" Foreground="{StaticResource TextMutedBrush}" Text="0:00" />
-                        <Slider x:Name="Seek" Grid.Column="1" VerticalAlignment="Center" Maximum="1000" />
+                        <Slider x:Name="Seek" ToolTip="Drag to jump anywhere in the film, or use the left and right arrow keys" Grid.Column="1" VerticalAlignment="Center" Maximum="1000" />
                         <TextBlock x:Name="DurationText" Grid.Column="2" VerticalAlignment="Center" Margin="10,0,0,0"
                                    FontFamily="Consolas" FontSize="13" Foreground="{StaticResource TextMutedBrush}" Text="0:00" />
                         <Popup x:Name="ScrubPopup" PlacementTarget="{Binding ElementName=Seek}" Placement="Relative"
@@ -289,11 +290,11 @@
                                    FontFamily="Consolas" FontSize="12" Foreground="{StaticResource TextMutedBrush}" />
 
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                            <Button x:Name="PrevBtn" Style="{StaticResource GhostButton}" Padding="10,8" Margin="2,0"
+                            <Button x:Name="PrevBtn" ToolTip="Previous film in this folder (P)" Style="{StaticResource GhostButton}" Padding="10,8" Margin="2,0"
                                     Click="PrevBtn_Click" AutomationProperties.Name="Previous">
                                 <TextBlock Text="&#xE892;" FontFamily="Segoe MDL2 Assets" FontSize="14" />
                             </Button>
-                            <Button x:Name="Back10Btn" Style="{StaticResource GhostButton}" Padding="10,8" Margin="2,0"
+                            <Button x:Name="Back10Btn" ToolTip="Back 10 seconds (J, or the left arrow for 5)" Style="{StaticResource GhostButton}" Padding="10,8" Margin="2,0"
                                     Click="Back10_Click" AutomationProperties.Name="Back 10 seconds">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="&#xEB9E;" FontFamily="Segoe MDL2 Assets" FontSize="13" Margin="0,0,5,0"
@@ -301,11 +302,11 @@
                                     <TextBlock Text="-10sec" FontSize="12" VerticalAlignment="Center" />
                                 </StackPanel>
                             </Button>
-                            <Button x:Name="PlayBtn" Style="{StaticResource PrimaryButton}" Padding="16,8" Margin="4,0"
+                            <Button x:Name="PlayBtn" ToolTip="Play or pause (Space)" Style="{StaticResource PrimaryButton}" Padding="16,8" Margin="4,0"
                                     Click="PlayBtn_Click" AutomationProperties.Name="Play or pause">
                                 <TextBlock x:Name="PlayGlyph" Text="&#xE769;" FontFamily="Segoe MDL2 Assets" FontSize="14" />
                             </Button>
-                            <Button x:Name="Fwd10Btn" Style="{StaticResource GhostButton}" Padding="10,8" Margin="2,0"
+                            <Button x:Name="Fwd10Btn" ToolTip="Forward 10 seconds (L, or the right arrow for 5)" Style="{StaticResource GhostButton}" Padding="10,8" Margin="2,0"
                                     Click="Fwd10_Click" AutomationProperties.Name="Forward 10 seconds">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="+10sec" FontSize="12" VerticalAlignment="Center" Margin="0,0,5,0" />
@@ -313,30 +314,30 @@
                                                VerticalAlignment="Center" />
                                 </StackPanel>
                             </Button>
-                            <Button x:Name="NextBtn" Style="{StaticResource GhostButton}" Padding="10,8" Margin="2,0"
+                            <Button x:Name="NextBtn" ToolTip="Next film in this folder (N)" Style="{StaticResource GhostButton}" Padding="10,8" Margin="2,0"
                                     Click="NextBtn_Click" AutomationProperties.Name="Next">
                                 <TextBlock Text="&#xE893;" FontFamily="Segoe MDL2 Assets" FontSize="14" />
                             </Button>
                         </StackPanel>
 
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                            <Button x:Name="ChaptersBtn" Style="{StaticResource GhostButton}" Padding="10,8" Margin="2,0"
+                            <Button x:Name="ChaptersBtn" ToolTip="Jump to a chapter, or save your own bookmark here" Style="{StaticResource GhostButton}" Padding="10,8" Margin="2,0"
                                     Click="ChaptersBtn_Click" AutomationProperties.Name="Chapters">
                                 <TextBlock Text="&#xE7C3;" FontFamily="Segoe MDL2 Assets" FontSize="14" />
                             </Button>
-                            <Button x:Name="AudioBtn" Style="{StaticResource GhostButton}" Padding="10,8" Margin="2,0"
+                            <Button x:Name="AudioBtn" ToolTip="Choose which audio track to listen to (A)" Style="{StaticResource GhostButton}" Padding="10,8" Margin="2,0"
                                     Click="AudioBtn_Click" AutomationProperties.Name="Audio track">
                                 <TextBlock Text="&#xE8D6;" FontFamily="Segoe MDL2 Assets" FontSize="14" />
                             </Button>
-                            <Button x:Name="SubsBtn" Style="{StaticResource GhostButton}" Padding="10,8" Margin="2,0"
+                            <Button x:Name="SubsBtn" ToolTip="Subtitles: choose a track, or turn them off (C)" Style="{StaticResource GhostButton}" Padding="10,8" Margin="2,0"
                                     Click="SubsBtn_Click" AutomationProperties.Name="Subtitles">
                                 <TextBlock x:Name="SubsGlyph" Text="CC" FontSize="12" FontWeight="Bold" />
                             </Button>
-                            <Button x:Name="RateBtn" Style="{StaticResource GhostButton}" Padding="10,8" Margin="2,0"
+                            <Button x:Name="RateBtn" ToolTip="Playback speed (] faster, [ slower, Ctrl+0 back to normal)" Style="{StaticResource GhostButton}" Padding="10,8" Margin="2,0"
                                     Click="RateBtn_Click" AutomationProperties.Name="Playback speed">
                                 <TextBlock x:Name="RateText" Text="1×" FontSize="12" FontWeight="Bold" />
                             </Button>
-                            <Button x:Name="VolumeBtn" Style="{StaticResource GhostButton}" Padding="10,8" Margin="2,0,8,0"
+                            <Button x:Name="VolumeBtn" ToolTip="Volume" Style="{StaticResource GhostButton}" Padding="10,8" Margin="2,0,8,0"
                                     Click="VolumeBtn_Click" AutomationProperties.Name="Volume">
                                 <TextBlock x:Name="MuteGlyph" Text="&#xE767;" FontFamily="Segoe MDL2 Assets" FontSize="14" />
                             </Button>
@@ -353,11 +354,11 @@
                                                    Foreground="{StaticResource TextMutedBrush}" />
                                         <!-- IsMoveToPointEnabled gives click-to-position; the custom
                                              drag helper used elsewhere is horizontal-only. -->
-                                        <Slider x:Name="VolumeSlider" Orientation="Vertical" Height="120"
+                                        <Slider x:Name="VolumeSlider" ToolTip="Volume — the up and down arrow keys do this too" Orientation="Vertical" Height="120"
                                                 Maximum="100" IsMoveToPointEnabled="True"
                                                 HorizontalAlignment="Center"
                                                 AutomationProperties.Name="Volume level" />
-                                        <Button x:Name="MuteBtn" Style="{StaticResource GhostButton}"
+                                        <Button x:Name="MuteBtn" ToolTip="Mute (M)" Style="{StaticResource GhostButton}"
                                                 Padding="8,5" Margin="0,10,0,0" HorizontalAlignment="Center"
                                                 Click="MuteBtn_Click" AutomationProperties.Name="Mute">
                                             <TextBlock x:Name="MuteToggleGlyph" Text="&#xE74F;"
@@ -366,7 +367,7 @@
                                     </StackPanel>
                                 </Border>
                             </Popup>
-                            <Button x:Name="FullscreenBtn" Style="{StaticResource GhostButton}" Padding="10,8" Margin="2,0"
+                            <Button x:Name="FullscreenBtn" ToolTip="Fill the screen (F, or double-click the picture)" Style="{StaticResource GhostButton}" Padding="10,8" Margin="2,0"
                                     Click="FullscreenBtn_Click" AutomationProperties.Name="Fullscreen">
                                 <TextBlock x:Name="FullscreenGlyph" Text="&#xE740;" FontFamily="Segoe MDL2 Assets" FontSize="14" />
                             </Button>
