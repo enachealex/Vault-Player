@@ -95,6 +95,26 @@ public static class TvPage
     font-family:inherit; vertical-align:top;
   }
   .chip.sel { background:var(--accent); border-color:var(--accent); color:#fff; }
+  /* ---- dropdowns ---- */
+  .menu { display:none; position:fixed; z-index:50; background:var(--deep);
+          border:1px solid var(--line); border-radius:.8rem; padding:.6rem;
+          box-shadow:0 1.4rem 3.4rem rgba(0,0,0,.7); }
+  .menu.on { display:block; }
+  .mrow {
+    display:block; width:100%; text-align:left; background:transparent; border:none;
+    color:var(--text); font-family:inherit; font-size:1.525rem; padding:.9rem 1.4rem;
+    border-radius:.5rem; white-space:nowrap;
+  }
+  .mrow[disabled] { color:var(--line); }
+  /* The layout choices show the shape they produce, with the words underneath
+     rather than beside — a grid of squares reads as a picture of the result,
+     and the label says which one it is. */
+  .mrow.tile { text-align:center; padding:1.1rem 1.6rem; }
+  .mrow.tile .lab { display:block; margin-top:.7rem; font-size:1.35rem; }
+  .mrow.tile .sub2 { display:block; font-size:1.15rem; color:var(--muted); margin-top:.15rem; }
+  .mrow.sel .lab { color:var(--accent); font-weight:700; }
+  .caret { margin-left:.7rem; font-size:1.1rem; color:var(--muted); }
+
   /* The layout control sits at the far right of the shelf row. */
   .chip.layout { float:right; margin-right:0; padding:.55rem 1rem; }
   .gg { display:inline-block; line-height:0; }
@@ -148,8 +168,18 @@ public static class TvPage
            border-radius:.5rem; background-size:cover; background-position:center; overflow:hidden; }
   .thumb .glyph { position:absolute; left:0; top:42%; width:100%; text-align:center;
                   font-size:3.375rem; color:var(--line); }
-  .name { font-size:1.525rem; font-weight:600; margin-top:.55rem; line-height:1.3; height:3rem; overflow:hidden; }
-  .meta { font-size:1.375rem; color:var(--muted); }
+  /* The title reserves two lines so cards keep a common height, but the box was
+     taller than the two lines it holds, which left a gap under every one-line
+     title. min-height sized to the line height closes it without letting a long
+     title push its card out of line with the rest of the row. */
+  /* No reserved second line. The box used to hold two lines whatever the title
+     was, which left a short one floating above a gap before the runtime. It
+     sizes to its text now and is capped at two lines, so a long title still
+     cannot push its card out of step with the row. Cards are top-aligned, so
+     uneven heights cost nothing. */
+  .name { font-size:1.525rem; font-weight:600; margin-top:.55rem; line-height:1.25;
+          max-height:3.8rem; overflow:hidden; }
+  .meta { font-size:1.375rem; color:var(--muted); margin-top:-.15rem; }
   .badge { position:absolute; left:.4rem; top:.4rem; background:rgba(14,6,4,.9); color:var(--warm);
            font-size:1.225rem; padding:.25rem .5rem; border-radius:.35rem; font-weight:700; }
   .resume { position:absolute; left:0; right:0; bottom:0; height:.35rem; background:rgba(0,0,0,.55); }
@@ -237,6 +267,7 @@ public static class TvPage
   <!-- Shows the digits as they are typed, so pressing 1 then 4 is visibly on
        its way to 14 rather than looking like it jumped to 1 and stuck. -->
   <div class="jump" id="jump"></div>
+<div class="menu" id="menu"></div>
 </div></section>
 
 <section id="detail" class="screen"><div class="col">
@@ -380,16 +411,25 @@ public static class TvPage
   }
 
   // ---- focus ------------------------------------------------------------
+  // While a menu is open it is the only thing focus may reach. Without that the
+  // arrows wander out of the menu and into the grid behind it, leaving a menu
+  // on screen that nothing is pointing at.
+  function focusScope() {
+    return document.querySelector('.menu.on') || document.querySelector('.screen.on');
+  }
   function focusables() {
-    var out = [], all = document.querySelectorAll('.screen.on [data-f]');
+    var out = [], all = focusScope().querySelectorAll('[data-f]');
     for (var i = 0; i < all.length; i++) if (all[i].offsetParent !== null && !all[i].disabled) out.push(all[i]);
     return out;
   }
-  function current() { return document.querySelector('.screen.on [data-f].focus'); }
+  function current() { return focusScope().querySelector('[data-f].focus'); }
   function setFocus(el) {
     if (!el) return;
-    var old = current();
-    if (old) old.className = old.className.replace(/\s*focus/, '');
+    // Cleared across the whole document, not within the current scope. Opening
+    // a menu narrows the scope to the menu, so a scoped clear would leave the
+    // ring behind on the button that opened it and two things would look
+    // focused at once.
+    clearFocusRing();
     el.className += ' focus';
     // Move real DOM focus too, not only the ring. Without this the document's
     // active element never leaves <body>, so a television's own spatial
@@ -409,11 +449,17 @@ public static class TvPage
       else if (bot + pad > g.scrollTop + g.clientHeight) g.scrollTop = bot - g.clientHeight + pad;
     }
   }
+  function clearFocusRing() {
+    var lit = document.querySelectorAll('[data-f].focus');
+    for (var i = 0; i < lit.length; i++)
+      lit[i].className = lit[i].className.replace(/\s*focus/, '');
+  }
+
   function focusFirst(force) {
     if (!force && current()) return;
     var f = focusables(), pref = null;
     for (var i = 0; i < f.length; i++) if (f[i].getAttribute('data-first') !== null) { pref = f[i]; break; }
-    var old = current(); if (old) old.className = old.className.replace(/\s*focus/, '');
+    clearFocusRing();
     setFocus(pref || f[0]);
   }
   function move(dx, dy) {
@@ -474,6 +520,9 @@ public static class TvPage
     var el = current(); if (el) el.click();
   }
   function back() {
+    // A menu is the innermost thing on screen, so it is the first thing Back
+    // should take away.
+    if (closeMenu()) return;
     if (S.screen === 'player') { stopPlayback(); return; }
     if (S.screen === 'detail') { show('library'); return; }
     if (S.screen === 'shelves') { show('detail'); return; }
@@ -696,18 +745,25 @@ public static class TvPage
     var who = $('who');
     who.innerHTML = '';
     if (!S.me) return;
-    // Stacked, not inline: the name is a label for the button under it, and
-    // side by side it read as part of the same control.
-    var name = document.createElement('div');
-    name.className = 'whoname';
-    name.textContent = S.me.displayName;
-    who.appendChild(name);
-    var out = document.createElement('button');
-    out.className = 'chip';
-    out.setAttribute('data-f', '');
-    out.textContent = 'Sign out';
-    out.addEventListener('click', signOut);
-    who.appendChild(out);
+    // The name IS the button. A caret says it opens onto something, which is
+    // the only way a viewer would know to press it.
+    var b = document.createElement('button');
+    b.className = 'chip';
+    b.setAttribute('data-f', '');
+    b.appendChild(document.createTextNode(S.me.displayName));
+    var caret = document.createElement('span');
+    caret.className = 'caret';
+    caret.innerHTML = '&#9662;';
+    b.appendChild(caret);
+    b.addEventListener('click', function () {
+      openMenu(b, [
+        // Nothing behind it yet, so it is shown and disabled rather than
+        // hidden — the menu keeps its shape when settings arrive.
+        { label: 'Settings', disabled: true },
+        { label: 'Sign out', onSelect: signOut }
+      ]);
+    });
+    who.appendChild(b);
   }
 
   function renderRail() {
@@ -760,22 +816,40 @@ public static class TvPage
     b.className = 'chip layout';
     b.setAttribute('data-f', '');
     b.innerHTML = gridGlyph(S.cols);
-    b.addEventListener('click', cycleLayout);
+    var caret = document.createElement('span');
+    caret.className = 'caret';
+    caret.innerHTML = '&#9662;';
+    b.appendChild(caret);
+    b.addEventListener('click', function () { openLayoutMenu(b); });
     return b;
   }
 
-  // Pressing it steps to the next layout. A dropdown would need a menu, a way
-  // out of the menu, and somewhere for focus to go afterwards; stepping through
-  // four options shows the result immediately and needs none of that.
-  function cycleLayout() {
-    var i = COLS.indexOf(S.cols);
-    S.cols = COLS[(i + 1) % COLS.length];
-    try { localStorage.setItem(LS_COLS, String(S.cols)); } catch (e) {}
+  var COL_NOTES = { 3: 'Largest', 4: 'Recommended', 5: 'More at once', 6: 'Most at once' };
+
+  function openLayoutMenu(anchor) {
+    var rows = [];
+    for (var i = 0; i < COLS.length; i++) {
+      (function (n) {
+        rows.push({
+          tile: true,
+          selected: n === S.cols,
+          html: gridGlyph(n),
+          label: n + ' across',
+          sub: COL_NOTES[n],
+          onSelect: function () { setCols(n); }
+        });
+      })(COLS[i]);
+    }
+    openMenu(anchor, rows);
+  }
+
+  function setCols(n) {
+    S.cols = n;
+    try { localStorage.setItem(LS_COLS, String(n)); } catch (e) {}
     applyCols();
     renderRail();
     renderGrid(null, true);
-    // Keep focus on the control that was just pressed, or the viewer is dumped
-    // back into the grid every time they try the next size.
+    // Put focus back on the control that was just used, not into the grid.
     var chips = $('rail').getElementsByClassName('layout');
     if (chips.length) setFocus(chips[0]);
   }
@@ -956,7 +1030,7 @@ public static class TvPage
     row.appendChild(mkBtn(canResume ? 'Start again' : 'Play', function () { play(it, 0); }, !canResume, !route));
     // Only worth offering once the catalogue has answered — a shelf needs a
     // film key to hold, and the server is what supplies it.
-    row.appendChild(mkBtn('Collections', openShelves, false, false, true));
+    row.appendChild(mkBtn('Add to Collection', openShelves, false, false, true));
     row.appendChild(mkBtn('Back', function () { show('library'); }, false, false, true));
     show('detail');
   }
@@ -968,6 +1042,80 @@ public static class TvPage
     b.disabled = !!disabled;
     b.addEventListener('click', fn);
     return b;
+  }
+
+  // ---- dropdowns --------------------------------------------------------
+  //
+  // A menu on a television has to be escapable, has to hold focus while it is
+  // open, and has to give focus back to whatever opened it. Nothing else here
+  // needs a menu, so this is deliberately one small thing rather than a
+  // framework: a list of rows, an anchor to sit under, and a way out.
+
+  var menuOwner = null;
+
+  function openMenu(anchor, rows) {
+    var m = $('menu');
+    m.innerHTML = '';
+    for (var i = 0; i < rows.length; i++) {
+      (function (row, first) {
+        var b = document.createElement('button');
+        b.className = 'mrow' + (row.tile ? ' tile' : '') + (row.selected ? ' sel' : '');
+        if (row.disabled) {
+          b.disabled = true;
+        } else {
+          b.setAttribute('data-f', '');
+          if (first) b.setAttribute('data-first', '');
+        }
+        b.innerHTML = row.html || '';
+        if (row.label) {
+          var lab = document.createElement('span');
+          lab.className = 'lab';
+          lab.textContent = row.label;
+          b.appendChild(lab);
+        }
+        if (row.sub) {
+          var sub = document.createElement('span');
+          sub.className = 'sub2';
+          sub.textContent = row.sub;
+          b.appendChild(sub);
+        }
+        if (!row.disabled) {
+          b.addEventListener('click', function () {
+            closeMenu();
+            if (row.onSelect) row.onSelect();
+          });
+        }
+        m.appendChild(b);
+      })(rows[i], i === 0 || (i === 1 && rows[0].disabled));
+    }
+
+    m.className = 'menu on';
+    // Positioned after it is visible, because until then it has no size to
+    // measure and would be placed against zero.
+    var a = anchor.getBoundingClientRect(), mr = m.getBoundingClientRect();
+    var left = Math.min(a.left, window.innerWidth - mr.width - 16);
+    var top = a.bottom + 8;
+    if (top + mr.height > window.innerHeight - 8) top = Math.max(8, a.top - mr.height - 8);
+    m.style.left = Math.max(8, left) + 'px';
+    m.style.top = top + 'px';
+
+    menuOwner = anchor;
+    focusFirst(true);
+  }
+
+  /// Returns true if there was a menu to close, so Back can stop there.
+  function closeMenu() {
+    var m = $('menu');
+    if (m.className.indexOf('on') < 0) return false;
+    m.className = 'menu';
+    m.innerHTML = '';
+    // Focus goes back to whatever opened it, or the viewer is dropped somewhere
+    // they did not choose.
+    var owner = menuOwner;
+    menuOwner = null;
+    if (owner && owner.offsetParent !== null) setFocus(owner);
+    else focusFirst(true);
+    return true;
   }
 
   // ---- jumping to a film by number --------------------------------------
