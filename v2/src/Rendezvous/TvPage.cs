@@ -37,6 +37,9 @@ public static class TvPage
     --text:#F6ECE5; --muted:#D9C0B3; --accent:#C8442A; --warm:#F0A070;
   }
   * { box-sizing:border-box; }
+  /* Every size on this page is in rem against this root, which rescale() then
+     drives from the screen's own size. Sizes here are 0.375rem larger than they
+     were, which is six pixels at the 16px root a 1080p set gets. */
   html { font-size:16px; }
   html,body { height:100%; margin:0; }
   body {
@@ -49,16 +52,16 @@ public static class TvPage
   .screen.on { display:block; }
   .col { height:100%; display:flex; flex-direction:column; }
 
-  h1 { font-size:2.6rem; margin:0 0 .6rem; font-weight:700; }
-  .sub { color:var(--muted); font-size:1.35rem; margin:0 0 1.6rem; line-height:1.5; }
+  h1 { font-size:2.975rem; margin:0 0 .6rem; font-weight:700; }
+  .sub { color:var(--muted); font-size:1.725rem; margin:0 0 1.6rem; line-height:1.5; }
 
   /* Focus IS the interface here. It must never be subtle or absent. */
   [data-f] { outline:none; }
   [data-f].focus { box-shadow:0 0 0 .25rem var(--accent); }
 
   /* ---- sign in ---- */
-  .url { font-size:2.6rem; font-weight:800; color:var(--warm); margin:.4rem 0 1.4rem; }
-  .entry { font-family:Consolas,monospace; font-size:3.6rem; font-weight:800; color:var(--accent);
+  .url { font-size:2.975rem; font-weight:800; color:var(--warm); margin:.4rem 0 1.4rem; }
+  .entry { font-family:Consolas,monospace; font-size:3.975rem; font-weight:800; color:var(--accent);
            letter-spacing:.5rem; min-height:4.4rem; }
   .entry .ph { color:var(--line); }
   .keys { max-width:62rem; }
@@ -66,16 +69,18 @@ public static class TvPage
   .key {
     display:inline-block; width:5.4rem; margin:0 .5rem .5rem 0; padding:1rem 0;
     background:var(--surface); border:1px solid var(--line); border-radius:.45rem;
-    font-size:1.5rem; font-weight:700; text-align:center; color:var(--text);
+    font-size:1.875rem; font-weight:700; text-align:center; color:var(--text);
     font-family:inherit; vertical-align:top;
   }
-  .key.act { color:var(--warm); font-size:1.05rem; }
+  .key.act { color:var(--warm); font-size:1.425rem; }
   .krow { white-space:nowrap; }
-  .err { color:var(--accent); font-size:1.3rem; min-height:2rem; margin-top:1rem; }
+  .err { color:var(--accent); font-size:1.675rem; min-height:2rem; margin-top:1rem; }
 
   /* ---- library ---- */
   .bar { flex:none; margin-bottom:1.2rem; }
-  .bar .who { float:right; color:var(--muted); font-size:1.2rem; padding-top:1rem; }
+  .bar .who { float:right; color:var(--muted); font-size:1.575rem; padding-top:.6rem;
+              text-align:right; }
+  .whoname { margin-bottom:.5rem; }
   /* Collections. inline-block chips rather than flex, for the same reason the
      grid uses them: `gap` collapses to nothing on the sets this has to run on.
      Hidden entirely until a shelf exists, so a library nobody has organised
@@ -86,10 +91,19 @@ public static class TvPage
   .chip {
     display:inline-block; margin:0 .6rem .6rem 0; padding:.6rem 1.3rem;
     background:var(--surface); border:1px solid var(--line); border-radius:1.4rem;
-    font-size:1.15rem; font-weight:600; color:var(--muted);
+    font-size:1.525rem; font-weight:600; color:var(--muted);
     font-family:inherit; vertical-align:top;
   }
   .chip.sel { background:var(--accent); border-color:var(--accent); color:#fff; }
+  /* The layout control sits at the far right of the shelf row. */
+  .chip.layout { float:right; margin-right:0; padding:.55rem 1rem; }
+  .gg { display:inline-block; line-height:0; }
+  .gg i { display:inline-block; background:var(--muted); margin:.09rem; vertical-align:top; }
+  .gg3 i { width:.62rem; height:.62rem; }
+  .gg4 i { width:.48rem; height:.48rem; }
+  .gg5 i { width:.38rem; height:.38rem; }
+  .gg6 i { width:.31rem; height:.31rem; }
+  .chip.layout.focus .gg i { background:var(--text); }
 
   /* The padding is what stops the focus ring being shaved off. Cards sit flush
      against the edges of this box, and the ring is drawn OUTSIDE the card, so
@@ -98,12 +112,33 @@ public static class TvPage
      highlight being broken rather than as the card being at the edge. */
   .grid { flex:1; min-height:0; overflow-y:auto; overflow-x:hidden; padding:.4rem; }
   .grid::-webkit-scrollbar { display:none; }
+  /* Column count is a setting, so the widths are written per layout rather than
+     once. inline-block and percentage margins, never flex gap — gap collapses
+     to nothing on the sets this has to run on and the grid silently loses all
+     its spacing. */
   .card {
-    display:inline-block; width:18.4%; margin:0 1.9% 1.8rem 0; vertical-align:top;
+    display:inline-block; vertical-align:top;
     background:transparent; border:none; padding:0; text-align:left; color:inherit;
     font-family:inherit;
   }
-  .card:nth-child(5n) { margin-right:0; }
+  .cols3 .card { width:31.3%; margin:0 3% 2rem 0; }
+  .cols3 .card:nth-child(3n) { margin-right:0; }
+  .cols4 .card { width:23.5%; margin:0 2% 1.9rem 0; }
+  .cols4 .card:nth-child(4n) { margin-right:0; }
+  .cols5 .card { width:18.4%; margin:0 1.9% 1.8rem 0; }
+  .cols5 .card:nth-child(5n) { margin-right:0; }
+  .cols6 .card { width:15.4%; margin:0 1.5% 1.7rem 0; }
+  .cols6 .card:nth-child(6n) { margin-right:0; }
+
+  /* The number in the corner of each card, and the digits typed to reach it. */
+  .idx { position:absolute; right:.4rem; bottom:.4rem; background:rgba(14,6,4,.88);
+         color:var(--text); font-size:1.225rem; font-weight:700;
+         padding:.15rem .5rem; border-radius:.3rem; }
+  .jump { position:fixed; left:50%; top:50%; transform:translate(-50%,-50%);
+          background:rgba(14,6,4,.95); border:2px solid var(--accent); border-radius:1rem;
+          padding:1.6rem 3rem; font-size:4rem; font-weight:800; color:var(--accent);
+          display:none; letter-spacing:.4rem; }
+  .jump.on { display:block; }
   /* 16:9, because these are frames lifted out of the films themselves, not
      printed poster art. A 2:3 portrait box cropped a 2.39:1 frame down to a
      narrow vertical strip — the thin, distorted slivers this used to show.
@@ -112,11 +147,11 @@ public static class TvPage
   .thumb { position:relative; width:100%; padding-top:56.25%; background:var(--surface);
            border-radius:.5rem; background-size:cover; background-position:center; overflow:hidden; }
   .thumb .glyph { position:absolute; left:0; top:42%; width:100%; text-align:center;
-                  font-size:3rem; color:var(--line); }
-  .name { font-size:1.15rem; font-weight:600; margin-top:.55rem; line-height:1.3; height:3rem; overflow:hidden; }
-  .meta { font-size:1rem; color:var(--muted); }
+                  font-size:3.375rem; color:var(--line); }
+  .name { font-size:1.525rem; font-weight:600; margin-top:.55rem; line-height:1.3; height:3rem; overflow:hidden; }
+  .meta { font-size:1.375rem; color:var(--muted); }
   .badge { position:absolute; left:.4rem; top:.4rem; background:rgba(14,6,4,.9); color:var(--warm);
-           font-size:.85rem; padding:.25rem .5rem; border-radius:.35rem; font-weight:700; }
+           font-size:1.225rem; padding:.25rem .5rem; border-radius:.35rem; font-weight:700; }
   .resume { position:absolute; left:0; right:0; bottom:0; height:.35rem; background:rgba(0,0,0,.55); }
   .resume i { display:block; height:100%; background:var(--accent); }
 
@@ -126,7 +161,7 @@ public static class TvPage
   .shrow {
     display:block; width:100%; text-align:left; margin:0 0 .7rem;
     padding:1.1rem 1.5rem; background:var(--surface); border:1px solid var(--line);
-    border-radius:.6rem; color:var(--text); font-size:1.4rem; font-family:inherit;
+    border-radius:.6rem; color:var(--text); font-size:1.775rem; font-family:inherit;
   }
   .shrow .tick { color:var(--accent); font-weight:700; margin-right:1rem; }
   .shrow.new { color:var(--warm); }
@@ -143,11 +178,11 @@ public static class TvPage
           background-size:cover; background-position:center; overflow:hidden;
           box-shadow:0 1.2rem 3rem rgba(0,0,0,.55); }
   .dart .glyph { position:absolute; left:0; top:40%; width:100%; text-align:center;
-                 font-size:4rem; color:var(--line); }
-  .dmeta { color:var(--muted); font-size:1.3rem; margin:.6rem 0; }
-  .warn { color:var(--warm); font-size:1.25rem; margin:1rem 0; max-width:52rem; line-height:1.55; }
+                 font-size:4.375rem; color:var(--line); }
+  .dmeta { color:var(--muted); font-size:1.675rem; margin:.6rem 0; }
+  .warn { color:var(--warm); font-size:1.625rem; margin:1rem 0; max-width:52rem; line-height:1.55; }
   .btn { display:inline-block; background:var(--accent); color:#fff; border:none; border-radius:.5rem;
-         padding:1.1rem 2.6rem; font-size:1.35rem; font-weight:700; font-family:inherit; margin:1.4rem .7rem 0 0; }
+         padding:1.1rem 2.6rem; font-size:1.725rem; font-weight:700; font-family:inherit; margin:1.4rem .7rem 0 0; }
   .btn.ghost { background:transparent; border:1px solid var(--line); color:var(--text); }
   .btn[disabled] { opacity:.4; }
 
@@ -158,24 +193,24 @@ public static class TvPage
   #hud { position:absolute; left:0; right:0; bottom:0; padding:2rem 4rem 2.6rem;
          background:linear-gradient(transparent,rgba(14,6,4,.95)); transition:opacity .25s; }
   #hud.hide { opacity:0; }
-  #hud .t { font-size:1.8rem; font-weight:700; }
-  #hud .times { font-size:1.1rem; color:var(--muted); margin:.8rem 0 .5rem; }
+  #hud .t { font-size:2.175rem; font-weight:700; }
+  #hud .times { font-size:1.475rem; color:var(--muted); margin:.8rem 0 .5rem; }
   #hud .times .right { float:right; }
   .track { height:.4rem; background:rgba(255,255,255,.22); border-radius:.2rem; overflow:hidden; clear:both; }
   .track i { display:block; height:100%; background:var(--accent); }
   /* Positioned against #hud, its parent, so it fades with the rest of the HUD
      instead of sitting over the picture for the whole film. */
-  #hint { position:absolute; top:.7rem; right:4rem; color:var(--muted); font-size:1.05rem; }
-  .center { text-align:center; color:var(--muted); font-size:1.4rem; padding-top:6rem; }
+  #hint { position:absolute; top:.7rem; right:4rem; color:var(--muted); font-size:1.425rem; }
+  .center { text-align:center; color:var(--muted); font-size:1.775rem; padding-top:6rem; }
 
   /* Shown while the server repackages a film the television cannot open as it
      stands. Absolutely positioned rather than flex-centred: this has to lay out
      the same on a 2018 set as on a current one. */
   #prep { display:none; position:absolute; left:0; right:0; top:38%; text-align:center; }
   #prep.on { display:block; }
-  #prep .pt { font-size:1.9rem; font-weight:700; }
-  #prep .pp { font-size:3.2rem; font-weight:700; color:var(--accent); margin:1.4rem 0 1rem; }
-  #prep .ps { font-size:1.2rem; color:var(--muted); }
+  #prep .pt { font-size:2.275rem; font-weight:700; }
+  #prep .pp { font-size:3.575rem; font-weight:700; color:var(--accent); margin:1.4rem 0 1rem; }
+  #prep .ps { font-size:1.575rem; color:var(--muted); }
 </style>
 </head>
 <body>
@@ -199,6 +234,9 @@ public static class TvPage
   <div class="bar"><span class="who" id="who"></span><h1>Your library</h1>
     <div class="rail" id="rail"></div></div>
   <div class="grid" id="grid"></div>
+  <!-- Shows the digits as they are typed, so pressing 1 then 4 is visibly on
+       its way to 14 rather than looking like it jumped to 1 and stuck. -->
+  <div class="jump" id="jump"></div>
 </div></section>
 
 <section id="detail" class="screen"><div class="col">
@@ -264,7 +302,16 @@ public static class TvPage
   var LS = 'vault.tv.rt';
 
   var S = { access:null, refresh:null, me:null, items:[], resume:{}, film:null, screen:'signin',
-            memoryOnly:false, collections:[], shelf:null };
+            memoryOnly:false, collections:[], shelf:null, cols:4 };
+
+  // How many films across. Remembered per television, because it is a property
+  // of how far away the sofa is, not of the account.
+  var COLS = [3, 4, 5, 6];
+  var LS_COLS = 'vault.tv.cols';
+  try {
+    var savedCols = parseInt(localStorage.getItem(LS_COLS), 10);
+    if (COLS.indexOf(savedCols) >= 0) S.cols = savedCols;
+  } catch (e) {}
 
   // What this particular television can decode.
   //
@@ -410,6 +457,9 @@ public static class TvPage
     else if (c === 417 || k === 'MediaFastForward') seekBy(30);
     else if (c === 412 || k === 'MediaRewind') seekBy(-30);
     else if (S.screen === 'signin' && typeText(k, c)) { /* physical keyboard */ }
+    // On the library, the remote's number buttons move the highlight to the
+    // film carrying that number.
+    else if (S.screen === 'library' && jumpDigit(k, c)) { /* handled */ }
     else handled = false;
     if (handled) { e.preventDefault(); e.stopPropagation(); }
   }, true);
@@ -646,8 +696,11 @@ public static class TvPage
     var who = $('who');
     who.innerHTML = '';
     if (!S.me) return;
-    var name = document.createElement('span');
-    name.textContent = S.me.displayName + '  ';
+    // Stacked, not inline: the name is a label for the button under it, and
+    // side by side it read as part of the same control.
+    var name = document.createElement('div');
+    name.className = 'whoname';
+    name.textContent = S.me.displayName;
     who.appendChild(name);
     var out = document.createElement('button');
     out.className = 'chip';
@@ -687,6 +740,49 @@ public static class TvPage
       var c = S.collections[i];
       rail.appendChild(chip(c.name + '  ' + c.items.length, c));
     }
+    rail.appendChild(layoutChip());
+  }
+
+  // A grid of squares drawn to match the layout it will switch to, so the
+  // control shows the current choice rather than naming it. Sits at the right
+  // end of the shelf row, away from the shelves it has nothing to do with.
+  function gridGlyph(cols) {
+    var out = '';
+    for (var r = 0; r < 2; r++) {
+      for (var c = 0; c < cols; c++) out += '<i></i>';
+      out += '<br>';
+    }
+    return '<span class="gg gg' + cols + '">' + out + '</span>';
+  }
+
+  function layoutChip() {
+    var b = document.createElement('button');
+    b.className = 'chip layout';
+    b.setAttribute('data-f', '');
+    b.innerHTML = gridGlyph(S.cols);
+    b.addEventListener('click', cycleLayout);
+    return b;
+  }
+
+  // Pressing it steps to the next layout. A dropdown would need a menu, a way
+  // out of the menu, and somewhere for focus to go afterwards; stepping through
+  // four options shows the result immediately and needs none of that.
+  function cycleLayout() {
+    var i = COLS.indexOf(S.cols);
+    S.cols = COLS[(i + 1) % COLS.length];
+    try { localStorage.setItem(LS_COLS, String(S.cols)); } catch (e) {}
+    applyCols();
+    renderRail();
+    renderGrid(null, true);
+    // Keep focus on the control that was just pressed, or the viewer is dumped
+    // back into the grid every time they try the next size.
+    var chips = $('rail').getElementsByClassName('layout');
+    if (chips.length) setFocus(chips[0]);
+  }
+
+  function applyCols() {
+    var g = $('grid');
+    g.className = 'grid cols' + S.cols;
   }
 
   // Every terminal screen in the library must leave at least one thing to
@@ -759,6 +855,7 @@ public static class TvPage
       return;
     }
 
+    applyCols();
     g.innerHTML = '';
     for (var i = 0; i < items.length; i++) {
       (function (it, idx) {
@@ -771,6 +868,10 @@ public static class TvPage
         b.innerHTML =
           '<div class="thumb"><span class="glyph">&#127916;</span>' +
             (routeFor(it) ? '' : '<span class="badge">APP ONLY</span>') +
+            // The number the remote's digits jump to. Position in the list as
+            // shown, so it follows the shelf and the sort rather than being an
+            // id the viewer would have to learn.
+            '<span class="idx">' + (idx + 1) + '</span>' +
             (pct > 1 ? '<span class="resume"><i style="width:' + pct + '%"></i></span>' : '') +
           '</div><div class="name"></div><div class="meta">' +
           (it.durationMs ? fmt(it.durationMs) : '') + '</div>';
@@ -867,6 +968,47 @@ public static class TvPage
     b.disabled = !!disabled;
     b.addEventListener('click', fn);
     return b;
+  }
+
+  // ---- jumping to a film by number --------------------------------------
+  //
+  // Type the number printed in a card's corner and the highlight goes there.
+  // Digits accumulate while they keep coming, so 1 then 4 reaches 14 and a
+  // third digit reaches 142 — the highlight follows every press rather than
+  // waiting, so the search is visibly narrowing as you type. A pause of a
+  // second and a half ends that number; the next digit starts a fresh one.
+  //
+  // It only ever moves the highlight. Opening a film stays a deliberate press
+  // of OK, so a mistyped digit costs nothing but another press.
+
+  var JUMP_GAP = 1500;
+  var jumpBuf = '', jumpTimer = null;
+
+  function jumpDigit(k, c) {
+    var ch = (k && k.length === 1) ? k : String.fromCharCode(c);
+    if (ch < '0' || ch > '9') return false;
+
+    var cards = $('grid').getElementsByClassName('card');
+    if (!cards.length) return false;
+
+    var next = jumpBuf + ch;
+    // A number no film could carry starts again from this digit, rather than
+    // leaving somebody typing into something that can never match.
+    if (parseInt(next, 10) > cards.length) next = ch;
+    jumpBuf = next;
+
+    var n = parseInt(jumpBuf, 10);
+    if (n >= 1 && n <= cards.length) setFocus(cards[n - 1]);
+
+    $('jump').textContent = jumpBuf;
+    $('jump').className = 'jump on';
+
+    clearTimeout(jumpTimer);
+    jumpTimer = setTimeout(function () {
+      jumpBuf = '';
+      $('jump').className = 'jump';
+    }, JUMP_GAP);
+    return true;
   }
 
   // ---- collections ------------------------------------------------------
