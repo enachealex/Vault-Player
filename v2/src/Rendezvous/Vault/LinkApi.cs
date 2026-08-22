@@ -19,8 +19,18 @@ public record LinkClaimReq(string Code);
 /// </summary>
 public static class LinkApi
 {
-    private const string Alphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
-    private const int CodeLength = 6;
+    // Digits only, because the thing typing this is a television remote. A
+    // keypad needs no hunting across a grid of letters, and most remotes have
+    // number buttons that work directly.
+    //
+    // Eight of them rather than six. Six digits is a million combinations,
+    // against nearly nine hundred million for the six-character alphabet this
+    // replaced — and at twenty guesses a minute against a code that lives ten
+    // minutes, a million is thin enough to matter over a year of trying. Eight
+    // restores it to a hundred million while costing two more button presses on
+    // a keypad, which is still less work than six letters ever were.
+    private const string Alphabet = "0123456789";
+    private const int CodeLength = 8;
     private const int TtlMinutes = 10;
 
     private sealed record PendingLink(string UserId, long ExpiresAt);
@@ -29,7 +39,7 @@ public static class LinkApi
     // person scans again. Codes are single-claim and die in minutes.
     private static readonly ConcurrentDictionary<string, PendingLink> Open = new();
 
-    // A 6-character code is guessable in principle, so failed claims are
+    // A short code is guessable in principle, so failed claims are
     // metered globally: past this rate the endpoint answers 429 for everyone
     // for the remainder of the minute. Legitimate traffic is a handful of
     // claims an evening; a brute-force run is thousands a second.

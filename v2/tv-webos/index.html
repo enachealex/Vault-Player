@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Vault Movies</title>
+<style>
+  html,body { height:100%; margin:0; background:#1A0D09; color:#F6ECE5;
+              font-family:'Segoe UI',Roboto,system-ui,sans-serif; }
+  .mid { position:absolute; left:0; right:0; top:38%; text-align:center; }
+  h1 { font-size:2.4rem; margin:0 0 1rem; }
+  p  { font-size:1.3rem; color:#D9C0B3; margin:.4rem 0; }
+  a  { color:#F0A070; }
+</style>
+</head>
+<body>
+<div class="mid">
+  <h1>Vault Movies</h1>
+  <p id="msg">Connecting to your server&hellip;</p>
+</div>
+<script>
+/*
+ * The whole app is served by the Vault server; this package exists only to put
+ * an icon on the television's home screen and hand over to it.
+ *
+ * It loads the page rather than bundling a copy, for two reasons. The document
+ * then shares an origin with the API, so every call to /api/v1 and /media stays
+ * same-origin — a bundled copy would sit on a file:// origin, make every request
+ * cross-origin, and force CORS headers onto an API that deliberately has none.
+ * And the television never needs reinstalling: improvements to the app ship
+ * from the server and are simply there the next time it opens.
+ *
+ * The LAN address is tried first. When the set is at home that is one hop
+ * instead of a round trip through the internet, and it keeps working when the
+ * line is down. Falls back to the public address anywhere else.
+ */
+(function () {
+  var LAN    = 'http://192.168.1.33:5555';
+  var PUBLIC = 'https://party.thejumpvault.com';
+  var msg = document.getElementById('msg');
+
+  function go(base) { location.replace(base + '/tv'); }
+
+  function reach(base, ok, fail) {
+    // A HEAD to /health is the cheapest question that proves it is our server
+    // and not a captive portal answering everything with a login page.
+    var done = false, x = new XMLHttpRequest();
+    var timer = setTimeout(function () {
+      if (done) return; done = true; try { x.abort(); } catch (e) {} fail();
+    }, 2000);
+    try {
+      x.open('GET', base + '/health', true);
+      x.onreadystatechange = function () {
+        if (x.readyState !== 4 || done) return;
+        done = true; clearTimeout(timer);
+        if (x.status >= 200 && x.status < 400) ok(); else fail();
+      };
+      x.send();
+    } catch (e) {
+      if (!done) { done = true; clearTimeout(timer); fail(); }
+    }
+  }
+
+  reach(LAN, function () { go(LAN); }, function () {
+    msg.textContent = 'Connecting over the internet…';
+    reach(PUBLIC, function () { go(PUBLIC); }, function () {
+      msg.innerHTML = 'Could not reach your server.<br>' +
+                      'Check it is switched on, then close and reopen this app.';
+    });
+  });
+})();
+</script>
+</body>
+</html>

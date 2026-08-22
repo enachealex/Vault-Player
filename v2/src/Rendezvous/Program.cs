@@ -253,9 +253,41 @@ app.MapGet("/health", () => "ok");
 // Served to the TV's own browser rather than shipped as a store package: the
 // certification cost of webOS/Tizen/Android TV buys nothing a page cannot do.
 app.MapGet("/tv", (HttpContext ctx) =>
-    Results.Content(
+{
+    // Never cached. The installed television app is only a redirect here, so
+    // this response IS the app — a set that cached it would be pinned to
+    // whatever version it first saw, with no way to update short of
+    // reinstalling. Televisions are exactly the devices that stay on for weeks.
+    ctx.Response.Headers.CacheControl = "no-store, no-cache, must-revalidate";
+    ctx.Response.Headers.Pragma = "no-cache";
+    ctx.Response.Headers.Expires = "0";
+    return Results.Content(
         VideoPlayer.Rendezvous.TvPage.Render(
             $"{ctx.Request.Scheme}://{ctx.Request.Host}/link", $"{ctx.Request.Host}/link"),
+        "text/html; charset=utf-8");
+});
+
+// ---- The television app, as an installable package ------------------------
+// LG televisions cannot install anything from a file downloaded in their own
+// browser, and webOS has no add-to-home-screen. Sideloading from a PC over the
+// network is the only route — so the package is served here for the PC to fetch
+// and the instructions live beside it.
+//
+// The package is tiny and carries no copy of the app: it is an icon, a name,
+// and a redirect to this server. That keeps the page same-origin with the API
+// and means a television never needs reinstalling when the app improves.
+app.MapGet("/tv/app.ipk", () =>
+{
+    var path = Path.Combine(AppContext.BaseDirectory, "tv", "vaultmovies.ipk");
+    return File.Exists(path)
+        ? Results.File(path, "application/octet-stream",
+                       fileDownloadName: "com.jumpvault.vaultmovies_1.0.0_all.ipk")
+        : Results.NotFound();
+});
+
+app.MapGet("/tv/install", (HttpContext ctx) =>
+    Results.Content(
+        VideoPlayer.Rendezvous.TvInstallPage.Render($"{ctx.Request.Scheme}://{ctx.Request.Host}"),
         "text/html; charset=utf-8"));
 
 app.MapGet("/join/{code}", (string code, HttpContext ctx) =>

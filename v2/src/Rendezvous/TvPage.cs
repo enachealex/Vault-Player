@@ -6,7 +6,7 @@ namespace VideoPlayer.Rendezvous;
 /// Written for a remote, not a mouse: everything is reachable with a D-pad,
 /// focus is always visible and always somewhere, and Back never strands anyone.
 /// Sign-in never asks for a password — the phone does that (see
-/// docs/TV-APP-INTEGRATION.md) and the television only takes a six-character code.
+/// docs/TV-APP-INTEGRATION.md) and the television only takes an eight-digit code.
 ///
 /// Served BY the relay on purpose. Nothing under /api/v1, /media or /stream
 /// sends CORS headers, so same-origin is the only way this page can call the
@@ -64,7 +64,7 @@ public static class TvPage
   .keys { max-width:62rem; }
   /* inline-block + margins, never flex gap */
   .key {
-    display:inline-block; width:4.4rem; margin:0 .45rem .45rem 0; padding:.75rem 0;
+    display:inline-block; width:5.4rem; margin:0 .5rem .5rem 0; padding:1rem 0;
     background:var(--surface); border:1px solid var(--line); border-radius:.45rem;
     font-size:1.5rem; font-weight:700; text-align:center; color:var(--text);
     font-family:inherit; vertical-align:top;
@@ -154,7 +154,7 @@ public static class TvPage
 
 <section id="signin" class="screen on"><div class="col">
   <h1>Sign in to Vault Movies</h1>
-  <p class="sub">On your phone, open this page and sign in with your username <b>or email</b>.<br>It will show you a six-character code.</p>
+  <p class="sub">On your phone, open this page and sign in with your username <b>or email</b>.<br>It will show you an eight-digit code.</p>
   <div class="url">__LINKSHORT__</div>
   <div class="entry" id="entry"></div>
   <div class="keys" id="keys"></div>
@@ -198,20 +198,16 @@ public static class TvPage
 <script>
 (function () {
   'use strict';
-  // An ordinary keyboard: digits along the top, then QWERTY. Complete on
-  // purpose, including 0, 1, I, L and O.
-  //
-  // Codes never contain those five — they are too easily confused with each
-  // other from across a room, so the server leaves them out when it mints one.
-  // Omitting their keys as well made the keyboard look broken, which costs more
-  // than the two keys ever save: a full keyboard is what everybody already
-  // knows how to read, and a key that never comes up costs nothing.
-  var ROWS = ['1234567890', 'QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'];
-  var ALPHABET = ROWS.join('');
-  // Delete sits at the end of the digits, Sign in at the end of the middle
-  // letter row — both on the right, where a thumb on the D-pad reaches them
-  // without crossing the whole keyboard.
-  var ROW_ACTIONS = { 0: { act: 'del', label: 'Delete' }, 2: { act: 'go', label: 'Sign in' } };
+  // A keypad, because the thing typing this is a remote. Codes are digits only
+  // now, so there is nothing else to offer — and a 3-wide pad needs no hunting
+  // across a grid of letters. Many remotes have number buttons that work
+  // directly on it too.
+  var ROWS = ['123', '456', '789', '0'];
+  var ALPHABET = '0123456789';
+  var CODE_LEN = 8;
+  // Delete beside the top row, Sign in beside the middle — both to the right of
+  // the pad, where the D-pad reaches them in one press from any digit.
+  var ROW_ACTIONS = { 0: { act: 'del', label: 'Delete' }, 1: { act: 'go', label: 'Sign in' } };
   var LS = 'vault.tv.rt';
 
   var S = { access:null, refresh:null, me:null, items:[], resume:{}, film:null, screen:'signin',
@@ -438,13 +434,13 @@ public static class TvPage
   // ---- sign in ----------------------------------------------------------
   function renderEntry() {
     var out = '';
-    for (var i = 0; i < 6; i++) out += entry.charAt(i) ? entry.charAt(i) : '<span class="ph">&middot;</span>';
+    for (var i = 0; i < CODE_LEN; i++) out += entry.charAt(i) ? entry.charAt(i) : '<span class="ph">&middot;</span>';
     $('entry').innerHTML = out;
   }
   function pushChar(ch) {
-    if (entry.length >= 6) return;
+    if (entry.length >= CODE_LEN) return;
     entry += ch; renderEntry();
-    if (entry.length === 6) claim(0);
+    if (entry.length === CODE_LEN) claim(0);
   }
   function buildKeys() {
     var host = $('keys'), html = '', first = true;
@@ -484,7 +480,9 @@ public static class TvPage
   // rather than sending the person back to their phone for nothing.
   var RETRY = [2000, 4000, 8000, 15000, 15000, 15000];
   function claim(attempt) {
-    if (entry.length !== 6) { $('signinErr').textContent = 'Enter all six characters.'; return; }
+    if (entry.length !== CODE_LEN) {
+      $('signinErr').textContent = 'Enter all ' + CODE_LEN + ' digits.'; return;
+    }
     $('signinErr').textContent = attempt ? 'The server is busy — still trying…' : 'Signing in…';
     fetch('/api/v1/link/claim', {
       method:'POST', headers:{'Content-Type':'application/json'},

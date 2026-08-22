@@ -17,4 +17,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
+  <!-- The webOS package served at /tv/app.ipk. Built by scripts/pack-webos.ps1
+       and committed, so a deploy does not need the LG tooling present. -->
+  <ItemGroup>
+    <None Include="tv/vaultmovies.ipk" CopyToOutputDirectory="PreserveNewest" Condition="Exists('tv/vaultmovies.ipk')" />
+  </ItemGroup>
+
 </Project>
