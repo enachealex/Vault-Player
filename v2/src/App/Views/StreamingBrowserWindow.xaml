@@ -36,9 +36,22 @@
                             Click="Reload_Click" ToolTip="Reload" AutomationProperties.Name="Reload" />
                 </StackPanel>
 
-                <TextBlock x:Name="PageTitle" Grid.Column="1" VerticalAlignment="Center" Margin="14,0"
-                           FontSize="13" Foreground="{StaticResource TextMutedBrush}"
-                           TextTrimming="CharacterEllipsis" Text="Loading…" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="14,0">
+                    <!-- Streaming sites are heavy and their first load can take
+                         ten seconds or more, most of it before anything is
+                         painted. Without a sign that work is happening, a slow
+                         page and a broken one look identical. -->
+                    <TextBlock x:Name="BusyDots" Text="&#xE895;" FontFamily="Segoe MDL2 Assets"
+                               FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0"
+                               Foreground="{StaticResource AccentBrush}" Visibility="Collapsed">
+                        <TextBlock.RenderTransform>
+                            <RotateTransform x:Name="BusySpin" CenterX="6" CenterY="7" />
+                        </TextBlock.RenderTransform>
+                    </TextBlock>
+                    <TextBlock x:Name="PageTitle" VerticalAlignment="Center"
+                               FontSize="13" Foreground="{StaticResource TextMutedBrush}"
+                               TextTrimming="CharacterEllipsis" Text="Loading…" />
+                </StackPanel>
 
                 <Button x:Name="HandoffBtn" Grid.Column="2" Style="{StaticResource PrimaryButton}" Padding="14,7"
                         Click="Handoff_Click"
@@ -54,6 +67,11 @@
         </Border>
 
         <!-- Shown on a DRM player page, where embedded playback can't work -->
+        <ProgressBar x:Name="LoadBar" Grid.Row="0" VerticalAlignment="Bottom" Height="2"
+                     IsIndeterminate="True" Visibility="Collapsed"
+                     Background="Transparent" BorderThickness="0"
+                     Foreground="{StaticResource AccentBrush}" />
+
         <Border x:Name="DrmBar" Grid.Row="1" Visibility="Collapsed"
                 Background="{StaticResource SurfaceAltBrush}"
                 BorderBrush="{StaticResource AccentBrush}" BorderThickness="0,0,0,2" Padding="14,10">
