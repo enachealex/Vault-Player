@@ -70,6 +70,7 @@ public static class TvPage
     font-family:inherit; vertical-align:top;
   }
   .key.wide { width:9.7rem; color:var(--warm); }
+  .krow { white-space:nowrap; }
   .err { color:var(--accent); font-size:1.3rem; min-height:2rem; margin-top:1rem; }
 
   /* ---- library ---- */
@@ -98,8 +99,12 @@ public static class TvPage
     font-family:inherit;
   }
   .card:nth-child(5n) { margin-right:0; }
-  /* padding-top is the portable 2:3 box; aspect-ratio is far too new */
-  .thumb { position:relative; width:100%; padding-top:150%; background:var(--surface);
+  /* 16:9, because these are frames lifted out of the films themselves, not
+     printed poster art. A 2:3 portrait box cropped a 2.39:1 frame down to a
+     narrow vertical strip — the thin, distorted slivers this used to show.
+     padding-top is the portable way to hold a ratio; aspect-ratio is far too
+     new for the sets this has to run on. */
+  .thumb { position:relative; width:100%; padding-top:56.25%; background:var(--surface);
            border-radius:.5rem; background-size:cover; background-position:center; overflow:hidden; }
   .thumb .glyph { position:absolute; left:0; top:42%; width:100%; text-align:center;
                   font-size:3rem; color:var(--line); }
@@ -193,7 +198,13 @@ public static class TvPage
 <script>
 (function () {
   'use strict';
-  var ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // no I/L/O/0/1 — unreadable across a room
+  // Laid out as a keyboard, not an alphabet. People hunt for letters by shape
+  // and position, and everyone already knows where Q and M are; an A-to-Z grid
+  // makes you read every key. I, L and O are dropped along with 0 and 1 because
+  // they are indistinguishable from each other across a room, which is also why
+  // the codes never contain them.
+  var ROWS = ['QWERTYUP', 'ASDFGHJK', 'ZXCVBNM', '23456789'];
+  var ALPHABET = ROWS.join('');
   var LS = 'vault.tv.rt';
 
   var S = { access:null, refresh:null, me:null, items:[], resume:{}, film:null, screen:'signin',
@@ -277,6 +288,11 @@ public static class TvPage
     var old = current();
     if (old) old.className = old.className.replace(/\s*focus/, '');
     el.className += ' focus';
+    // Move real DOM focus too, not only the ring. Without this the document's
+    // active element never leaves <body>, so a television's own spatial
+    // navigation and its voice guidance have nothing to work with — and on a
+    // set whose browser drives the arrow keys itself, the page never sees them.
+    try { el.focus(); } catch (e) {}
     // scrollIntoView options need Chromium 61; keep the element visible by hand.
     var g = el.parentNode;
     while (g && g !== document.body && g.className.indexOf('grid') < 0) g = g.parentNode;
@@ -424,14 +440,28 @@ public static class TvPage
     if (entry.length === 6) claim(0);
   }
   function buildKeys() {
-    var host = $('keys'), html = '';
-    for (var i = 0; i < ALPHABET.length; i++)
-      html += '<button class="key" data-f' + (i === 0 ? ' data-first' : '') +
-              ' data-ch="' + ALPHABET.charAt(i) + '">' + ALPHABET.charAt(i) + '</button>';
-    html += '<button class="key wide" data-f data-act="del">Delete</button>';
-    html += '<button class="key wide" data-f data-act="go">Sign in</button>';
+    var host = $('keys'), html = '', first = true;
+    for (var r = 0; r < ROWS.length; r++) {
+      // Each row is its own block, so Up and Down move between rows rather than
+      // wherever the reflow happened to put the next key.
+      html += '<div class="krow">';
+      for (var i = 0; i < ROWS[r].length; i++) {
+        var ch = ROWS[r].charAt(i);
+        html += '<button class="key" data-f' + (first ? ' data-first' : '') +
+                ' data-ch="' + ch + '">' + ch + '</button>';
+        first = false;
+      }
+      if (r === ROWS.length - 1) {
+        html += '<button class="key wide" data-f data-act="del">Delete</button>';
+        html += '<button class="key wide" data-f data-act="go">Sign in</button>';
+      }
+      html += '</div>';
+    }
     host.innerHTML = html;
-    for (var j = 0; j < host.children.length; j++) {
+    // The buttons are now nested a level deeper, so wire them by query rather
+    // than by walking the host's immediate children.
+    var keys = host.getElementsByTagName('button');
+    for (var j = 0; j < keys.length; j++) {
       (function (b) {
         b.addEventListener('click', function () {
           var act = b.getAttribute('data-act');
@@ -439,7 +469,7 @@ public static class TvPage
           else if (act === 'go') claim(0);
           else pushChar(b.getAttribute('data-ch'));
         });
-      })(host.children[j]);
+      })(keys[j]);
     }
   }
   // The claim limiter is global and counts failures server-wide, so a device

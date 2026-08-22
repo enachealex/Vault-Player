@@ -1,0 +1,14 @@
+{
+  "id": "com.jumpvault.vaultmovies",
+  "version": "1.0.0",
+  "vendor": "Jump Vault LLC",
+  "type": "web",
+  "main": "index.html",
+  "title": "Vault Movies",
+  "icon": "icon.png",
+  "largeIcon": "largeIcon.png",
+  "bgColor": "#1A0D09",
+  "iconColor": "#C8442A",
+  "handlesRelaunch": true,
+  "disableBackHistoryAPI": true
+}
