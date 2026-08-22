@@ -198,13 +198,20 @@ public static class TvPage
 <script>
 (function () {
   'use strict';
-  // Laid out as a keyboard, not an alphabet. People hunt for letters by shape
-  // and position, and everyone already knows where Q and M are; an A-to-Z grid
-  // makes you read every key. I, L and O are dropped along with 0 and 1 because
-  // they are indistinguishable from each other across a room, which is also why
-  // the codes never contain them.
-  var ROWS = ['QWERTYUP', 'ASDFGHJK', 'ZXCVBNM', '23456789'];
+  // An ordinary keyboard: digits along the top, then QWERTY. Complete on
+  // purpose, including 0, 1, I, L and O.
+  //
+  // Codes never contain those five — they are too easily confused with each
+  // other from across a room, so the server leaves them out when it mints one.
+  // Omitting their keys as well made the keyboard look broken, which costs more
+  // than the two keys ever save: a full keyboard is what everybody already
+  // knows how to read, and a key that never comes up costs nothing.
+  var ROWS = ['1234567890', 'QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'];
   var ALPHABET = ROWS.join('');
+  // Delete sits at the end of the digits, Sign in at the end of the middle
+  // letter row — both on the right, where a thumb on the D-pad reaches them
+  // without crossing the whole keyboard.
+  var ROW_ACTIONS = { 0: { act: 'del', label: 'Delete' }, 2: { act: 'go', label: 'Sign in' } };
   var LS = 'vault.tv.rt';
 
   var S = { access:null, refresh:null, me:null, items:[], resume:{}, film:null, screen:'signin',
@@ -451,9 +458,9 @@ public static class TvPage
                 ' data-ch="' + ch + '">' + ch + '</button>';
         first = false;
       }
-      if (r === ROWS.length - 1) {
-        html += '<button class="key wide" data-f data-act="del">Delete</button>';
-        html += '<button class="key wide" data-f data-act="go">Sign in</button>';
+      if (ROW_ACTIONS[r]) {
+        html += '<button class="key wide" data-f data-act="' + ROW_ACTIONS[r].act + '">' +
+                ROW_ACTIONS[r].label + '</button>';
       }
       html += '</div>';
     }
