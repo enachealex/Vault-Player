@@ -511,7 +511,7 @@ public static class TvPage
     else if (k === 'ArrowUp' || c === 38) { if (!playing) move(0, -1); }
     else if (k === 'ArrowDown' || c === 40) { if (!playing) move(0, 1); }
     else if (k === 'Enter' || c === 13) activate();
-    else if (BACK.indexOf(c) >= 0 || k === 'Backspace' || k === 'Escape' || k === 'GoBack') back();
+    else if (BACK.indexOf(c) >= 0 || k === 'Backspace' || k === 'Escape' || k === 'GoBack') handleBack();
     else if (c === 415 || c === 19 || c === 179 || k === 'MediaPlayPause') { if (S.screen === 'player') togglePlay(); }
     else if (c === 417 || k === 'MediaFastForward') seekBy(30);
     else if (c === 412 || k === 'MediaRewind') seekBy(-30);
@@ -532,6 +532,41 @@ public static class TvPage
     if (S.screen === 'player') { togglePlay(); return; }
     var el = current(); if (el) el.click();
   }
+  // Back arrives by two different roads and sometimes both at once.
+  //
+  // A television browser treats Back as history navigation and acts on it
+  // before the page's key handler ever runs — preventDefault comes too late,
+  // which is why pressing Back inside a film walked out of the app instead of
+  // leaving the film. The cure is to always have somewhere to go back TO: a
+  // history entry of our own is pushed, so the press is spent popping that
+  // rather than leaving, and a fresh one is pushed to replace it.
+  //
+  // Some sets then deliver the keydown as well, so one press can arrive twice.
+  // Anything within a few hundred milliseconds of the last is the same press.
+  var lastBackAt = 0;
+
+  function handleBack() {
+    var now = new Date().getTime();
+    if (now - lastBackAt < 400) return;
+    lastBackAt = now;
+    back();
+  }
+
+  function armBackTrap() {
+    try {
+      history.pushState({ vault: 1 }, '');
+      window.addEventListener('popstate', function () {
+        handleBack();
+        // Re-arm immediately, or the next press has nothing of ours left to
+        // consume and takes the viewer out of the app.
+        try { history.pushState({ vault: 1 }, ''); } catch (e) {}
+      });
+    } catch (e) {
+      // No history API: the key handler alone still covers sets that deliver
+      // a keydown, which is what happened before this existed.
+    }
+  }
+
   function back() {
     // A menu is the innermost thing on screen, so it is the first thing Back
     // should take away.
@@ -1514,6 +1549,7 @@ public static class TvPage
 
   // ---- boot -------------------------------------------------------------
   rescale();
+  armBackTrap();
   buildKeys(); renderEntry();
   try { S.refresh = localStorage.getItem(LS); } catch (e) { S.memoryOnly = true; }
   if (S.refresh) refresh().then(function (ok) { if (ok) enter(); else show('signin'); });
