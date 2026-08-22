@@ -501,6 +501,8 @@ public static class TvPage
   var BACK = [8, 27, 10009 /* Tizen */, 461 /* webOS */];
   document.addEventListener('keydown', function (e) {
     var k = e.key, c = e.keyCode, handled = true;
+    // Cheap insurance: if a re-arm was ever lost, ordinary use puts it back.
+    if (!trapArmed()) armTrap();
     // While a film is up there is nothing to focus, so sideways means seek.
     // Plenty of remotes send only the arrows during playback and never the
     // dedicated transport keys, so without this the hint on screen would be
@@ -511,7 +513,7 @@ public static class TvPage
     else if (k === 'ArrowUp' || c === 38) { if (!playing) move(0, -1); }
     else if (k === 'ArrowDown' || c === 40) { if (!playing) move(0, 1); }
     else if (k === 'Enter' || c === 13) activate();
-    else if (BACK.indexOf(c) >= 0 || k === 'Backspace' || k === 'Escape' || k === 'GoBack') handleBack();
+    else if (BACK.indexOf(c) >= 0 || k === 'Backspace' || k === 'Escape' || k === 'GoBack') handleBack(VIA_KEY);
     else if (c === 415 || c === 19 || c === 179 || k === 'MediaPlayPause') { if (S.screen === 'player') togglePlay(); }
     else if (c === 417 || k === 'MediaFastForward') seekBy(30);
     else if (c === 412 || k === 'MediaRewind') seekBy(-30);
@@ -543,28 +545,66 @@ public static class TvPage
   //
   // Some sets then deliver the keydown as well, so one press can arrive twice.
   // Anything within a few hundred milliseconds of the last is the same press.
-  var lastBackAt = 0;
+  // One press can arrive on both roads at once, so they are told apart: two
+  // hits on DIFFERENT roads in quick succession are one press echoing, while
+  // two on the SAME road are a viewer pressing Back twice and must both count —
+  // otherwise backing quickly out of nested screens silently loses presses.
+  var VIA_KEY = 1, VIA_POP = 2, ECHO_MS = 350;
+  var lastBackAt = 0, lastBackVia = 0;
 
-  function handleBack() {
+  function handleBack(via) {
     var now = new Date().getTime();
-    if (now - lastBackAt < 400) return;
+    if (lastBackVia && via !== lastBackVia && (now - lastBackAt) < ECHO_MS) return;
     lastBackAt = now;
+    lastBackVia = via;
     back();
   }
 
+  // Our own history entry, marked so it can be told from the page's first one
+  // and never stacked twice.
+  function trapArmed() { return !!(history.state && history.state.vault); }
+
+  function armTrap() {
+    if (!window.history || !history.pushState) return false;
+    if (trapArmed()) return true;
+    try { history.pushState({ vault: 1 }, ''); return true; }
+    catch (e) { return false; }
+  }
+
   function armBackTrap() {
-    try {
-      history.pushState({ vault: 1 }, '');
-      window.addEventListener('popstate', function () {
-        handleBack();
-        // Re-arm immediately, or the next press has nothing of ours left to
-        // consume and takes the viewer out of the app.
-        try { history.pushState({ vault: 1 }, ''); } catch (e) {}
-      });
-    } catch (e) {
-      // No history API: the key handler alone still covers sets that deliver
-      // a keydown, which is what happened before this existed.
+    if (!armTrap()) return;   // no history API: the key handler alone covers it
+
+    window.addEventListener('popstate', function () {
+      // Re-armed first and unconditionally — before deciding what the press
+      // meant, and even on the library where Back does nothing. The moment
+      // there is no entry of ours left, the next press leaves the page. A tick
+      // later, because pushing synchronously from inside popstate is the
+      // fragile case on older engines.
+      setTimeout(armTrap, 0);
+      handleBack(VIA_POP);
+    });
+
+    // Chromium 79 and later — webOS 6.0, so 2021 sets onward — treats a history
+    // entry as skippable when the document that pushed it has never had a user
+    // gesture, and Back jumps straight over such an entry WITHOUT firing
+    // popstate. This trap is armed during boot, before anyone has touched
+    // anything, so on those sets it would be stepped over and Back would leave
+    // the app after all. A gesture anywhere clears the flag for entries already
+    // pushed, so the first real press seals it. Back and Escape do not count as
+    // activation, and are skipped so the sealing press cannot be the very press
+    // that needed the trap.
+    var sealed = false;
+    function seal(e) {
+      if (sealed) return;
+      var c = e.keyCode || 0;
+      if (e.type === 'keydown' && (c === 27 || BACK.indexOf(c) >= 0)) return;
+      sealed = true;
+      document.removeEventListener('keydown', seal, true);
+      document.removeEventListener('click', seal, true);
+      armTrap();
     }
+    document.addEventListener('keydown', seal, true);
+    document.addEventListener('click', seal, true);
   }
 
   function back() {
