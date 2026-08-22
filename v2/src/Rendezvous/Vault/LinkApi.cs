@@ -23,14 +23,17 @@ public static class LinkApi
     // keypad needs no hunting across a grid of letters, and most remotes have
     // number buttons that work directly.
     //
-    // Eight of them rather than six. Six digits is a million combinations,
-    // against nearly nine hundred million for the six-character alphabet this
-    // replaced — and at twenty guesses a minute against a code that lives ten
-    // minutes, a million is thin enough to matter over a year of trying. Eight
-    // restores it to a hundred million while costing two more button presses on
-    // a keypad, which is still less work than six letters ever were.
+    // Six of them: a million combinations. That is a hundredth of what eight
+    // gave, so the guess limiter below is tightened to match — the keyspace and
+    // the rate limit are one decision, not two, and shrinking one without the
+    // other is how a short code becomes a guessable one.
+    //
+    // The pool recycles rather than being consumed. A code is removed the
+    // instant it is claimed, and expired ones are swept whenever another is
+    // minted, so at any moment only the handful of codes actually waiting to be
+    // typed are spoken for.
     private const string Alphabet = "0123456789";
-    private const int CodeLength = 8;
+    private const int CodeLength = 6;
     private const int TtlMinutes = 10;
 
     private sealed record PendingLink(string UserId, long ExpiresAt);
@@ -39,13 +42,18 @@ public static class LinkApi
     // person scans again. Codes are single-claim and die in minutes.
     private static readonly ConcurrentDictionary<string, PendingLink> Open = new();
 
-    // A short code is guessable in principle, so failed claims are
-    // metered globally: past this rate the endpoint answers 429 for everyone
-    // for the remainder of the minute. Legitimate traffic is a handful of
-    // claims an evening; a brute-force run is thousands a second.
+    // A short code is guessable in principle, so failed claims are metered
+    // globally: past this rate the endpoint answers 429 for everyone for the
+    // remainder of the minute.
+    //
+    // Five a minute, not twenty. Against a million combinations, twenty would
+    // let a patient attacker put two hundred guesses at every code during the
+    // ten minutes it lives. Five costs a legitimate device nothing — it types
+    // one code, once, correctly — and a brute-force run is thousands a second,
+    // so it trips this instantly either way.
     private static int _failedClaims;
     private static long _failedWindowStart;
-    private const int MaxFailedPerMinute = 20;
+    private const int MaxFailedPerMinute = 5;
 
     public static void MapLinkApi(this WebApplication app)
     {
@@ -161,7 +169,7 @@ public static class LinkApi
             : $"""
               <h1>You're verified</h1>
               <p>Type this code into your TV or device:</p>
-              <div class="code">{code}</div>
+              <div class="codebox"><div class="code">{code}</div></div>
               <p>It works once and expires in 10 minutes.</p>
               """;
 
@@ -177,17 +185,25 @@ public static class LinkApi
                      background:#1A0D09; color:#F6ECE5; font-family:'Segoe UI',system-ui,sans-serif; }
               .card { padding:40px 44px; max-width:420px; width:100%; box-sizing:border-box; }
               .dot { width:22px; height:22px; border-radius:7px; background:#C8442A; margin-bottom:18px; }
-              h1 { font-size:22px; margin:0 0 6px; }
-              p { color:#D9C0B3; font-size:14px; line-height:1.55; margin:8px 0; }
+              /* Every size here is 6px larger than it was. This is read at arm's
+                 length on a phone, often by somebody already squinting at a
+                 television across the room. */
+              h1 { font-size:28px; margin:0 0 6px; }
+              p { color:#D9C0B3; font-size:20px; line-height:1.55; margin:8px 0; }
               .err { color:#F0A070; }
-              label { display:block; font-size:10.5px; font-weight:bold; color:#D9C0B3;
+              label { display:block; font-size:16.5px; font-weight:bold; color:#D9C0B3;
                       letter-spacing:1px; margin:14px 0 6px; }
-              input { width:100%; box-sizing:border-box; padding:12px; font-size:16px; border-radius:10px;
+              input { width:100%; box-sizing:border-box; padding:12px; font-size:22px; border-radius:10px;
                       border:1px solid #43281F; background:#2A160F; color:#F6ECE5; }
               button { margin-top:18px; width:100%; padding:13px; border-radius:10px; border:none;
-                       background:#C8442A; color:#fff; font-weight:600; font-size:15px; cursor:pointer; }
-              .code { font-family:Consolas,monospace; font-size:44px; font-weight:bold; color:#C8442A;
-                      letter-spacing:6px; text-align:center; margin:18px 0; user-select:all; }
+                       background:#C8442A; color:#fff; font-weight:600; font-size:21px; cursor:pointer; }
+              /* The code gets a panel of its own. It is the one thing on this
+                 page that has to be read and copied by hand, so it is separated
+                 from the prose around it rather than being merely larger text. */
+              .codebox { background:#3A3A3A; border:2px solid #5A5A5A; border-radius:14px;
+                         padding:20px 16px; margin:22px 0; }
+              .code { font-family:Consolas,monospace; font-size:50px; font-weight:bold; color:#F6ECE5;
+                      letter-spacing:8px; text-align:center; user-select:all; }
             </style>
             </head>
             <body><div class="card"><div class="dot"></div>{{body}}</div></body>

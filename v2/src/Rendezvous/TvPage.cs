@@ -6,7 +6,7 @@ namespace VideoPlayer.Rendezvous;
 /// Written for a remote, not a mouse: everything is reachable with a D-pad,
 /// focus is always visible and always somewhere, and Back never strands anyone.
 /// Sign-in never asks for a password — the phone does that (see
-/// docs/TV-APP-INTEGRATION.md) and the television only takes an eight-digit code.
+/// docs/TV-APP-INTEGRATION.md) and the television only takes a six-digit code.
 ///
 /// Served BY the relay on purpose. Nothing under /api/v1, /media or /stream
 /// sends CORS headers, so same-origin is the only way this page can call the
@@ -91,7 +91,12 @@ public static class TvPage
   }
   .chip.sel { background:var(--accent); border-color:var(--accent); color:#fff; }
 
-  .grid { flex:1; min-height:0; overflow-y:auto; overflow-x:hidden; }
+  /* The padding is what stops the focus ring being shaved off. Cards sit flush
+     against the edges of this box, and the ring is drawn OUTSIDE the card, so
+     without room to breathe the outer column loses its left or right edge and
+     the top and bottom rows lose theirs to the scroll clip — which reads as the
+     highlight being broken rather than as the card being at the edge. */
+  .grid { flex:1; min-height:0; overflow-y:auto; overflow-x:hidden; padding:.4rem; }
   .grid::-webkit-scrollbar { display:none; }
   .card {
     display:inline-block; width:18.4%; margin:0 1.9% 1.8rem 0; vertical-align:top;
@@ -115,7 +120,30 @@ public static class TvPage
   .resume { position:absolute; left:0; right:0; bottom:0; height:.35rem; background:rgba(0,0,0,.55); }
   .resume i { display:block; height:100%; background:var(--accent); }
 
+  /* ---- collections ---- */
+  .shlist { flex:1; min-height:0; overflow-y:auto; padding:.4rem; }
+  .shlist::-webkit-scrollbar { display:none; }
+  .shrow {
+    display:block; width:100%; text-align:left; margin:0 0 .7rem;
+    padding:1.1rem 1.5rem; background:var(--surface); border:1px solid var(--line);
+    border-radius:.6rem; color:var(--text); font-size:1.4rem; font-family:inherit;
+  }
+  .shrow .tick { color:var(--accent); font-weight:700; margin-right:1rem; }
+  .shrow.new { color:var(--warm); }
+
   /* ---- detail ---- */
+  /* Text on the left, the film on the right. Two columns rather than a title
+     stranded at the top of an empty screen. */
+  /* Both columns centred against each other rather than the text riding at the
+     top of an otherwise empty screen. */
+  .dwrap { display:flex; flex:1; min-height:0; align-items:center; }
+  .dtext { flex:1; min-width:0; padding-right:3.5rem; }
+  .dart { flex:none; width:52%; position:relative;
+          padding-top:29.25%; background:var(--surface); border-radius:.8rem;
+          background-size:cover; background-position:center; overflow:hidden;
+          box-shadow:0 1.2rem 3rem rgba(0,0,0,.55); }
+  .dart .glyph { position:absolute; left:0; top:40%; width:100%; text-align:center;
+                 font-size:4rem; color:var(--line); }
   .dmeta { color:var(--muted); font-size:1.3rem; margin:.6rem 0; }
   .warn { color:var(--warm); font-size:1.25rem; margin:1rem 0; max-width:52rem; line-height:1.55; }
   .btn { display:inline-block; background:var(--accent); color:#fff; border:none; border-radius:.5rem;
@@ -154,7 +182,7 @@ public static class TvPage
 
 <section id="signin" class="screen on"><div class="col">
   <h1>Sign in to Vault Movies</h1>
-  <p class="sub">On your phone, open this page and sign in with your username <b>or email</b>.<br>It will show you an eight-digit code.</p>
+  <p class="sub">On your phone, open this page and sign in with your username <b>or email</b>.<br>It will show you a six-digit code.</p>
   <div class="url">__LINKSHORT__</div>
   <div class="entry" id="entry"></div>
   <div class="keys" id="keys"></div>
@@ -174,10 +202,30 @@ public static class TvPage
 </div></section>
 
 <section id="detail" class="screen"><div class="col">
-  <h1 id="dTitle"></h1>
-  <div class="dmeta" id="dMeta"></div>
-  <div class="warn" id="dWarn"></div>
-  <div id="dRow"></div>
+  <div class="dwrap">
+    <div class="dtext">
+      <h1 id="dTitle"></h1>
+      <div class="dmeta" id="dMeta"></div>
+      <div class="warn" id="dWarn"></div>
+      <div id="dRow"></div>
+    </div>
+    <!-- The film itself, rather than half a screen of nothing. -->
+    <div class="dart" id="dArt"><span class="glyph">&#127916;</span></div>
+  </div>
+</div></section>
+
+<section id="shelves" class="screen"><div class="col">
+  <h1>Add to a collection</h1>
+  <p class="sub" id="shTitle"></p>
+  <div class="shlist" id="shList"></div>
+</div></section>
+
+<section id="newshelf" class="screen"><div class="col">
+  <h1>Name the collection</h1>
+  <p class="sub">Something you will recognise on the shelf &mdash; "Pixar", "Christmas".</p>
+  <div class="entry" id="nameEntry"></div>
+  <div class="keys" id="nameKeys"></div>
+  <div class="err" id="nameErr"></div>
 </div></section>
 
 <section id="player" class="screen">
@@ -212,7 +260,7 @@ public static class TvPage
     [{ act: 'del', label: 'Del' }, '0', { act: 'go', label: 'Enter' }]
   ];
   var ALPHABET = '0123456789';
-  var CODE_LEN = 8;
+  var CODE_LEN = 6;
   var LS = 'vault.tv.rt';
 
   var S = { access:null, refresh:null, me:null, items:[], resume:{}, film:null, screen:'signin',
@@ -276,7 +324,7 @@ public static class TvPage
 
   function show(name) {
     S.screen = name;
-    var all = ['signin','gate','library','detail','player'];
+    var all = ['signin','gate','library','detail','shelves','newshelf','player'];
     for (var i = 0; i < all.length; i++) {
       var el = $(all[i]);
       if (all[i] === name) el.className = 'screen on'; else el.className = 'screen';
@@ -305,9 +353,13 @@ public static class TvPage
     var g = el.parentNode;
     while (g && g !== document.body && g.className.indexOf('grid') < 0) g = g.parentNode;
     if (g && g.className && g.className.indexOf('grid') >= 0) {
+      // Leave room for the focus ring at both ends, or scrolling parks a card
+      // exactly against the edge and clips the very highlight that says where
+      // you are.
+      var pad = 24;
       var top = el.offsetTop, bot = top + el.offsetHeight;
-      if (top < g.scrollTop) g.scrollTop = top - 16;
-      else if (bot > g.scrollTop + g.clientHeight) g.scrollTop = bot - g.clientHeight + 16;
+      if (top - pad < g.scrollTop) g.scrollTop = top - pad;
+      else if (bot + pad > g.scrollTop + g.clientHeight) g.scrollTop = bot - g.clientHeight + pad;
     }
   }
   function focusFirst(force) {
@@ -374,6 +426,8 @@ public static class TvPage
   function back() {
     if (S.screen === 'player') { stopPlayback(); return; }
     if (S.screen === 'detail') { show('library'); return; }
+    if (S.screen === 'shelves') { show('detail'); return; }
+    if (S.screen === 'newshelf') { show('shelves'); return; }
     // Library and sign-in are the floor. Doing nothing is deliberate — letting
     // Back bubble exits the app entirely on several platforms.
   }
@@ -760,6 +814,14 @@ public static class TvPage
   function openDetail(it) {
     S.film = it;
     $('dTitle').textContent = it.name;
+
+    // Reuse the cached poster — the grid has already fetched it, so this is
+    // instant and costs no second request.
+    var art = $('dArt');
+    art.style.backgroundImage = '';
+    var gl = art.getElementsByClassName('glyph')[0];
+    if (gl) gl.style.display = '';
+    if (it.artUrl) loadArt(art, it.artUrl);
     var bits = [];
     if (it.durationMs) bits.push(fmt(it.durationMs));
     if (it.videoCodec) bits.push(String(it.videoCodec).toUpperCase());
@@ -791,6 +853,9 @@ public static class TvPage
     var row = $('dRow'); row.innerHTML = '';
     if (canResume) row.appendChild(mkBtn('Resume ' + fmt(seen.resumeMs), function () { play(it, seen.resumeMs); }, true));
     row.appendChild(mkBtn(canResume ? 'Start again' : 'Play', function () { play(it, 0); }, !canResume, !route));
+    // Only worth offering once the catalogue has answered — a shelf needs a
+    // film key to hold, and the server is what supplies it.
+    row.appendChild(mkBtn('Collections', openShelves, false, false, true));
     row.appendChild(mkBtn('Back', function () { show('library'); }, false, false, true));
     show('detail');
   }
@@ -802,6 +867,153 @@ public static class TvPage
     b.disabled = !!disabled;
     b.addEventListener('click', fn);
     return b;
+  }
+
+  // ---- collections ------------------------------------------------------
+  //
+  // Shelves can be made and filled from the television, not only the desktop.
+  // The API is the same one the desktop uses; the only thing the set needs of
+  // its own is a way to type a name, since a collection is called something
+  // rather than numbered.
+
+  function openShelves() {
+    if (!S.film) return;
+    $('shTitle').textContent = S.film.name;
+    renderShelves();
+    show('shelves');
+  }
+
+  function onShelf(shelf, film) {
+    for (var i = 0; i < shelf.items.length; i++)
+      if (shelf.items[i].filmKey === film.filmKey) return true;
+    return false;
+  }
+
+  function renderShelves() {
+    var host = $('shList'), film = S.film;
+    host.innerHTML = '';
+
+    for (var i = 0; i < S.collections.length; i++) {
+      (function (shelf, first) {
+        var on = onShelf(shelf, film);
+        var b = document.createElement('button');
+        b.className = 'shrow';
+        b.setAttribute('data-f', '');
+        if (first) b.setAttribute('data-first', '');
+        // A tick that holds its column whether or not it is showing, so the
+        // names stay in line and the list does not jump as things are toggled.
+        b.innerHTML = '<span class="tick">' + (on ? '&#10003;' : '&nbsp;&nbsp;') + '</span>';
+        b.appendChild(document.createTextNode(shelf.name + '  (' + shelf.items.length + ')'));
+        b.addEventListener('click', function () { toggleShelf(shelf, on); });
+        host.appendChild(b);
+      })(S.collections[i], i === 0);
+    }
+
+    var mk = document.createElement('button');
+    mk.className = 'shrow new';
+    mk.setAttribute('data-f', '');
+    if (!S.collections.length) mk.setAttribute('data-first', '');
+    mk.textContent = '+  New collection';
+    mk.addEventListener('click', function () { openNewShelf(); });
+    host.appendChild(mk);
+
+    focusFirst(true);
+  }
+
+  function toggleShelf(shelf, wasOn) {
+    var path = '/api/v1/collections/' + shelf.id + '/items/' + (wasOn ? 'remove' : 'add');
+    api(path, { method: 'POST', body: JSON.stringify({ filmKey: S.film.filmKey }) })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (updated) {
+        if (!updated) return;
+        // Swap the server's answer in rather than guessing what it did, so the
+        // count and the tick can never drift from what is actually stored.
+        for (var i = 0; i < S.collections.length; i++)
+          if (S.collections[i].id === updated.id) S.collections[i] = updated;
+        renderShelves();
+        renderRail();
+      })['catch'](function () {});
+  }
+
+  // ---- naming a new one --------------------------------------------------
+
+  var NAME_ROWS = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'];
+  var newName = '';
+
+  function openNewShelf() {
+    newName = '';
+    $('nameErr').textContent = '';
+    renderName();
+    buildNameKeys();
+    show('newshelf');
+  }
+
+  function renderName() {
+    $('nameEntry').textContent = newName || ' ';
+  }
+
+  function buildNameKeys() {
+    var host = $('nameKeys');
+    if (host.getElementsByTagName('button').length) return;   // built once
+    var html = '';
+    for (var r = 0; r < NAME_ROWS.length; r++) {
+      html += '<div class="krow">';
+      for (var i = 0; i < NAME_ROWS[r].length; i++) {
+        var ch = NAME_ROWS[r].charAt(i);
+        html += '<button class="key" data-f' + (r === 0 && i === 0 ? ' data-first' : '') +
+                ' data-ch="' + ch + '">' + ch + '</button>';
+      }
+      if (r === 0) html += '<button class="key act" data-f data-act="del">Del</button>';
+      if (r === 1) html += '<button class="key act" data-f data-act="sp">Space</button>';
+      if (r === 2) html += '<button class="key act" data-f data-act="go">Save</button>';
+      html += '</div>';
+    }
+    host.innerHTML = html;
+    var keys = host.getElementsByTagName('button');
+    for (var j = 0; j < keys.length; j++) {
+      (function (b) {
+        b.addEventListener('click', function () {
+          var act = b.getAttribute('data-act');
+          if (act === 'del') { newName = newName.slice(0, -1); renderName(); }
+          else if (act === 'sp') { if (newName.length && newName.length < 40) { newName += ' '; renderName(); } }
+          else if (act === 'go') { saveNewShelf(); }
+          else if (newName.length < 40) {
+            // Typed in capitals because that is what the keys show, but stored
+            // the way a person writes a name.
+            newName += newName.length ? b.getAttribute('data-ch').toLowerCase()
+                                      : b.getAttribute('data-ch');
+            renderName();
+          }
+        });
+      })(keys[j]);
+    }
+  }
+
+  function saveNewShelf() {
+    var name = newName.replace(/^\s+|\s+$/g, '');
+    if (!name) { $('nameErr').textContent = 'Give it a name first.'; return; }
+    $('nameErr').textContent = 'Saving…';
+    api('/api/v1/collections', { method: 'POST', body: JSON.stringify({ name: name }) })
+      .then(function (r) {
+        return r.json()['catch'](function () { return null; }).then(function (j) {
+          if (!r.ok) { $('nameErr').textContent = (j && j.error) || 'Could not create that.'; return; }
+          S.collections.push(j);
+          // Put the film on it straight away — making a shelf from a film's own
+          // page can only mean one thing.
+          return api('/api/v1/collections/' + j.id + '/items/add',
+                     { method: 'POST', body: JSON.stringify({ filmKey: S.film.filmKey }) })
+            .then(function (r2) { return r2.ok ? r2.json() : null; })
+            .then(function (updated) {
+              if (updated) {
+                for (var i = 0; i < S.collections.length; i++)
+                  if (S.collections[i].id === updated.id) S.collections[i] = updated;
+              }
+              renderRail();
+              renderShelves();
+              show('shelves');
+            });
+        });
+      })['catch'](function () { $('nameErr').textContent = 'Could not reach the server.'; });
   }
 
   // ---- player -----------------------------------------------------------
