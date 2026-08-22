@@ -18,6 +18,40 @@ public partial class SettingsWindow : Window
     {
         InitializeComponent();
         BuildDeviceList();
+        ShowLibrary();
+    }
+
+    /// <summary>Say where films are coming from, in the terms the setup screen used.</summary>
+    private void ShowLibrary()
+    {
+        var settings = AppServices.Settings;
+        switch (settings.LibraryMode)
+        {
+            case "this-pc":
+                LibraryModeText.Text = "Hosted on this PC";
+                LibraryWhereText.Text = AppServices.Library.IsRunning
+                    ? settings.HostFilmsFolder ?? ""
+                    : "Not running — " + (settings.HostFilmsFolder ?? "no folder chosen");
+                break;
+            case "own-server":
+                LibraryModeText.Text = "On a server you run";
+                LibraryWhereText.Text = settings.AuthServer ?? "";
+                break;
+            case "none":
+                LibraryModeText.Text = "Local files only";
+                LibraryWhereText.Text = "No library server.";
+                break;
+            default:
+                LibraryModeText.Text = "Not set up yet";
+                LibraryWhereText.Text = "Choose where your films are served from.";
+                break;
+        }
+    }
+
+    private void Library_Click(object sender, RoutedEventArgs e)
+    {
+        new LibrarySetupWindow { Owner = this }.ShowDialog();
+        ShowLibrary();
     }
 
     private void BuildDeviceList()

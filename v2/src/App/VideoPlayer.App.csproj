@@ -37,6 +37,9 @@
   <ItemGroup>
     <!-- Bundled ffmpeg (thumbnails now; outbound streaming later). -->
     <None Include="..\..\tools\ffmpeg.exe" Link="ffmpeg.exe" CopyToOutputDirectory="PreserveNewest" Condition="Exists('..\..\tools\ffmpeg.exe')" />
+    <!-- Only used when this app runs the library server itself: the server wants
+         ffprobe for film runtimes, and finds it beside the executable. -->
+    <None Include="..\..\tools\ffprobe.exe" Link="ffprobe.exe" CopyToOutputDirectory="PreserveNewest" Condition="Exists('..\..\tools\ffprobe.exe')" />
   </ItemGroup>
 
   <!-- VideoLAN.LibVLC.Windows ships a copy target that assigns one Link value

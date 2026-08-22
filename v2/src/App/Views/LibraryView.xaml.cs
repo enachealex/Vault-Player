@@ -238,9 +238,12 @@ public partial class LibraryView : UserControl, IDisposable
         // Nothing to say and nothing to take away — leave the grid alone. The
         // `hadFilms` half matters on sign-out: the films are gone from `items`
         // and the grid still has them on screen.
-        // The refresh button only makes sense once there is a server library to
-        // refresh, and never while choosing a film to host.
-        VaultBtn.Visibility = _serverMovies.Count > 0 && _onPick is null
+        // Shown whenever there is a server to ask, not only when it already
+        // answered with films. A library that has just been set up has none
+        // yet, and the person who has this second copied their first film onto
+        // it — hiding the one control that would make it appear left them with
+        // nothing to do but restart the server.
+        VaultBtn.Visibility = (_serverMovies.Count > 0 || AppServices.Account.IsSignedIn) && _onPick is null
             ? Visibility.Visible
             : Visibility.Collapsed;
 

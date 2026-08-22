@@ -514,37 +514,33 @@ public sealed class PartySession : IDisposable
         _ => "application/octet-stream",
     };
 
+    /// <summary>
+    /// Make sure a server is running here for the party to go through.
+    ///
+    /// This used to start the executable itself, with no environment at all.
+    /// That was survivable while a party was the only thing the server did, and
+    /// stopped being so once the same server, on the same port, could also be
+    /// somebody's film library: whichever path started first won, and if this
+    /// one did, the user's library was quietly replaced by a server pointed at
+    /// no films and signing tokens with the published development key — while
+    /// the library screen, seeing a healthy port, reported success.
+    ///
+    /// So there is one way to start it now, and this is not it.
+    /// </summary>
     private static async Task EnsureLocalRendezvousAsync()
     {
-        using var http = new HttpClient { Timeout = TimeSpan.FromMilliseconds(900) };
-        if (await Healthy(http)) return;
-
-        var exe = FindRendezvousExe() ?? throw new InvalidOperationException(
-            "Rendezvous server not found. Build VideoPlayer.Rendezvous first.");
-        Process.Start(new ProcessStartInfo
-        {
-            FileName = exe,
-            WorkingDirectory = Path.GetDirectoryName(exe)!,
-            UseShellExecute = false,
-            CreateNoWindow = true,
-        });
-
-        for (var i = 0; i < 20; i++)
-        {
-            await Task.Delay(300);
-            if (await Healthy(http)) return;
-        }
-        throw new InvalidOperationException("Rendezvous server failed to start.");
+        if (await AppServices.Library.StartForPartyAsync()) return;
+        throw new InvalidOperationException(
+            AppServices.Library.LastError ?? "The Watch Party server would not start.");
     }
 
-    private static async Task<bool> Healthy(HttpClient http)
+    internal static string? FindRendezvousExe()
     {
-        try { return (await http.GetStringAsync($"http://127.0.0.1:{RendezvousPort}/health")) == "ok"; }
-        catch { return false; }
-    }
+        // Where a shipped copy lives: its own folder beside the app, so the two
+        // applications' dependencies never share a directory.
+        var packaged = Path.Combine(AppContext.BaseDirectory, "server", "VideoPlayer.Rendezvous.exe");
+        if (File.Exists(packaged)) return packaged;
 
-    private static string? FindRendezvousExe()
-    {
         var beside = Path.Combine(AppContext.BaseDirectory, "VideoPlayer.Rendezvous.exe");
         if (File.Exists(beside)) return beside;
         var dir = new DirectoryInfo(AppContext.BaseDirectory);

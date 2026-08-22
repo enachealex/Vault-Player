@@ -25,7 +25,17 @@ using VideoPlayer.Rendezvous.Vault;
 
 var builder = WebApplication.CreateBuilder(args);
 var port = Environment.GetEnvironmentVariable("PORT") ?? "5555";
-builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+
+// Which addresses to answer on. 0.0.0.0 by default because the usual job of
+// this server is to be reached — by a television, a phone, or a guest across
+// the internet through a reverse proxy.
+//
+// It is a variable rather than a constant because the desktop app can now run
+// this server itself, and somebody hosting purely for their own PC has no
+// reason to be listening to the whole house. VAULT_BIND=127.0.0.1 gives them
+// loopback only.
+var bind = Environment.GetEnvironmentVariable("VAULT_BIND") is { Length: > 0 } b ? b : "0.0.0.0";
+builder.WebHost.UseUrls($"http://{bind}:{port}");
 
 // Kestrel's defaults assume ordinary web traffic and are all wrong here: this
 // server exists to shuttle entire films between machines.
@@ -233,6 +243,13 @@ app.MapLinkApi();
 // nothing in this process is touching the cache.
 app.Services.GetRequiredService<HlsRemuxer>().SweepPartials();
 
+// Say up front which media tools were found. Without ffmpeg there are no
+// posters and no browser-playable copies of MKV films, and the symptom of that
+// arrives much later — as a television refusing a film — with nothing to
+// connect it back to a missing binary.
+app.Logger.LogInformation("Media tools: {State}", VideoPlayer.Rendezvous.Vault.MediaTools.Describe());
+app.Logger.LogInformation("Serving films from {Root}", VideoPlayer.Rendezvous.Vault.CatalogScanner.MediaRoot);
+
 // Index the media disk in the background. Not awaited: a first sweep of a large
 // library probes and extracts a poster for every file, and the relay must be
 // answering /health and hosting parties long before that finishes.
@@ -284,6 +301,15 @@ app.MapGet("/tv/app.ipk", () =>
                        fileDownloadName: "com.jumpvault.vaultmovies_1.0.0_all.ipk")
         : Results.NotFound();
 });
+
+// ---- Running your own library ----------------------------------------------
+// Linked from the desktop app's setup screen. Says how to run this server on a
+// NAS, a spare PC or a rented box, how to get films onto it, and — the part
+// worth being unambiguous about — that none of those films ever come to us.
+app.MapGet("/setup", (HttpContext ctx) =>
+    Results.Content(
+        VideoPlayer.Rendezvous.SetupPage.Render($"{ctx.Request.Scheme}://{ctx.Request.Host}"),
+        "text/html; charset=utf-8"));
 
 app.MapGet("/tv/install", (HttpContext ctx) =>
     Results.Content(

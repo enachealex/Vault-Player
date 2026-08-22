@@ -45,6 +45,47 @@ if (Test-Path $staging) { Remove-Item -Recurse -Force $staging }
 dotnet publish $project -c Release -r win-x64 --self-contained true -o $staging --nologo
 if ($LASTEXITCODE -ne 0) { throw "publish failed" }
 
+# The library server ships inside the app, in its own folder.
+#
+# Without this the app can only ever join somebody else's server: the code that
+# starts a local one looks beside the executable and then up a development tree,
+# so a released build failed with "Build VideoPlayer.Rendezvous first" — a
+# developer's error message shown to a viewer. A subfolder rather than the same
+# directory because the two are separate .NET applications with their own
+# dependency sets, and merging them is how one shadows the other's assemblies.
+$server = Join-Path $staging "server"
+Write-Host "Publishing the library server to $server ..." -ForegroundColor Cyan
+$serverProject = Join-Path $PSScriptRoot "..\src\Rendezvous\VideoPlayer.Rendezvous.csproj"
+dotnet publish $serverProject -c Release -r win-x64 --self-contained true -o $server --nologo
+if ($LASTEXITCODE -ne 0) { throw "server publish failed" }
+if (-not (Test-Path (Join-Path $server "VideoPlayer.Rendezvous.exe"))) { throw "server exe missing" }
+Write-Host ("  server = {0:N0} MB" -f ((Get-ChildItem $server -Recurse | Measure-Object Length -Sum).Sum / 1MB)) -ForegroundColor Gray
+
+# ffmpeg and ffprobe go in beside the server.
+#
+# The deployed server gets these from its container image and so never noticed
+# they were missing here. On a PC they are not on PATH, and without them the
+# hosted library has no runtimes, no posters, and — the one that matters — it
+# cannot repackage MKV or HEVC films, which is every rip and everything a
+# television actually needs. The symptom arrives much later, as a TV refusing a
+# film, with nothing pointing back to a missing binary. So it is checked here.
+$tools = Join-Path $PSScriptRoot "..\tools"
+foreach ($tool in @("ffmpeg.exe", "ffprobe.exe")) {
+    $source = Join-Path $tools $tool
+    if (Test-Path $source) {
+        Copy-Item $source (Join-Path $server $tool) -Force
+        Write-Host ("  {0} -> server" -f $tool) -ForegroundColor Gray
+    }
+    else {
+        # Both are required, and ffprobe is not the softer half it sounds like:
+        # it fills in each film's video codec, and HlsRemuxer.CanRemux refuses a
+        # film whose codec is unknown. Without it every film on a phone or a
+        # television answers "can't be repackaged for a browser" — so shipping
+        # without it would be shipping a hosting feature that cannot serve a TV.
+        throw "tools\$tool is missing. A hosted library needs both ffmpeg.exe and ffprobe.exe: without them nothing plays on a phone or a television. Put both, from the same build, into tools\."
+    }
+}
+
 # Pre-build libVLC's plugin cache so shipped copies don't scan ~320 native
 # plugin DLLs on first launch (~12 s cold). The app writes plugins.dat with its
 # OWN libVLC, so the cache always matches the bundled version.

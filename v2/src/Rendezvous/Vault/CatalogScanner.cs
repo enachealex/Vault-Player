@@ -252,40 +252,14 @@ public class CatalogScanner(IServiceScopeFactory scopes, ILogger<CatalogScanner>
 
     // ---- ffprobe / ffmpeg ---------------------------------------------------
 
-    // Whether each tool exists on PATH. Probed once: a missing tool stays missing
-    // for the life of the process, and asking per file would fork thousands of
-    // processes to learn the same thing.
-    private static bool? _haveFfprobe;
-    private static bool? _haveFfmpeg;
-
-    private static bool Have(string tool, ref bool? cache)
-    {
-        if (cache is not null) return cache.Value;
-        try
-        {
-            using var probe = Process.Start(new ProcessStartInfo(tool, "-version")
-            {
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true,
-            });
-            probe!.WaitForExit(5000);
-            cache = probe.ExitCode == 0;
-        }
-        catch
-        {
-            cache = false;
-        }
-        return cache.Value;
-    }
 
     /// <summary>Fill in duration and codecs, and decide browser playability.</summary>
     private async Task ProbeAsync(CatalogItem row, string file, CancellationToken ct)
     {
-        if (!Have("ffprobe", ref _haveFfprobe)) return;
+        if (MediaTools.Ffprobe is not { } ffprobe) return;
         try
         {
-            var json = await RunAsync("ffprobe", new[]
+            var json = await RunAsync(ffprobe, new[]
             {
                 "-v", "quiet", "-print_format", "json", "-show_format", "-show_streams", file,
             }, TimeSpan.FromSeconds(60), ct);
@@ -337,7 +311,7 @@ public class CatalogScanner(IServiceScopeFactory scopes, ILogger<CatalogScanner>
 
     private async Task ExtractArtAsync(CatalogItem row, string file, CancellationToken ct)
     {
-        if (!Have("ffmpeg", ref _haveFfmpeg)) return;
+        if (!MediaTools.HasFfmpeg) return;
 
         // A fifth of the way in for anything with a known length, otherwise two
         // minutes — far enough past studio logos to show the actual film.
@@ -380,7 +354,7 @@ public class CatalogScanner(IServiceScopeFactory scopes, ILogger<CatalogScanner>
     {
         // -ss before -i is the fast seek: ffmpeg jumps rather than decoding
         // everything up to that point, which matters on a 30 GB remux.
-        await RunAsync("ffmpeg", new[]
+        await RunAsync(MediaTools.Ffmpeg!, new[]
         {
             "-nostdin", "-v", "quiet", "-y",
             "-ss", seconds.ToString("0.###", CultureInfo.InvariantCulture),

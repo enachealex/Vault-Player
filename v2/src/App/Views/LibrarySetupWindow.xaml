@@ -1,0 +1,216 @@
+<Window x:Class="VideoPlayer.App.Views.LibrarySetupWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Your films"
+        Width="620" Height="700"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource BgBrush}"
+        FontFamily="{StaticResource BodyFont}">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" Padding="26,26,26,0">
+            <StackPanel>
+
+                <TextBlock Text="Where are your films?" FontSize="21" FontWeight="Bold"
+                           FontFamily="{StaticResource DisplayFont}"
+                           Foreground="{StaticResource TextBrush}" />
+                <TextBlock TextWrapping="Wrap" FontSize="12.5" Margin="0,8,0,0"
+                           Foreground="{StaticResource TextMutedBrush}"
+                           Text="Pick one. You can change it whenever you like, and nothing here is permanent." />
+
+                <!-- 1. Host on this PC -->
+                <Border x:Name="ThisPcCard" Background="{StaticResource SurfaceBrush}" CornerRadius="14"
+                        BorderBrush="{StaticResource LineBrush}" BorderThickness="1"
+                        Padding="18" Margin="0,20,0,0">
+                    <StackPanel>
+                        <RadioButton x:Name="ThisPcChoice" GroupName="Mode" Checked="Mode_Changed"
+                                     Foreground="{StaticResource TextBrush}"
+                                     AutomationProperties.Name="Host my films on this PC">
+                            <TextBlock FontSize="14.5" FontWeight="Bold" Margin="4,0,0,0"
+                                       Foreground="{StaticResource TextBrush}"
+                                       Text="Host my films on this PC" />
+                        </RadioButton>
+                        <TextBlock TextWrapping="Wrap" FontSize="12" Margin="24,6,0,0"
+                                   Foreground="{StaticResource TextMutedBrush}"
+                                   Text="Point at a folder of films and this PC serves them — to itself, to your phone, and to your TV on the same network. Nothing to install." />
+
+                        <StackPanel x:Name="ThisPcBody" Margin="24,14,0,0">
+                            <TextBlock Text="FILMS FOLDER" FontSize="10.5" FontWeight="Bold"
+                                       Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,6" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Border Grid.Column="0" Style="{StaticResource FieldBox}">
+                                    <TextBlock x:Name="FolderText" Padding="10,10" FontSize="13"
+                                               Foreground="{StaticResource TextBrush}"
+                                               TextTrimming="CharacterEllipsis"
+                                               Text="No folder chosen yet" />
+                                </Border>
+                                <Button Grid.Column="1" Content="Choose…" Style="{StaticResource GhostButton}"
+                                        Padding="14,8" Margin="8,0,0,0" Click="ChooseFolder_Click"
+                                        ToolTip="Pick the folder your films are in"
+                                        AutomationProperties.Name="Choose films folder" />
+                            </Grid>
+
+                            <CheckBox x:Name="ShareBox" Margin="0,14,0,0" Checked="Share_Changed" Unchecked="Share_Changed"
+                                      Foreground="{StaticResource TextBrush}"
+                                      AutomationProperties.Name="Let other devices on my network watch">
+                                <TextBlock TextWrapping="Wrap" FontSize="12.5" Margin="4,0,0,0"
+                                           Foreground="{StaticResource TextBrush}"
+                                           Text="Let other devices on my home network watch" />
+                            </CheckBox>
+                            <TextBlock TextWrapping="Wrap" FontSize="11.5" Margin="24,4,0,0"
+                                       Foreground="{StaticResource TextMutedBrush}"
+                                       Text="Needed for the TV and for phones. Turn it off and only this PC can watch. Either way nothing outside your home can reach it." />
+
+                            <CheckBox x:Name="AutoStartBox" Margin="0,10,0,0" Checked="AutoStart_Changed" Unchecked="AutoStart_Changed"
+                                      Foreground="{StaticResource TextBrush}"
+                                      AutomationProperties.Name="Start hosting when the app opens">
+                                <TextBlock TextWrapping="Wrap" FontSize="12.5" Margin="4,0,0,0"
+                                           Foreground="{StaticResource TextBrush}"
+                                           Text="Start hosting whenever I open Vault Movies" />
+                            </CheckBox>
+
+                            <Border x:Name="StatusPanel" Background="{StaticResource SurfaceAltBrush}" CornerRadius="10"
+                                    Padding="14,12" Margin="0,16,0,0">
+                                <StackPanel>
+                                    <TextBlock x:Name="StatusText" TextWrapping="Wrap" FontSize="12.5"
+                                               Foreground="{StaticResource TextBrush}"
+                                               Text="Not running." />
+                                    <StackPanel x:Name="AddressRow" Margin="0,10,0,0" Visibility="Collapsed">
+                                        <TextBlock Text="ON YOUR TV OR PHONE, OPEN" FontSize="10" FontWeight="Bold"
+                                                   Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,5" />
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock x:Name="AddressText" Grid.Column="0" FontSize="15"
+                                                       FontFamily="Consolas" VerticalAlignment="Center"
+                                                       Foreground="{StaticResource AccentWarmBrush}" />
+                                            <Button Grid.Column="1" Content="Copy" Style="{StaticResource GhostButton}"
+                                                    Padding="12,5" Click="CopyAddress_Click"
+                                                    ToolTip="Copy this address to the clipboard"
+                                                    AutomationProperties.Name="Copy address" />
+                                        </Grid>
+                                        <TextBlock TextWrapping="Wrap" FontSize="11.5" Margin="0,8,0,0"
+                                                   Foreground="{StaticResource TextMutedBrush}"
+                                                   Text="The first time, Windows may ask whether to allow Vault Movies on your network — choose Private networks, or nothing else will be able to reach it." />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                <Button x:Name="StartButton" Content="Start hosting" Style="{StaticResource PrimaryButton}"
+                                        Padding="16,7" Click="Start_Click"
+                                        ToolTip="Begin serving this folder"
+                                        AutomationProperties.Name="Start hosting" />
+                                <Button x:Name="StopButton" Content="Stop" Style="{StaticResource GhostButton}"
+                                        Padding="16,7" Margin="8,0,0,0" Click="Stop_Click"
+                                        ToolTip="Stop serving; films on this PC still play"
+                                        AutomationProperties.Name="Stop hosting" />
+                                <Button Content="Set up the TV" Style="{StaticResource LinkButton}"
+                                        Margin="14,0,0,0" VerticalAlignment="Center" Click="TvHelp_Click"
+                                        ToolTip="How to put Vault Movies on an LG television"
+                                        AutomationProperties.Name="Set up the TV" />
+                            </StackPanel>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- 2. Their own server -->
+                <Border x:Name="OwnServerCard" Background="{StaticResource SurfaceBrush}" CornerRadius="14"
+                        BorderBrush="{StaticResource LineBrush}" BorderThickness="1"
+                        Padding="18" Margin="0,14,0,0">
+                    <StackPanel>
+                        <RadioButton x:Name="OwnServerChoice" GroupName="Mode" Checked="Mode_Changed"
+                                     Foreground="{StaticResource TextBrush}"
+                                     AutomationProperties.Name="Connect to a server I run">
+                            <TextBlock FontSize="14.5" FontWeight="Bold" Margin="4,0,0,0"
+                                       Foreground="{StaticResource TextBrush}"
+                                       Text="Connect to a server I run" />
+                        </RadioButton>
+                        <TextBlock TextWrapping="Wrap" FontSize="12" Margin="24,6,0,0"
+                                   Foreground="{StaticResource TextMutedBrush}"
+                                   Text="A NAS, a spare PC, a home server, a machine at a hosting company — anything that stays on. It holds the films and everyone signs in to it." />
+
+                        <StackPanel x:Name="OwnServerBody" Margin="24,14,0,0">
+                            <TextBlock Text="SERVER ADDRESS" FontSize="10.5" FontWeight="Bold"
+                                       Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,6" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Border Grid.Column="0" Style="{StaticResource FieldBox}">
+                                    <TextBox x:Name="ServerBox" Style="{StaticResource FieldText}"
+                                             AutomationProperties.Name="Server address" />
+                                </Border>
+                                <Button x:Name="ConnectButton" Grid.Column="1" Content="Connect"
+                                        Style="{StaticResource GhostButton}" Padding="14,8" Margin="8,0,0,0"
+                                        Click="Connect_Click"
+                                        ToolTip="Check this address answers, then use it"
+                                        AutomationProperties.Name="Connect" />
+                            </Grid>
+                            <TextBlock x:Name="ServerHint" TextWrapping="Wrap" FontSize="11.5" Margin="2,8,0,0"
+                                       Foreground="{StaticResource TextMutedBrush}"
+                                       Text="For example http://192.168.1.20:5555 at home, or https://films.yourname.com from anywhere." />
+                            <Button Content="How do I set one up?" Style="{StaticResource LinkButton}"
+                                    HorizontalAlignment="Left" Margin="2,10,0,0" Click="SelfHostHelp_Click"
+                                    ToolTip="Step-by-step instructions, in your browser"
+                                    AutomationProperties.Name="How do I set one up?" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- 3. Nothing -->
+                <Border x:Name="NoneCard" Background="{StaticResource SurfaceBrush}" CornerRadius="14"
+                        BorderBrush="{StaticResource LineBrush}" BorderThickness="1"
+                        Padding="18" Margin="0,14,0,0">
+                    <StackPanel>
+                        <RadioButton x:Name="NoneChoice" GroupName="Mode" Checked="Mode_Changed"
+                                     Foreground="{StaticResource TextBrush}"
+                                     AutomationProperties.Name="Just play files on this PC">
+                            <TextBlock FontSize="14.5" FontWeight="Bold" Margin="4,0,0,0"
+                                       Foreground="{StaticResource TextBrush}"
+                                       Text="Just play files on this PC" />
+                        </RadioButton>
+                        <TextBlock TextWrapping="Wrap" FontSize="12" Margin="24,6,0,0"
+                                   Foreground="{StaticResource TextMutedBrush}"
+                                   Text="No server at all. Open a folder and watch. Watch Party still works." />
+                    </StackPanel>
+                </Border>
+
+                <Border Background="{StaticResource SurfaceAltBrush}" CornerRadius="12"
+                        Padding="16,14" Margin="0,18,0,26">
+                    <StackPanel>
+                        <TextBlock Text="Your films stay yours" FontSize="13" FontWeight="Bold"
+                                   Foreground="{StaticResource TextBrush}" />
+                        <TextBlock TextWrapping="Wrap" FontSize="11.5" Margin="0,6,0,0"
+                                   Foreground="{StaticResource TextMutedBrush}"
+                                   Text="Whichever of these you pick, your films sit on hardware you own and are streamed from it. They are never uploaded to us, and we hold no copy of them, no list of them, and no record of what you watch." />
+                    </StackPanel>
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <Border Grid.Row="1" Background="{StaticResource BgDeepBrush}"
+                BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,0" Padding="26,14">
+            <Grid>
+                <TextBlock x:Name="FooterNote" VerticalAlignment="Center" FontSize="11.5"
+                           Foreground="{StaticResource TextMutedBrush}" TextTrimming="CharacterEllipsis" />
+                <Button Content="Done" Style="{StaticResource PrimaryButton}" Padding="22,7"
+                        HorizontalAlignment="Right" Click="Done_Click" IsDefault="True"
+                        ToolTip="Save and close"
+                        AutomationProperties.Name="Done" />
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

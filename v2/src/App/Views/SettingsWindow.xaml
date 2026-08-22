@@ -11,6 +11,29 @@
                    FontFamily="{StaticResource DisplayFont}"
                    Foreground="{StaticResource TextBrush}" />
 
+        <!-- Where the films come from -->
+        <TextBlock Text="YOUR FILMS" FontSize="10.5" FontWeight="Bold"
+                   Foreground="{StaticResource TextMutedBrush}" Margin="0,20,0,6" />
+        <Border Background="{StaticResource SurfaceBrush}" CornerRadius="10" Padding="14,12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0">
+                    <TextBlock x:Name="LibraryModeText" FontSize="13.5"
+                               Foreground="{StaticResource TextBrush}" TextWrapping="Wrap" />
+                    <TextBlock x:Name="LibraryWhereText" FontSize="11.5" Margin="0,3,0,0"
+                               Foreground="{StaticResource TextMutedBrush}"
+                               TextWrapping="Wrap" TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+                <Button Grid.Column="1" Content="Change…" Style="{StaticResource GhostButton}"
+                        Padding="14,7" VerticalAlignment="Center" Click="Library_Click"
+                        ToolTip="Choose where your films are served from"
+                        AutomationProperties.Name="Change where your films come from" />
+            </Grid>
+        </Border>
+
         <!-- Audio output -->
         <TextBlock Text="AUDIO OUTPUT" FontSize="10.5" FontWeight="Bold"
                    Foreground="{StaticResource TextMutedBrush}" Margin="0,20,0,6" />

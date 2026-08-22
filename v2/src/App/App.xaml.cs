@@ -105,6 +105,44 @@ public partial class App : Application
             return;
         }
 
+        // Headless: construct every window and exit 0 if they all load.
+        //
+        // XAML failures are runtime failures. A duplicated attribute, a stray
+        // text node, or a StaticResource whose key does not exist all compile
+        // perfectly and then throw the first time somebody opens that screen —
+        // twice now, in this app. This makes that a check rather than a
+        // discovery.
+        if (Array.IndexOf(e.Args, "--check-windows") >= 0)
+        {
+            var failures = 0;
+            foreach (var (name, make) in new (string, Func<Window>)[]
+            {
+                ("SettingsWindow", () => new Views.SettingsWindow()),
+                ("LibrarySetupWindow", () => new Views.LibrarySetupWindow()),
+                ("AccountWindow", () => new Views.AccountWindow()),
+                ("CaptionStyleWindow", () => new Views.CaptionStyleWindow()),
+                ("FriendsWindow", () => new Views.FriendsWindow()),
+                ("UploadsWindow", () => new Views.UploadsWindow()),
+                ("ManageUsersWindow", () => new Views.ManageUsersWindow()),
+                ("AddShortcutWindow", () => new Views.AddShortcutWindow()),
+            })
+            {
+                try
+                {
+                    var window = make();
+                    window.Close();
+                    Console.WriteLine($"ok    {name}");
+                }
+                catch (Exception ex)
+                {
+                    failures++;
+                    Console.WriteLine($"FAIL  {name}: {ex.GetType().Name}: {ex.Message}");
+                }
+            }
+            Shutdown(failures);
+            return;
+        }
+
         // Headless: build the libVLC plugin cache into the bundled plugins
         // folder, then exit. Run once at pack time so shipped copies start fast.
         if (Array.IndexOf(e.Args, "--gen-plugin-cache") >= 0)
@@ -241,6 +279,55 @@ public partial class App : Application
             // Pull any library changes made on another machine. Fire-and-forget:
             // signed-out or offline just no-ops, and the app is already usable.
             _ = Services.AppServices.Account.SyncAsync();
+
+            // Bring up a library hosted on this PC, if that is what was chosen.
+            // Fire-and-forget as well: it takes a couple of seconds and nothing
+            // on screen is waiting for it. No-ops for everybody else.
+            _ = Services.AppServices.Library.StartFromSettingsAsync();
+
+            if (fileToOpen is null && inviteUri is null) OfferSetup();
         }
+    }
+
+    /// <summary>
+    /// On a genuinely fresh install, ask where the films are before the user has
+    /// to go looking for the setting.
+    ///
+    /// Deliberately narrow. Anyone with a server address, an account, or a
+    /// folder they have opened before already has an answer to this question,
+    /// and being asked it again by an update would be a worse first impression
+    /// than never being asked at all. Those people find it under Settings.
+    /// </summary>
+    private static void OfferSetup()
+    {
+        var settings = Services.AppServices.Settings;
+        if (settings.SetupDone) return;
+        if (settings.LibraryMode is not null) return;
+        if (!string.IsNullOrWhiteSpace(settings.AuthServer)) return;
+        if (settings.RefreshToken is not null) return;
+        if (!string.IsNullOrWhiteSpace(settings.LastFolder)) return;
+
+        try
+        {
+            new Views.LibrarySetupWindow { Owner = VideoPlayer.App.MainWindow.Instance }.ShowDialog();
+        }
+        catch (Exception ex)
+        {
+            // Never let the welcome get in the way of the app opening.
+            LogCrash("setup", ex);
+        }
+    }
+
+    /// <summary>
+    /// Take the hosted library down with the app.
+    ///
+    /// It is a separate process, so without this it would outlive the window
+    /// that started it, keep the port, and keep serving from a folder the user
+    /// may since have unchosen — with no visible sign that anything is running.
+    /// </summary>
+    protected override void OnExit(ExitEventArgs e)
+    {
+        try { Services.AppServices.Library.Stop(); } catch { }
+        base.OnExit(e);
     }
 }

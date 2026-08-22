@@ -106,6 +106,41 @@ public class Settings
     /// <summary>Long-lived refresh token; the only credential kept on disk.</summary>
     public string? RefreshToken { get; set; }
 
+    // ---- Where the film library lives ------------------------------------
+    // Three answers, and the app is useful under all of them:
+    //   "this-pc"     run the library server here, over a folder of films
+    //   "own-server"  a server the user already runs; AuthServer points at it
+    //   null / "none" no library server at all — local files still play
+    //
+    // Deliberately one setting rather than a hosted-versus-not flag, because
+    // the difference that matters to somebody is where their films are, and
+    // the honest answer to that is never "in our cloud": the films stay on
+    // hardware they own in every one of these cases.
+    /// <summary>"this-pc" | "own-server" | "none". Null until setup is answered.</summary>
+    public string? LibraryMode { get; set; }
+
+    /// <summary>The folder served when LibraryMode is "this-pc".</summary>
+    public string? HostFilmsFolder { get; set; }
+
+    /// <summary>
+    /// Let other devices on the home network reach the library hosted here.
+    /// Off means loopback only: this PC can watch, the television cannot.
+    /// </summary>
+    public bool HostShareOnNetwork { get; set; } = true;
+
+    /// <summary>Start hosting when the app opens, so the TV works without opening the PC app first.</summary>
+    public bool HostAutoStart { get; set; } = true;
+
+    /// <summary>
+    /// This installation's own token-signing key for a library hosted here.
+    /// Generated once, kept, never shared: the server otherwise falls back to a
+    /// published development key that would let anybody mint valid tokens.
+    /// </summary>
+    public string? ServerSigningKey { get; set; }
+
+    /// <summary>True once the setup screen has been answered, so it stops appearing.</summary>
+    public bool SetupDone { get; set; }
+
     /// <summary>
     /// LAN Party username, when this session arrived through their sign-in.
     /// Display only — the link itself lives on the server, keyed on that name.

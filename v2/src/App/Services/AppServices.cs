@@ -39,6 +39,13 @@ public static class AppServices
     /// <summary>Films held on the Vault server and streamed from it.</summary>
     public static CatalogService Catalog { get; } = new(Account);
 
+    /// <summary>
+    /// A film library hosted on this PC. Idle unless the user chose to host
+    /// here, which is the point: this exists so a folder of films can become
+    /// something a television can watch without anybody installing a server.
+    /// </summary>
+    public static LibraryServer Library { get; } = new();
+
     /// <summary>Owner-only queue pushing films from the folder up to the server.</summary>
     public static UploadService Uploads { get; } = new(Account);
 

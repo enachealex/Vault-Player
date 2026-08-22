@@ -78,7 +78,6 @@ public class HlsRemuxer
     public const string PlaylistName = "index.m3u8";
 
     private readonly ConcurrentDictionary<string, Job> _jobs = new(StringComparer.Ordinal);
-    private static bool? _haveFfmpeg;
 
     /// <summary>
     /// Where segments are cached.
@@ -445,7 +444,7 @@ public class HlsRemuxer
 
     private async Task FfmpegAsync(List<string> args, string workingDirectory, Job job)
     {
-        var psi = new ProcessStartInfo("ffmpeg")
+        var psi = new ProcessStartInfo(MediaTools.Ffmpeg ?? "ffmpeg")
         {
             WorkingDirectory = workingDirectory,
             RedirectStandardOutput = true,
@@ -573,24 +572,5 @@ public class HlsRemuxer
         }
     }
 
-    private static bool HaveFfmpeg()
-    {
-        if (_haveFfmpeg is not null) return _haveFfmpeg.Value;
-        try
-        {
-            using var probe = Process.Start(new ProcessStartInfo("ffmpeg", "-version")
-            {
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true,
-            });
-            probe!.WaitForExit(5000);
-            _haveFfmpeg = probe.ExitCode == 0;
-        }
-        catch
-        {
-            _haveFfmpeg = false;
-        }
-        return _haveFfmpeg.Value;
-    }
+    private static bool HaveFfmpeg() => MediaTools.HasFfmpeg;
 }
