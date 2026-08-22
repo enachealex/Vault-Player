@@ -64,7 +64,10 @@ public static class TvPage
   .entry { font-family:Consolas,monospace; font-size:3.975rem; font-weight:800; color:var(--accent);
            letter-spacing:.5rem; min-height:4.4rem; }
   .entry .ph { color:var(--line); }
-  .keys { max-width:62rem; }
+  .keys { max-width:70rem; }
+  /* Eleven keys across at 5.4rem with .5rem between them; the spacebar matches
+     that span so the bottom of the keyboard lines up with the top of it. */
+  .key.space { width:64.4rem; }
   /* inline-block + margins, never flex gap */
   /* Fixed size, and centred by the box rather than by padding. Height used to
      come from padding plus the line box, so Del and Enter — set smaller so the
@@ -194,8 +197,11 @@ public static class TvPage
   /* ---- collections ---- */
   .shlist { flex:1; min-height:0; overflow-y:auto; padding:.4rem; }
   .shlist::-webkit-scrollbar { display:none; }
+  /* Capped rather than full-bleed. A button the width of a television reads as
+     a banner, and the eye has to travel the whole screen to find where the
+     highlight is. */
   .shrow {
-    display:block; width:100%; text-align:left; margin:0 0 .7rem;
+    display:block; width:100%; max-width:46rem; text-align:left; margin:0 0 .7rem;
     padding:1.1rem 1.5rem; background:var(--surface); border:1px solid var(--line);
     border-radius:.6rem; color:var(--text); font-size:1.775rem; font-family:inherit;
   }
@@ -1214,6 +1220,15 @@ public static class TvPage
     mk.addEventListener('click', function () { openNewShelf(); });
     host.appendChild(mk);
 
+    // The Back key does this too, but a remote's Back is not something every
+    // viewer trusts, and nothing else on this screen said how to leave it.
+    var bk = document.createElement('button');
+    bk.className = 'shrow back';
+    bk.setAttribute('data-f', '');
+    bk.textContent = 'Back';
+    bk.addEventListener('click', function () { show('detail'); });
+    host.appendChild(bk);
+
     // Toggling a shelf redraws this list, and redrawing used to send focus back
     // to the top — so ticking the third shelf bounced you to the first. Put it
     // back where it was.
@@ -1246,6 +1261,10 @@ public static class TvPage
           if (S.collections[i].id === updated.id) S.collections[i] = updated;
         renderShelves(idx);
         renderRail();
+        // Putting a film on a shelf is a finished errand, so it goes back to
+        // the film. Taking one off is usually part of tidying up, so that stays
+        // put and the list can be worked through.
+        if (!wasOn) show('detail');
       })['catch'](function (e) {
         shelfNote('Could not reach the server. ' + (e && e.message ? e.message : ''));
       });
@@ -1285,10 +1304,14 @@ public static class TvPage
                 ' data-ch="' + ch + '">' + ch + '</button>';
       }
       if (r === 0) html += '<button class="key act" data-f data-act="del">Del</button>';
-      if (r === 1) html += '<button class="key act" data-f data-act="sp">Space</button>';
-      if (r === 2) html += '<button class="key act" data-f data-act="go">Save</button>';
+      if (r === 1) html += '<button class="key act" data-f data-act="go">Save</button>';
       html += '</div>';
     }
+    // A spacebar along the bottom, the width of the rows above it, because that
+    // is where every keyboard puts one and it is the easiest key to hit with a
+    // remote when it is the only thing on its row.
+    html += '<div class="krow"><button class="key act space" data-f data-act="sp">Space</button></div>';
+
     host.innerHTML = html;
     var keys = host.getElementsByTagName('button');
     for (var j = 0; j < keys.length; j++) {
@@ -1332,7 +1355,9 @@ public static class TvPage
               }
               renderRail();
               renderShelves();
-              show('shelves');
+              // The film is on the new shelf; there is nothing further to do
+              // here, so return to it rather than to a list.
+              show('detail');
             });
         });
       })['catch'](function () { $('nameErr').textContent = 'Could not reach the server.'; });
