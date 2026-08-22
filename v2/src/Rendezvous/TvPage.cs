@@ -69,7 +69,7 @@ public static class TvPage
     font-size:1.5rem; font-weight:700; text-align:center; color:var(--text);
     font-family:inherit; vertical-align:top;
   }
-  .key.wide { width:9.7rem; color:var(--warm); }
+  .key.act { color:var(--warm); font-size:1.05rem; }
   .krow { white-space:nowrap; }
   .err { color:var(--accent); font-size:1.3rem; min-height:2rem; margin-top:1rem; }
 
@@ -198,16 +198,21 @@ public static class TvPage
 <script>
 (function () {
   'use strict';
-  // A keypad, because the thing typing this is a remote. Codes are digits only
-  // now, so there is nothing else to offer — and a 3-wide pad needs no hunting
-  // across a grid of letters. Many remotes have number buttons that work
-  // directly on it too.
-  var ROWS = ['123', '456', '789', '0'];
+  // A telephone keypad, laid out the way every one of them is: three across,
+  // counting down, with the bottom row carrying 0 between the two actions. Del
+  // sits under 7 and Enter under 9, so both are a single press from the digits
+  // above them and neither ever needs hunting for.
+  //
+  // Rows are descriptors rather than a string, because that bottom row mixes a
+  // digit with two actions and a string cannot say that.
+  var ROWS = [
+    ['1', '2', '3'],
+    ['4', '5', '6'],
+    ['7', '8', '9'],
+    [{ act: 'del', label: 'Del' }, '0', { act: 'go', label: 'Enter' }]
+  ];
   var ALPHABET = '0123456789';
   var CODE_LEN = 8;
-  // Delete beside the top row, Sign in beside the middle — both to the right of
-  // the pad, where the D-pad reaches them in one press from any digit.
-  var ROW_ACTIONS = { 0: { act: 'del', label: 'Delete' }, 1: { act: 'go', label: 'Sign in' } };
   var LS = 'vault.tv.rt';
 
   var S = { access:null, refresh:null, me:null, items:[], resume:{}, film:null, screen:'signin',
@@ -449,14 +454,16 @@ public static class TvPage
       // wherever the reflow happened to put the next key.
       html += '<div class="krow">';
       for (var i = 0; i < ROWS[r].length; i++) {
-        var ch = ROWS[r].charAt(i);
-        html += '<button class="key" data-f' + (first ? ' data-first' : '') +
-                ' data-ch="' + ch + '">' + ch + '</button>';
-        first = false;
-      }
-      if (ROW_ACTIONS[r]) {
-        html += '<button class="key wide" data-f data-act="' + ROW_ACTIONS[r].act + '">' +
-                ROW_ACTIONS[r].label + '</button>';
+        var k = ROWS[r][i];
+        if (typeof k === 'string') {
+          html += '<button class="key" data-f' + (first ? ' data-first' : '') +
+                  ' data-ch="' + k + '">' + k + '</button>';
+          first = false;
+        } else {
+          // Same width as a digit so the columns line up; smaller text so the
+          // word fits the key rather than the key stretching to fit the word.
+          html += '<button class="key act" data-f data-act="' + k.act + '">' + k.label + '</button>';
+        }
       }
       html += '</div>';
     }
