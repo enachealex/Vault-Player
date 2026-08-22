@@ -66,8 +66,14 @@ public static class TvPage
   .entry .ph { color:var(--line); }
   .keys { max-width:62rem; }
   /* inline-block + margins, never flex gap */
+  /* Fixed size, and centred by the box rather than by padding. Height used to
+     come from padding plus the line box, so Del and Enter — set smaller so the
+     words fit — came out five pixels shorter than the digits beside them. The
+     key is a shape now and the text sits in the middle of it, whatever size
+     that text happens to be. */
   .key {
-    display:inline-block; width:5.4rem; margin:0 .5rem .5rem 0; padding:1rem 0;
+    display:inline-flex; align-items:center; justify-content:center;
+    width:5.4rem; height:5.4rem; margin:0 .5rem .5rem 0; padding:0;
     background:var(--surface); border:1px solid var(--line); border-radius:.45rem;
     font-size:1.875rem; font-weight:700; text-align:center; color:var(--text);
     font-family:inherit; vertical-align:top;
