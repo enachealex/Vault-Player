@@ -286,6 +286,7 @@ public static class TvPage
 <section id="shelves" class="screen"><div class="col">
   <h1>Add to a collection</h1>
   <p class="sub" id="shTitle"></p>
+  <div class="err" id="shErr"></div>
   <div class="shlist" id="shList"></div>
 </div></section>
 
@@ -1179,12 +1180,12 @@ public static class TvPage
     return false;
   }
 
-  function renderShelves() {
+  function renderShelves(keepIndex) {
     var host = $('shList'), film = S.film;
     host.innerHTML = '';
 
     for (var i = 0; i < S.collections.length; i++) {
-      (function (shelf, first) {
+      (function (shelf, first, index) {
         var on = onShelf(shelf, film);
         var b = document.createElement('button');
         b.className = 'shrow';
@@ -1194,9 +1195,9 @@ public static class TvPage
         // names stay in line and the list does not jump as things are toggled.
         b.innerHTML = '<span class="tick">' + (on ? '&#10003;' : '&nbsp;&nbsp;') + '</span>';
         b.appendChild(document.createTextNode(shelf.name + '  (' + shelf.items.length + ')'));
-        b.addEventListener('click', function () { toggleShelf(shelf, on); });
+        b.addEventListener('click', function () { toggleShelf(shelf, on, index); });
         host.appendChild(b);
-      })(S.collections[i], i === 0);
+      })(S.collections[i], i === 0, i);
     }
 
     var mk = document.createElement('button');
@@ -1207,22 +1208,46 @@ public static class TvPage
     mk.addEventListener('click', function () { openNewShelf(); });
     host.appendChild(mk);
 
-    focusFirst(true);
+    // Toggling a shelf redraws this list, and redrawing used to send focus back
+    // to the top — so ticking the third shelf bounced you to the first. Put it
+    // back where it was.
+    var rows = host.getElementsByClassName('shrow');
+    if (typeof keepIndex === 'number' && rows[keepIndex]) setFocus(rows[keepIndex]);
+    else focusFirst(true);
   }
 
-  function toggleShelf(shelf, wasOn) {
+  function toggleShelf(shelf, wasOn, idx) {
     var path = '/api/v1/collections/' + shelf.id + '/items/' + (wasOn ? 'remove' : 'add');
+    shelfNote('');
     api(path, { method: 'POST', body: JSON.stringify({ filmKey: S.film.filmKey }) })
-      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (r) {
+        return r.json()['catch'](function () { return null; }).then(function (j) {
+          if (!r.ok) {
+            // Every failure here used to be silent: a bad response returned
+            // null and the catch swallowed the rest, so a film that would not
+            // go on a shelf looked exactly like a button that did nothing.
+            shelfNote((j && j.error) || ('The server refused that (' + r.status + ').'));
+            return null;
+          }
+          return j;
+        });
+      })
       .then(function (updated) {
         if (!updated) return;
         // Swap the server's answer in rather than guessing what it did, so the
         // count and the tick can never drift from what is actually stored.
         for (var i = 0; i < S.collections.length; i++)
           if (S.collections[i].id === updated.id) S.collections[i] = updated;
-        renderShelves();
+        renderShelves(idx);
         renderRail();
-      })['catch'](function () {});
+      })['catch'](function (e) {
+        shelfNote('Could not reach the server. ' + (e && e.message ? e.message : ''));
+      });
+  }
+
+  function shelfNote(text) {
+    var el = $('shErr');
+    if (el) el.textContent = text || '';
   }
 
   // ---- naming a new one --------------------------------------------------
@@ -1287,6 +1312,7 @@ public static class TvPage
       .then(function (r) {
         return r.json()['catch'](function () { return null; }).then(function (j) {
           if (!r.ok) { $('nameErr').textContent = (j && j.error) || 'Could not create that.'; return; }
+          $('nameErr').textContent = '';
           S.collections.push(j);
           // Put the film on it straight away — making a shelf from a film's own
           // page can only mean one thing.
