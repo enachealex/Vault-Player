@@ -35,6 +35,12 @@ public static class TvPage
   :root {
     --bg:#1A0D09; --deep:#0E0604; --surface:#24100B; --line:#43281F;
     --text:#F6ECE5; --muted:#D9C0B3; --accent:#C8442A; --warm:#F0A070;
+    /* Focus has its own colour, and deliberately not the accent. The accent
+       fills the selected shelf chip, tints the selected layout, and draws the
+       resume bar — so a red ring meant "you are here" in the same red that
+       already meant "this one is chosen", and from across a room they were the
+       same thing. Blue is nothing else on this page. */
+    --focus:#005ED9;
   }
   * { box-sizing:border-box; }
   /* Every size on this page is in rem against this root, which rescale() then
@@ -55,9 +61,16 @@ public static class TvPage
   h1 { font-size:2.975rem; margin:0 0 .6rem; font-weight:700; }
   .sub { color:var(--muted); font-size:1.725rem; margin:0 0 1.6rem; line-height:1.5; }
 
-  /* Focus IS the interface here. It must never be subtle or absent. */
+  /* Focus IS the interface here. It must never be subtle or absent.
+     Two rings, not one. The blue is the highlight; the pale hairline inside it
+     is what keeps the blue readable when it lands on top of a film still,
+     which is most of this screen. Blue against this background is about 3:1,
+     which is fine on a wall of dark brown and not fine against a bright frame
+     — the hairline gives it an edge to sit against either way. Drawn as a
+     shadow rather than a border so it costs the card no width: these are
+     percentage-width columns and a real border would reflow the grid. */
   [data-f] { outline:none; }
-  [data-f].focus { box-shadow:0 0 0 .25rem var(--accent); }
+  [data-f].focus { box-shadow:0 0 0 .12rem var(--text), 0 0 0 .5rem var(--focus); }
 
   /* ---- sign in ---- */
   .url { font-size:2.975rem; font-weight:800; color:var(--warm); margin:.4rem 0 1.4rem; }
@@ -139,7 +152,7 @@ public static class TvPage
      without room to breathe the outer column loses its left or right edge and
      the top and bottom rows lose theirs to the scroll clip — which reads as the
      highlight being broken rather than as the card being at the edge. */
-  .grid { flex:1; min-height:0; overflow-y:auto; overflow-x:hidden; padding:.4rem; }
+  .grid { flex:1; min-height:0; overflow-y:auto; overflow-x:hidden; padding:.65rem; }
   .grid::-webkit-scrollbar { display:none; }
   /* Column count is a setting, so the widths are written per layout rather than
      once. inline-block and percentage margins, never flex gap — gap collapses
@@ -195,7 +208,7 @@ public static class TvPage
   .resume i { display:block; height:100%; background:var(--accent); }
 
   /* ---- collections ---- */
-  .shlist { flex:1; min-height:0; overflow-y:auto; padding:.4rem; }
+  .shlist { flex:1; min-height:0; overflow-y:auto; padding:.65rem; }
   .shlist::-webkit-scrollbar { display:none; }
   /* Capped rather than full-bleed. A button the width of a television reads as
      a banner, and the eye has to travel the whole screen to find where the
@@ -255,7 +268,10 @@ public static class TvPage
   #prep .ps { font-size:1.575rem; color:var(--muted); }
 </style>
 </head>
-<body>
+<!-- tabindex so the document itself can be focused. Without it there is a
+     moment on load with no active element at all, and a television browser
+     reads that as "this page does not want the keys". -->
+<body tabindex="-1">
 
 <section id="signin" class="screen on"><div class="col">
   <h1>Sign in to Vault Movies</h1>
@@ -411,6 +427,11 @@ public static class TvPage
     var k = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
     document.documentElement.style.fontSize = Math.max(9, k * 16) + 'px';
   }
+  /* One rem, in pixels. Anything measuring against the focus ring has to ask,
+     because rescale() moves it. */
+  function rootPx() {
+    return parseFloat(document.documentElement.style.fontSize) || 16;
+  }
   window.addEventListener('resize', rescale);
 
   function show(name) {
@@ -455,8 +476,11 @@ public static class TvPage
     if (g && g.className && g.className.indexOf('grid') >= 0) {
       // Leave room for the focus ring at both ends, or scrolling parks a card
       // exactly against the edge and clips the very highlight that says where
-      // you are.
-      var pad = 24;
+      // you are. Measured off the root font size rather than fixed at 24px,
+      // because rescale() drives that from the screen: on a set reporting a 4K
+      // viewport the root doubles, the ring doubles with it, and a fixed 24
+      // would no longer clear it.
+      var pad = Math.round(rootPx() * 0.9);
       var top = el.offsetTop, bot = top + el.offsetHeight;
       if (top - pad < g.scrollTop) g.scrollTop = top - pad;
       else if (bot + pad > g.scrollTop + g.clientHeight) g.scrollTop = bot - g.clientHeight + pad;
@@ -524,6 +548,62 @@ public static class TvPage
     else handled = false;
     if (handled) { e.preventDefault(); e.stopPropagation(); }
   }, true);
+
+  // ---- taking the keys --------------------------------------------------
+  // A television browser opens a page with the remote still pointed at itself.
+  // The arrows drove its own cursor and the page saw nothing until somebody
+  // clicked once — which is a strange thing to have to explain to anybody, and
+  // impossible to guess.
+  //
+  // Nothing a page can say makes a browser hand the keys over, so it is asked
+  // repeatedly rather than once. The browser never announces the moment it
+  // becomes willing, so the only way to catch that moment is to keep asking
+  // through it. The asking stops the instant a key actually arrives, and gives
+  // up after twelve seconds either way rather than nagging a set that is never
+  // going to agree.
+  var claimTicks = 0, claimTimer = 0;
+
+  function claimWindow() { try { window.focus(); } catch (e) {} }
+
+  function claimKeys(force) {
+    // After the opening couple of seconds, only ask when the document plainly
+    // does not have focus. Otherwise this would keep calling focus() on the
+    // highlighted card while somebody is scrolling, and focus() scrolls.
+    if (!force && document.hasFocus && document.hasFocus()) return;
+    claimWindow();
+    var el = current();
+    try { if (el) el.focus(); else document.body.focus(); } catch (e) {}
+  }
+
+  function stopClaiming() {
+    if (claimTimer) { clearInterval(claimTimer); claimTimer = 0; }
+  }
+
+  claimTimer = setInterval(function () {
+    claimTicks++;
+    claimKeys(claimTicks <= 8);   // forced for the first two seconds
+    if (claimTicks > 48) stopClaiming();
+  }, 250);
+
+  // Every moment a browser might plausibly be willing.
+  window.addEventListener('load', function () { claimKeys(true); });
+  window.addEventListener('pageshow', function () { claimKeys(true); });
+  window.addEventListener('focus', function () { claimKeys(true); });
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) claimKeys(true);
+  });
+  // webOS fires this when the pointer appears or disappears, and it disappears
+  // the moment somebody reaches for the D-pad — which is precisely when the
+  // page wants the keys and the browser still has them.
+  document.addEventListener('cursorStateChange', function () { claimKeys(true); });
+  // A click claims the window and nothing more. Moving DOM focus here would
+  // drag it back to the highlighted element in the instant before the clicked
+  // one gets its turn, which is a way to make the pointer feel broken while
+  // fixing the remote.
+  document.addEventListener('click', claimWindow, true);
+
+  // A key arriving settles it: the page has the keys and can stop asking.
+  document.addEventListener('keydown', stopClaiming, true);
 
   function typeText(k, c) {
     var ch = (k && k.length === 1) ? k.toUpperCase() : String.fromCharCode(c);
