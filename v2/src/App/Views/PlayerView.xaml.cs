@@ -153,8 +153,7 @@ public partial class PlayerView : UserControl, IDisposable
             onPreview: ShowScrubPreview,
             onCommit: _ =>
             {
-                ScrubPopup.IsOpen = false;
-                ScrubThumbBorder.Visibility = Visibility.Collapsed;
+                HideScrubPreview();
                 ApplySeek();
             });
         Seek.MouseMove += Seek_MouseMove;
@@ -345,13 +344,19 @@ public partial class PlayerView : UserControl, IDisposable
         var targetMs = (long)(durationMs * fraction);
 
         ScrubText.Text = Fmt(targetMs);
-        ShowScrubPopupAt(fraction);
+        _scrubFraction = fraction;
 
         // Move the picture with the handle so you can see where you are landing.
         // Throttled, because a drag fires far faster than libVLC can seek and
         // queuing every pixel makes it lurch rather than glide.
         if (!PartyGuest && !DlnaActive && _player is not null && durationMs > 0)
         {
+            // The film itself is the preview here, so a hover thumbnail would
+            // only show where the pointer was before the press. Stopping the
+            // loader also keeps its grabs off the disk the live seek is using.
+            _scrubFrames?.Cancel();
+            ScrubThumbBorder.Visibility = Visibility.Collapsed;
+
             var now = DateTime.UtcNow;
             if (now - _lastLiveSeek >= LiveSeekInterval)
             {
@@ -359,6 +364,13 @@ public partial class PlayerView : UserControl, IDisposable
                 try { _player.Time = targetMs; } catch { /* torn down mid-drag */ }
             }
         }
+        else
+        {
+            // Casting: the TV cannot follow a drag, so thumbnails are the only
+            // picture of where it will land.
+            RequestScrubFrame(durationMs, fraction);
+        }
+        ShowScrubPopupAt(fraction);
     }
 
     private void ShowScrubPopupAt(double fraction)
@@ -371,8 +383,10 @@ public partial class PlayerView : UserControl, IDisposable
 
     // ---- Timeline hover preview --------------------------------------------
 
-    private CancellationTokenSource? _hoverCts;
-    private double _hoverBucket = -1;
+    private Helpers.ScrubFrameLoader? _scrubFrames;
+
+    /// <summary>Where the pointer is on the bar now, 0..1. Frames arrive late and are placed here.</summary>
+    private double _scrubFraction;
 
     private void Seek_MouseMove(object sender, MouseEventArgs e)
     {
@@ -383,58 +397,54 @@ public partial class PlayerView : UserControl, IDisposable
         var durationMs = DlnaActive ? _dlnaDur.TotalMilliseconds : _player?.Length ?? 0;
         if (durationMs <= 0) return;
 
-        var seconds = durationMs / 1000.0 * fraction;
+        _scrubFraction = fraction;
         ScrubText.Text = Fmt((long)(durationMs * fraction));
+        RequestScrubFrame(durationMs, fraction);
         ShowScrubPopupAt(fraction);
-        _ = RequestHoverFrameAsync(seconds, fraction);
     }
 
     private void Seek_MouseLeave(object sender, MouseEventArgs e)
     {
         if (_seekDrag?.IsDragging == true) return;
-        _hoverCts?.Cancel();
+        HideScrubPreview();
+    }
+
+    /// <summary>Close the popup and stop fetching; anything still on its way is dropped.</summary>
+    private void HideScrubPreview()
+    {
+        _scrubFrames?.Cancel();
         ScrubPopup.IsOpen = false;
         ScrubThumbBorder.Visibility = Visibility.Collapsed;
-        _hoverBucket = -1;
     }
 
     /// <summary>
-    /// Pull a frame for the hovered position. Only local files: a party guest's
+    /// Ask for a frame at a point on the bar. Only local files: a party guest's
     /// source is an HTTP relay that ffmpeg cannot seek cheaply, and asking it to
     /// would compete with the playback stream for the host's upload.
     /// </summary>
-    private async Task RequestHoverFrameAsync(double seconds, double fraction)
+    private void RequestScrubFrame(double durationMs, double fraction)
     {
-        if (IsRemoteSource || _movie.IsShortcut) return;
+        if (IsRemoteSource || _movie.IsShortcut || durationMs <= 0) return;
 
-        var bucket = Math.Round(seconds / 5.0) * 5.0;
-        if (Math.Abs(bucket - _hoverBucket) < 0.01) return;  // same frame as last time
-        _hoverBucket = bucket;
+        _scrubFrames ??= new Helpers.ScrubFrameLoader(
+            // Off the UI thread: even finding an already-cached frame touches the
+            // film's own disk, which may be asleep or across a network.
+            (bucket, ct) => Task.Run(() => ThumbnailService.ExtractFrameAsync(_movie.Path, bucket, ct), ct),
+            ShowScrubFrame);
+        var durationSec = durationMs / 1000.0;
+        _scrubFrames.Request(ThumbnailService.ScrubBucket(durationSec * fraction, durationSec));
+    }
 
-        _hoverCts?.Cancel();
-        var cts = new CancellationTokenSource();
-        _hoverCts = cts;
-        try
-        {
-            var frame = await ThumbnailService.ExtractFrameAsync(_movie.Path, bucket, cts.Token);
-            if (cts.IsCancellationRequested || frame is null) return;
-
-            var image = new System.Windows.Media.Imaging.BitmapImage();
-            image.BeginInit();
-            // OnLoad so the cached jpg is not left open by the UI.
-            image.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
-            image.UriSource = new Uri(frame);
-            image.EndInit();
-            image.Freeze();
-
-            ScrubThumb.Source = image;
-            ScrubThumbBorder.Visibility = Visibility.Visible;
-            ShowScrubPopupAt(fraction);
-        }
-        catch
-        {
-            // No preview is fine; the timestamp alone is still useful.
-        }
+    /// <summary>
+    /// A frame is ready. It goes where the pointer IS, not where it was when the
+    /// frame was asked for: with a moving pointer those differ, and snapping the
+    /// popup back each time a frame landed would make it stutter.
+    /// </summary>
+    private void ShowScrubFrame(double bucket, string path)
+    {
+        ScrubThumb.Source = ThumbnailService.LoadFrozen(path);
+        ScrubThumbBorder.Visibility = Visibility.Visible;
+        ShowScrubPopupAt(_scrubFraction);
     }
 
     private void OnCastDevicesChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
@@ -1518,6 +1528,8 @@ public partial class PlayerView : UserControl, IDisposable
     public void Dispose()
     {
         _uiTimer.Stop();
+        // A grab still running would otherwise outlive the view it was for.
+        _scrubFrames?.Dispose();
         MainWindow.Instance.PreviewKeyDown -= OnKeyDown;
         if (_overlayWindow is not null) _overlayWindow.PreviewKeyDown -= OnKeyDown;
         AppServices.Cast.Devices.CollectionChanged -= OnCastDevicesChanged;
