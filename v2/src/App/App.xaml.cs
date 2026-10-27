@@ -7,6 +7,8 @@ namespace VideoPlayer.App;
 
 public partial class App : Application
 {
+    private static bool _headless;
+
     public App()
     {
         Services.StartupTrace.Mark("App ctor entry");
@@ -25,6 +27,14 @@ public partial class App : Application
         DispatcherUnhandledException += (_, e) =>
         {
             LogCrash("UI thread", e.Exception);
+            // A headless run has nobody to read a dialog, and a dialog would
+            // take the screen from whoever is at the machine.
+            if (_headless)
+            {
+                Console.WriteLine($"FAIL  unhandled: {e.Exception.GetType().Name}: {e.Exception.Message}");
+                e.Handled = true;
+                return;
+            }
             MessageBox.Show(
                 $"Something went wrong, but the app is still running.\n\n{e.Exception.Message}",
                 "Vault Movies", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -141,6 +151,9 @@ public partial class App : Application
                 ("UploadsWindow", () => new Views.UploadsWindow()),
                 ("ManageUsersWindow", () => new Views.ManageUsersWindow()),
                 ("AddShortcutWindow", () => new Views.AddShortcutWindow()),
+                ("InviteWindow", () => new Views.InviteWindow()),
+                ("NameCollectionWindow", () => new Views.NameCollectionWindow()),
+                ("StreamingBrowserWindow", () => new Views.StreamingBrowserWindow("about:blank")),
             })
             {
                 try
@@ -156,6 +169,59 @@ public partial class App : Application
                 }
             }
             Shutdown(failures);
+            return;
+        }
+
+        // Headless: draw the main screens and every dialog to PNGs, then exit.
+        //   --snapshot-ui <folder> [path to PlayerView.xaml]
+        var snap = Array.IndexOf(e.Args, "--snapshot-ui");
+        if (snap >= 0 && snap + 1 < e.Args.Length)
+        {
+            _headless = true;
+            Shutdown(UiSnapshot.Run(e.Args[snap + 1], snap + 2 < e.Args.Length ? e.Args[snap + 2] : null));
+            return;
+        }
+
+        // A real window, for the few things --snapshot-ui cannot draw: the
+        // acrylic behind a dialog and the title bar are the compositor's, not
+        // WPF's. Opens without activating, closes itself, and is meant to be
+        // launched through run-quiet onto a second monitor.
+        //   --preview-window <home|library> [dialog] [seconds]
+        var pw = Array.IndexOf(e.Args, "--preview-window");
+        if (pw >= 0 && pw + 1 < e.Args.Length)
+        {
+            _headless = true;
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            var dialog = pw + 2 < e.Args.Length && !int.TryParse(e.Args[pw + 2], out _) ? e.Args[pw + 2] : null;
+            var seconds = int.TryParse(e.Args[^1], out var sec) ? sec : 12;
+
+            var main = new MainWindow { ShowActivated = false };
+            if (e.Args[pw + 1] == "library") main.Navigate(new Views.LibraryView());
+            main.Show();
+
+            // After the launcher has had time to park the main window, so the
+            // dialog opens centred over it rather than where it started.
+            var later = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+            later.Tick += (_, _) =>
+            {
+                later.Stop();
+                Window? box = dialog switch
+                {
+                    "settings" => new Views.SettingsWindow(),
+                    "account" => new Views.AccountWindow(),
+                    "library-setup" => new Views.LibrarySetupWindow(),
+                    _ => null,
+                };
+                if (box is null) return;
+                box.Owner = main;
+                box.ShowActivated = false;
+                box.Show();
+            };
+            later.Start();
+
+            var done = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(seconds) };
+            done.Tick += (_, _) => { done.Stop(); Shutdown(0); };
+            done.Start();
             return;
         }
 

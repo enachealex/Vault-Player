@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Threading;
 using Microsoft.Win32;
 using VideoPlayer.App.Models;
 using VideoPlayer.App.Services;
@@ -54,6 +55,7 @@ public partial class LibraryView : UserControl, IDisposable
     {
         InitializeComponent();
         _onPick = onPick;
+        _ambientDwell.Tick += AmbientDwell_Tick;
         SortBox.ItemsSource = Sorts.Select(s => s.Label).ToList();
         SortBox.SelectedIndex = 0;
         _ready = true;
@@ -342,6 +344,7 @@ public partial class LibraryView : UserControl, IDisposable
 
         ContinueList.ItemsSource = inProgress;
         ContinuePanel.Visibility = inProgress.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        if (inProgress.Count > 0) OfferAmbient(inProgress[0]);
         // AllHeader is owned by ApplyFilter — it names the active view, not just this section.
     }
 
@@ -528,6 +531,54 @@ public partial class LibraryView : UserControl, IDisposable
         // land on a shortcut the player can't open.
         MainWindow.Instance.Navigate(
             new PlayerView(movie, _movies.Where(m => !m.IsShortcut).ToList()));
+    }
+
+    // ---- The film behind the glass -------------------------------------------
+    //
+    // Pointing at a film puts its still behind the whole window, the way a
+    // television's home screen takes on whatever tile is highlighted. It waits
+    // for the pointer to settle first: sweeping across a row would otherwise
+    // flicker through every film on the way past.
+
+    private readonly DispatcherTimer _ambientDwell = new() { Interval = TimeSpan.FromMilliseconds(260) };
+    private MovieItem? _ambientNext;
+    private bool _ambientChosen;
+
+    private void MovieCard_Hover(object sender, RoutedEventArgs e)
+    {
+        if ((sender as Button)?.Tag is not MovieItem movie) return;
+        _ambientChosen = true;
+        _ambientNext = movie;
+        _ambientDwell.Stop();
+        _ambientDwell.Start();
+    }
+
+    private void AmbientDwell_Tick(object? sender, EventArgs e)
+    {
+        _ambientDwell.Stop();
+        if (_ambientNext?.Thumbnail is { } still) MainWindow.Instance.SetAmbient(still);
+    }
+
+    /// <summary>
+    /// Before anyone has pointed at anything, the film they were last watching
+    /// sets the scene. Its still may not be decoded yet, so wait for it —
+    /// unless the viewer has started browsing by the time it arrives.
+    /// </summary>
+    private void OfferAmbient(MovieItem movie)
+    {
+        if (_ambientChosen) return;
+        if (movie.Thumbnail is { } still) { MainWindow.Instance.SetAmbient(still); return; }
+
+        void OnChanged(object? s, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName != nameof(MovieItem.Thumbnail) || movie.Thumbnail is null) return;
+            movie.PropertyChanged -= OnChanged;
+            Dispatcher.BeginInvoke(() =>
+            {
+                if (!_ambientChosen && IsLoaded) MainWindow.Instance.SetAmbient(movie.Thumbnail);
+            });
+        }
+        movie.PropertyChanged += OnChanged;
     }
 
     // ---- Streaming shortcuts -----------------------------------------------
@@ -791,6 +842,7 @@ public partial class LibraryView : UserControl, IDisposable
 
     public void Dispose()
     {
+        _ambientDwell.Stop();
         _cts.Cancel();
         AppServices.Account.Changed -= OnAccountChanged;
     }

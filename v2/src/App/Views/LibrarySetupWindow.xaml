@@ -1,6 +1,8 @@
 <Window x:Class="VideoPlayer.App.Views.LibrarySetupWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="clr-namespace:VideoPlayer.App.Helpers"
+        ui:Glass.Window="True"
         Title="Your films"
         Width="620" Height="700"
         WindowStartupLocation="CenterOwner"
@@ -16,7 +18,6 @@
             <StackPanel>
 
                 <TextBlock Text="Where are your films?" FontSize="21" FontWeight="Bold"
-                           FontFamily="{StaticResource DisplayFont}"
                            Foreground="{StaticResource TextBrush}" />
                 <TextBlock TextWrapping="Wrap" FontSize="12.5" Margin="0,8,0,0"
                            Foreground="{StaticResource TextMutedBrush}"

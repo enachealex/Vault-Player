@@ -25,33 +25,41 @@ public static class JoinPage
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#1A0D09">
+<meta name="theme-color" content="#0B0D12">
 <title>Movie night - Vault Movies</title>
 <style>
+  /* The app's palette: smoked glass on a dusk sky, white for the one action. */
   :root {
-    --bg: #1A0D09; --deep: #0E0604; --line: #43281F;
-    --text: #F6ECE5; --muted: #D9C0B3; --accent: #C8442A; --warm: #F0A070;
+    --bg: #0B0D12; --deep: #06070A; --line: rgba(255,255,255,.12);
+    --glass: rgba(255,255,255,.07); --text: #F4F6FA; --muted: #A6AFBD;
+    --accent: #005ED9; --warm: #F5C77E;
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; }
   body {
-    margin: 0; background: var(--bg); color: var(--text);
+    margin: 0; background: radial-gradient(ellipse 70% 60% at 82% 8%, rgba(122,60,36,.5), rgba(11,13,18,0) 70%), radial-gradient(ellipse 80% 70% at 8% 100%, rgba(26,58,110,.5), rgba(11,13,18,0) 70%), #0B0D12; background-attachment: fixed; color: var(--text);
     font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
     display: flex; flex-direction: column;
     padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
     -webkit-font-smoothing: antialiased;
   }
-  .card { margin: auto; padding: 34px 26px; max-width: 420px; text-align: center; }
-  .dot { width: 26px; height: 26px; border-radius: 8px; background: var(--accent); margin: 0 auto 20px; }
+  .card { margin: auto; padding: 34px 28px; max-width: 420px; text-align: center;
+          background: var(--glass); border: 1px solid var(--line); border-radius: 26px; }
+  /* The app icon: a rounded rust square with a play mark. */
+  .dot { width: 46px; height: 46px; border-radius: 13px; margin: 0 auto 20px;
+         background: linear-gradient(135deg, #E35A3C, #B9381F);
+         display: flex; align-items: center; justify-content: center; }
+  .dot::after { content: ''; border-left: 14px solid #fff; border-top: 9px solid transparent;
+                border-bottom: 9px solid transparent; margin-left: 4px; }
   h1 { font-size: 21px; margin: 0 0 8px; font-weight: 700; }
   .code {
     font-family: Consolas, ui-monospace, monospace; font-size: 30px; font-weight: 800;
-    letter-spacing: 2px; color: var(--accent); margin: 14px 0 6px;
+    letter-spacing: 2px; color: var(--text); margin: 14px 0 6px;
   }
   p { color: var(--muted); font-size: 14.5px; line-height: 1.55; margin: 8px 0; }
   .btn {
     display: inline-block; margin-top: 18px; padding: 14px 30px; border-radius: 12px;
-    background: var(--accent); color: #fff; text-decoration: none; font-weight: 700;
+    background: var(--text); color: var(--bg); text-decoration: none; font-weight: 700;
     font-size: 16px; border: none; cursor: pointer; font-family: inherit;
   }
   .alt { display: block; margin-top: 16px; color: var(--warm); font-size: 13px; }
@@ -60,21 +68,21 @@ public static class JoinPage
   video { width: 100%; height: 100%; flex: 1; min-height: 0; background: #000; object-fit: contain; }
   #bar {
     display: flex; align-items: center; gap: 12px; padding: 10px 14px;
-    background: var(--deep); border-top: 1px solid var(--line); font-size: 13px;
+    background: rgba(20,22,28,.94); border-top: 1px solid var(--line); font-size: 13px;
   }
   #bar .t { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   #bar .s { color: var(--warm); white-space: nowrap; margin-left: auto; font-size: 12px; }
   #gate {
     position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center;
-    justify-content: center; background: rgba(14,6,4,.94); cursor: pointer;
+    justify-content: center; background: rgba(6,7,10,.94); cursor: pointer;
     padding: 24px; text-align: center;
   }
   #gate .play {
-    width: 78px; height: 78px; border-radius: 50%; background: var(--accent);
+    width: 78px; height: 78px; border-radius: 50%; background: var(--text);
     display: grid; place-items: center; margin-bottom: 16px;
   }
   #gate .play::after {
-    content: ''; border-left: 24px solid #fff; border-top: 15px solid transparent;
+    content: ''; border-left: 24px solid var(--bg); border-top: 15px solid transparent;
     border-bottom: 15px solid transparent; margin-left: 6px;
   }
   #gate h2 { margin: 0; font-size: 20px; }

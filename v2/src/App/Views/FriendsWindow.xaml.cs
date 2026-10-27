@@ -50,7 +50,7 @@ public partial class FriendsWindow : Window
     private void ShowStatus(string msg, bool isError)
     {
         StatusText.Text = msg;
-        StatusText.Foreground = (System.Windows.Media.Brush)FindResource(isError ? "AccentBrush" : "AccentWarmBrush");
+        StatusText.Foreground = (System.Windows.Media.Brush)FindResource(isError ? "DangerBrush" : "SuccessBrush");
         StatusText.Visibility = Visibility.Visible;
     }
 

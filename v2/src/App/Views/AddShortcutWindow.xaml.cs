@@ -28,7 +28,7 @@ public partial class AddShortcutWindow : Window
         if (url.Length > 0 && !urlOk)
         {
             UrlHint.Text = "That doesn't look like a web link — it needs to start with http:// or https://";
-            UrlHint.Foreground = (Brush)FindResource("AccentBrush");
+            UrlHint.Foreground = (Brush)FindResource("DangerBrush");
         }
         else
         {

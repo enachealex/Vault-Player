@@ -22,23 +22,25 @@ public static class TvInstallPage
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Vault Movies on your LG TV</title>
 <style>
-  :root { --bg:#1A0D09; --surface:#24100B; --line:#43281F;
-          --text:#F6ECE5; --muted:#D9C0B3; --accent:#C8442A; --warm:#F0A070; }
+  /* The app's palette: smoked glass on a dusk sky. */
+  :root { --bg:#0B0D12; --surface:rgba(255,255,255,.06); --line:rgba(255,255,255,.12);
+          --text:#F4F6FA; --muted:#A6AFBD; --accent:#005ED9; --link:#6CB2FF;
+          --warm:#F5C77E; --danger:#FF7A7A; }
   * { box-sizing:border-box; }
-  body { margin:0; background:var(--bg); color:var(--text); line-height:1.6;
+  body { margin:0; background:radial-gradient(ellipse 70% 60% at 82% 8%, rgba(122,60,36,.5), rgba(11,13,18,0) 70%), radial-gradient(ellipse 80% 70% at 8% 100%, rgba(26,58,110,.5), rgba(11,13,18,0) 70%), #0B0D12; background-attachment:fixed; color:var(--text); line-height:1.6;
          font-family:'Segoe UI',Roboto,system-ui,-apple-system,sans-serif; }
   .wrap { max-width:44rem; margin:0 auto; padding:3rem 1.5rem 5rem; }
   h1 { font-size:2rem; margin:0 0 .4rem; }
-  h2 { font-size:1.15rem; margin:2.4rem 0 .6rem; color:var(--warm); }
+  h2 { font-size:1.15rem; margin:2.4rem 0 .6rem; color:var(--text); }
   p, li { color:var(--muted); }
   li { margin:.4rem 0; }
   code { background:var(--surface); border:1px solid var(--line); border-radius:.3rem;
          padding:.15rem .4rem; font-size:.9em; color:var(--text); }
-  pre { background:var(--surface); border:1px solid var(--line); border-radius:.5rem;
+  pre { background:rgba(0,0,0,.35); border:1px solid var(--line); border-radius:.8rem;
         padding:.9rem 1rem; overflow-x:auto; }
   pre code { background:none; border:none; padding:0; }
-  .dl { display:inline-block; background:var(--accent); color:#fff; text-decoration:none;
-        border-radius:.5rem; padding:.8rem 1.6rem; font-weight:700; margin:.6rem 0 0; }
+  .dl { display:inline-block; background:var(--text); color:var(--bg); text-decoration:none;
+        border-radius:.75rem; padding:.8rem 1.6rem; font-weight:700; margin:.6rem 0 0; }
   .note { border-left:3px solid var(--warm); padding:.2rem 0 .2rem 1rem; margin:1.4rem 0; }
 </style>
 </head>

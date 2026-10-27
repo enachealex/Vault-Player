@@ -2,6 +2,7 @@ using System;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Media;
 using System.Windows.Shell;
 using VideoPlayer.App.Services;
 using VideoPlayer.App.Views;
@@ -40,8 +41,20 @@ public partial class MainWindow : Window
         // Cleared on every navigation so it can't outlive the view that set it;
         // the incoming view re-sets it from its own Loaded handler.
         TitleSubtext.Text = "";
+        // Over a film the bar goes black, so the picture is framed by black
+        // rather than by a strip of blurred wallpaper sitting above it.
+        TitleBar.Background = view is PlayerView
+            ? Brushes.Black
+            : (Brush)FindResource("TitleBarBrush");
         Host.Content = view;
     }
+
+    /// <summary>
+    /// The film behind the glass — a still, or null for the default dusk.
+    /// Kept across navigation on purpose: the film you were looking at in the
+    /// library is still there when you go back to the home screen.
+    /// </summary>
+    public void SetAmbient(ImageSource? still) => Ambient.Show(still);
 
     /// <summary>Secondary line in the title bar, e.g. the movie now playing.</summary>
     public void SetTitleContext(string text) => TitleSubtext.Text = text;

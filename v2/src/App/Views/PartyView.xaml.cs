@@ -840,7 +840,7 @@ public partial class PartyView : UserControl, IDisposable
         if (needed > 25)
         {
             BandwidthNote.Text += " That's more than most home connections upload — expect buffering.";
-            BandwidthNote.Foreground = (System.Windows.Media.Brush)FindResource("AccentBrush");
+            BandwidthNote.Foreground = (System.Windows.Media.Brush)FindResource("AccentWarmBrush");
         }
         else
         {

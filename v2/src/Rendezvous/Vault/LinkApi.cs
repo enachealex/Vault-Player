@@ -182,27 +182,37 @@ public static class LinkApi
             <title>Link a device — Vault Movies</title>
             <style>
               body { margin:0; min-height:100vh; display:grid; place-items:center;
-                     background:#1A0D09; color:#F6ECE5; font-family:'Segoe UI',system-ui,sans-serif; }
-              .card { padding:40px 44px; max-width:420px; width:100%; box-sizing:border-box; }
-              .dot { width:22px; height:22px; border-radius:7px; background:#C8442A; margin-bottom:18px; }
+                     background:radial-gradient(ellipse 70% 60% at 82% 8%, rgba(122,60,36,.5), rgba(11,13,18,0) 70%), radial-gradient(ellipse 80% 70% at 8% 100%, rgba(26,58,110,.5), rgba(11,13,18,0) 70%), #0B0D12; background-attachment:fixed;
+                     color:#F4F6FA; font-family:'Segoe UI',system-ui,sans-serif; }
+              .card { padding:36px 28px; margin:16px; max-width:440px; width:calc(100% - 32px); box-sizing:border-box;
+                      background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.12);
+                      border-radius:26px; }
+              /* The app icon: a rounded rust square with a play mark. */
+              .dot { width:46px; height:46px; border-radius:13px; margin-bottom:18px;
+                     background:linear-gradient(135deg,#E35A3C,#B9381F);
+                     display:flex; align-items:center; justify-content:center; }
+              .dot::after { content:''; border-left:14px solid #fff; border-top:9px solid transparent;
+                            border-bottom:9px solid transparent; margin-left:4px; }
               /* Every size here is 6px larger than it was. This is read at arm's
                  length on a phone, often by somebody already squinting at a
                  television across the room. */
               h1 { font-size:28px; margin:0 0 6px; }
-              p { color:#D9C0B3; font-size:20px; line-height:1.55; margin:8px 0; }
-              .err { color:#F0A070; }
-              label { display:block; font-size:16.5px; font-weight:bold; color:#D9C0B3;
+              p { color:#A6AFBD; font-size:20px; line-height:1.55; margin:8px 0; }
+              .err { color:#FF7A7A; }
+              label { display:block; font-size:16.5px; font-weight:bold; color:#A6AFBD;
                       letter-spacing:1px; margin:14px 0 6px; }
-              input { width:100%; box-sizing:border-box; padding:12px; font-size:22px; border-radius:10px;
-                      border:1px solid #43281F; background:#2A160F; color:#F6ECE5; }
-              button { margin-top:18px; width:100%; padding:13px; border-radius:10px; border:none;
-                       background:#C8442A; color:#fff; font-weight:600; font-size:21px; cursor:pointer; }
+              input { width:100%; box-sizing:border-box; padding:13px 14px; font-size:22px; border-radius:14px;
+                      border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.07); color:#F4F6FA;
+                      outline:none; }
+              input:focus { border-color:#005ED9; box-shadow:0 0 0 3px rgba(0,94,217,.35); }
+              button { margin-top:20px; width:100%; padding:14px; border-radius:14px; border:none;
+                       background:#F4F6FA; color:#0B0D12; font-weight:700; font-size:21px; cursor:pointer; }
               /* The code gets a panel of its own. It is the one thing on this
                  page that has to be read and copied by hand, so it is separated
                  from the prose around it rather than being merely larger text. */
-              .codebox { background:#3A3A3A; border:2px solid #5A5A5A; border-radius:14px;
+              .codebox { background:rgba(0,0,0,.35); border:1px solid rgba(255,255,255,.18); border-radius:18px;
                          padding:20px 16px; margin:22px 0; }
-              .code { font-family:Consolas,monospace; font-size:50px; font-weight:bold; color:#F6ECE5;
+              .code { font-family:Consolas,monospace; font-size:50px; font-weight:bold; color:#F4F6FA;
                       letter-spacing:8px; text-align:center; user-select:all; }
             </style>
             </head>

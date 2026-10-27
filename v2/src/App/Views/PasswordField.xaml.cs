@@ -68,7 +68,7 @@ public partial class PasswordField : UserControl
             Masked.Visibility = Visibility.Visible;
             Masked.Focus();
         }
-        EyeGlyph.Foreground = (Brush)FindResource(_revealed ? "AccentBrush" : "TextMutedBrush");
+        EyeGlyph.Foreground = (Brush)FindResource(_revealed ? "AccentLightBrush" : "TextMutedBrush");
         EyeBtn.ToolTip = _revealed ? "Hide password" : "Show password";
         AutomationProperties.SetName(EyeBtn, _revealed ? "Hide password" : "Show password");
     }

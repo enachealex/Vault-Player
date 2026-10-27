@@ -1,0 +1,70 @@
+<UserControl x:Class="VideoPlayer.App.Views.AmbientBackdrop"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             IsHitTestVisible="False" Focusable="False">
+    <!-- The wallpaper the whole window sits on. A film still when there is one
+         to show — the one under the pointer in the library — and a dusk sky
+         when there is not, so the glass always has something behind it. -->
+    <Grid ClipToBounds="True">
+        <Rectangle Fill="{StaticResource BgBrush}" />
+
+        <!-- Dusk: a warm glow low on the horizon, a cold one opposite. -->
+        <Rectangle>
+            <Rectangle.Fill>
+                <RadialGradientBrush Center="0.78,0.30" GradientOrigin="0.78,0.30" RadiusX="0.62" RadiusY="0.75">
+                    <GradientStop Color="#5A2C1C" Offset="0" />
+                    <GradientStop Color="#2A1712" Offset="0.45" />
+                    <GradientStop Color="#000B0D12" Offset="1" />
+                </RadialGradientBrush>
+            </Rectangle.Fill>
+        </Rectangle>
+        <Rectangle>
+            <Rectangle.Fill>
+                <RadialGradientBrush Center="0.12,0.92" GradientOrigin="0.12,0.92" RadiusX="0.7" RadiusY="0.8">
+                    <GradientStop Color="#1A3A6E" Offset="0" />
+                    <GradientStop Color="#0F1E3A" Offset="0.5" />
+                    <GradientStop Color="#000B0D12" Offset="1" />
+                </RadialGradientBrush>
+            </Rectangle.Fill>
+        </Rectangle>
+        <Rectangle>
+            <Rectangle.Fill>
+                <RadialGradientBrush Center="0.42,0.05" GradientOrigin="0.42,0.05" RadiusX="0.55" RadiusY="0.45">
+                    <GradientStop Color="#26314A" Offset="0" />
+                    <GradientStop Color="#000B0D12" Offset="1" />
+                </RadialGradientBrush>
+            </Rectangle.Fill>
+        </Rectangle>
+
+        <!-- Two layers so one film can fade into the next. Their own grid, so
+             the z-order the crossfade juggles stays beneath the scrim. -->
+        <Grid>
+            <Image x:Name="ArtA" Stretch="UniformToFill" Opacity="0"
+                   RenderOptions.BitmapScalingMode="Linear" />
+            <Image x:Name="ArtB" Stretch="UniformToFill" Opacity="0"
+                   RenderOptions.BitmapScalingMode="Linear" />
+        </Grid>
+
+        <!-- Scrim. White text has to read on top of whatever frame a film
+             happens to have, so the still is never shown at full strength:
+             darker towards the bottom where the grid is, and darker on the
+             left where titles sit. -->
+        <Rectangle>
+            <Rectangle.Fill>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                    <GradientStop Color="#8C07080B" Offset="0" />
+                    <GradientStop Color="#A607080B" Offset="0.45" />
+                    <GradientStop Color="#DB07080B" Offset="1" />
+                </LinearGradientBrush>
+            </Rectangle.Fill>
+        </Rectangle>
+        <Rectangle>
+            <Rectangle.Fill>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                    <GradientStop Color="#8007080B" Offset="0" />
+                    <GradientStop Color="#0007080B" Offset="0.6" />
+                </LinearGradientBrush>
+            </Rectangle.Fill>
+        </Rectangle>
+    </Grid>
+</UserControl>

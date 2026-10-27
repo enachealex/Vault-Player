@@ -87,7 +87,7 @@ public partial class SettingsWindow : Window
             Text = char.ConvertFromUtf32(0xE73E), // CheckMark glyph
             FontFamily = new FontFamily("Segoe MDL2 Assets"),
             FontSize = 14,
-            Foreground = (Brush)FindResource("AccentBrush"),
+            Foreground = (Brush)FindResource("AccentLightBrush"),
             VerticalAlignment = VerticalAlignment.Center,
             Visibility = isSelected ? Visibility.Visible : Visibility.Collapsed,
         };

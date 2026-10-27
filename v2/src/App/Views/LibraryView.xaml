@@ -2,6 +2,17 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:models="clr-namespace:VideoPlayer.App.Models">
+    <UserControl.Resources>
+        <!-- The frame on a card: rounded inside the card's own padding, so the
+             glass shows as an even rim all the way round. -->
+        <Style x:Key="CardFrame" TargetType="Border">
+            <Setter Property="Height" Value="117" />
+            <Setter Property="CornerRadius" Value="11" />
+            <Setter Property="Background" Value="{StaticResource BgDeepBrush}" />
+            <Setter Property="ClipToBounds" Value="True" />
+        </Style>
+    </UserControl.Resources>
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -13,13 +24,12 @@
         <!-- A party keeps running while you browse, so it needs to be visible
              and endable from here rather than silently alive in the background. -->
         <Border x:Name="PartyBanner" Grid.Row="0" Visibility="Collapsed"
-                Background="{StaticResource AccentSoftBrush}"
-                BorderBrush="{StaticResource AccentBrush}" BorderThickness="0,0,0,1"
-                Padding="24,10">
+                Background="{StaticResource AccentSoftBrush}" BorderBrush="#66005ED9" BorderThickness="1"
+                CornerRadius="16" Padding="18,8,8,8" Margin="40,12,40,0">
             <Grid>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="&#xE7F4;" FontFamily="Segoe MDL2 Assets" FontSize="13"
-                               VerticalAlignment="Center" Foreground="{StaticResource AccentBrush}" />
+                    <TextBlock Text="&#xE7F4;" FontFamily="{StaticResource IconFont}" FontSize="13"
+                               VerticalAlignment="Center" Foreground="{StaticResource AccentLightBrush}" />
                     <TextBlock x:Name="PartyBannerText" Text="" FontSize="13" Margin="10,0,0,0"
                                VerticalAlignment="Center" Foreground="{StaticResource TextBrush}" />
                 </StackPanel>
@@ -37,85 +47,82 @@
         <!-- Shown only when choosing a film to host, so it is obvious that
              clicking a poster starts a party rather than playing it here. -->
         <Border x:Name="PickModeBanner" Grid.Row="0" Visibility="Collapsed"
-                Background="{StaticResource AccentSoftBrush}"
-                BorderBrush="{StaticResource AccentBrush}" BorderThickness="0,0,0,1"
-                Padding="24,10">
+                Background="{StaticResource AccentSoftBrush}" BorderBrush="#66005ED9" BorderThickness="1"
+                CornerRadius="16" Padding="18,11" Margin="40,12,40,0">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <TextBlock Text="&#xE716;" FontFamily="Segoe MDL2 Assets" FontSize="13"
-                           VerticalAlignment="Center" Foreground="{StaticResource AccentBrush}" />
+                <TextBlock Text="&#xE716;" FontFamily="{StaticResource IconFont}" FontSize="13"
+                           VerticalAlignment="Center" Foreground="{StaticResource AccentLightBrush}" />
                 <TextBlock Text="Pick a film to host — everyone in the party watches this"
                            FontSize="13" Margin="10,0,0,0" VerticalAlignment="Center"
                            Foreground="{StaticResource TextBrush}" />
             </StackPanel>
         </Border>
 
-        <!-- Header -->
-        <Grid Grid.Row="1" Margin="24,18,24,10">
+        <!-- Header: back, the big page title, and the one primary action. -->
+        <Grid Grid.Row="1" Margin="40,16,40,14">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
-            <Button Grid.Column="0" Style="{StaticResource GhostButton}" Click="HomeBtn_Click"
-                    ToolTip="Back to the start screen" AutomationProperties.Name="Home" Padding="12,8">
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="&#xE72B;" FontFamily="Segoe MDL2 Assets" FontSize="14"
-                               VerticalAlignment="Center" Margin="0,0,8,0" />
-                    <TextBlock Text="Home" />
-                </StackPanel>
+            <Button Grid.Column="0" Style="{StaticResource IconButton}" Click="HomeBtn_Click"
+                    Width="42" Height="42" Background="{StaticResource SurfaceBrush}"
+                    BorderBrush="{StaticResource LineBrush}" VerticalAlignment="Center"
+                    ToolTip="Back to the start screen" AutomationProperties.Name="Home">
+                <TextBlock Text="&#xE72B;" FontFamily="{StaticResource IconFont}" FontSize="15" />
             </Button>
 
-            <StackPanel Grid.Column="1" Margin="16,0" VerticalAlignment="Center">
-                <TextBlock x:Name="FolderTitle" Text="Your movies" FontSize="20" FontWeight="Bold"
-                           FontFamily="{StaticResource DisplayFont}"
-                           Foreground="{StaticResource TextBrush}" TextTrimming="CharacterEllipsis" />
-                <TextBlock x:Name="FolderSubtitle" Text="" FontSize="12"
+            <StackPanel Grid.Column="1" Margin="18,0" VerticalAlignment="Center">
+                <TextBlock x:Name="FolderTitle" Text="Your movies" Style="{StaticResource PageTitle}" FontSize="30" />
+                <TextBlock x:Name="FolderSubtitle" Text="" FontSize="12.5" Margin="1,1,0,0"
                            Foreground="{StaticResource TextMutedBrush}" TextTrimming="CharacterEllipsis" />
             </StackPanel>
 
             <Button Grid.Column="2" Style="{StaticResource PrimaryButton}" Click="ChangeFolderBtn_Click"
+                    VerticalAlignment="Center"
                     ToolTip="Pick the folder your films are kept in" AutomationProperties.Name="Choose folder">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="&#xE8B7;" FontFamily="Segoe MDL2 Assets" FontSize="14"
-                               VerticalAlignment="Center" Margin="0,0,8,0" />
+                    <TextBlock Text="&#xEC50;" FontFamily="{StaticResource IconFont}" FontSize="15"
+                               VerticalAlignment="Center" Margin="0,0,9,0" />
                     <TextBlock x:Name="FolderBtnText" Text="Choose folder" />
                 </StackPanel>
             </Button>
         </Grid>
 
         <!-- Search + sort -->
-        <Grid x:Name="Toolbar" Grid.Row="2" Margin="24,0,24,12" Visibility="Collapsed">
+        <Grid x:Name="Toolbar" Grid.Row="2" Margin="40,0,40,16" Visibility="Collapsed">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
-            <Border Grid.Column="0" Background="{StaticResource SurfaceBrush}" CornerRadius="10"
-                    BorderBrush="{StaticResource LineBrush}" BorderThickness="1" MaxWidth="420"
-                    HorizontalAlignment="Left">
+            <!-- Fixed to the height of the buttons beside it, so the toolbar is one line. -->
+            <Border Grid.Column="0" Style="{StaticResource FieldBox}" MaxWidth="440" Height="40"
+                    HorizontalAlignment="Left" VerticalAlignment="Center">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="&#xE721;" FontFamily="Segoe MDL2 Assets" FontSize="14"
-                               Foreground="{StaticResource TextMutedBrush}" Margin="12,0,8,0"
+                    <TextBlock Grid.Column="0" Text="&#xE721;" FontFamily="{StaticResource IconFont}" FontSize="14"
+                               Foreground="{StaticResource TextMutedBrush}" Margin="16,0,6,0"
                                VerticalAlignment="Center" />
                     <Grid Grid.Column="1">
-                        <TextBox x:Name="SearchBox" Width="300" Padding="0,9" FontSize="13.5"
+                        <TextBox x:Name="SearchBox" Width="300" Padding="4,0" FontSize="13.5" VerticalAlignment="Center"
                                  Background="Transparent" Foreground="{StaticResource TextBrush}"
                                  BorderThickness="0" TextChanged="SearchBox_TextChanged"
                                  AutomationProperties.Name="Search movies" />
                         <TextBlock x:Name="SearchHint" Text="Search your movies…" FontSize="13.5"
                                    Foreground="{StaticResource TextMutedBrush}" IsHitTestVisible="False"
-                                   VerticalAlignment="Center" Margin="2,0,0,0" />
+                                   VerticalAlignment="Center" Margin="6,0,0,0" />
                     </Grid>
-                    <Button x:Name="ClearSearchBtn" ToolTip="Clear the search and show everything again" Grid.Column="2" Style="{StaticResource GhostButton}"
-                            Padding="8,4" Margin="4,4,6,4" Visibility="Collapsed" Click="ClearSearch_Click"
+                    <Button x:Name="ClearSearchBtn" ToolTip="Clear the search and show everything again" Grid.Column="2"
+                            Style="{StaticResource IconButton}" Width="28" Height="28" Margin="4,0,8,0"
+                            Visibility="Collapsed" Click="ClearSearch_Click"
                             AutomationProperties.Name="Clear search">
-                        <TextBlock Text="&#xE711;" FontFamily="Segoe MDL2 Assets" FontSize="11" />
+                        <TextBlock Text="&#xE711;" FontFamily="{StaticResource IconFont}" FontSize="10" />
                     </Button>
                 </Grid>
             </Border>
@@ -124,52 +131,53 @@
                 <!-- Only shown once the server has actually answered with films;
                      there is nothing to refresh otherwise. -->
                 <Button x:Name="VaultBtn" Style="{StaticResource GhostButton}" Click="VaultBtn_Click"
-                        Padding="12,8" Margin="0,0,14,0" Visibility="Collapsed"
+                        Padding="14,9" Margin="0,0,10,0" Visibility="Collapsed"
                         ToolTip="Re-check the Vault server for films added or removed"
                         AutomationProperties.Name="Refresh Vault library">
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="&#xE753;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                        <TextBlock Text="&#xE753;" FontFamily="{StaticResource IconFont}" FontSize="12"
                                    VerticalAlignment="Center" Margin="0,0,8,0" />
                         <TextBlock x:Name="VaultBtnText" Text="Vault" FontSize="12.5" />
                     </StackPanel>
                 </Button>
                 <Button x:Name="StreamingBtn" Style="{StaticResource GhostButton}" Click="StreamingBtn_Click"
-                        Padding="12,8" Margin="0,0,14,0"
+                        Padding="14,9" Margin="0,0,10,0"
                         ToolTip="Browse a streaming service, or add a title you own"
                         AutomationProperties.Name="Streaming">
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="&#xE7B5;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                        <TextBlock Text="&#xE7B5;" FontFamily="{StaticResource IconFont}" FontSize="12"
                                    VerticalAlignment="Center" Margin="0,0,8,0" />
                         <TextBlock Text="Streaming" FontSize="12.5" />
-                        <TextBlock Text="&#xE70D;" FontFamily="Segoe MDL2 Assets" FontSize="9"
+                        <TextBlock Text="&#xE70D;" FontFamily="{StaticResource IconFont}" FontSize="9"
                                    VerticalAlignment="Center" Margin="8,1,0,0" />
                     </StackPanel>
                 </Button>
                 <!-- Shelves. Hidden entirely until the account has one, so a
                      library nobody has organised looks exactly as it did. -->
-                <TextBlock x:Name="CollectionIcon" Text="&#xE8B7;" FontFamily="Segoe MDL2 Assets" FontSize="13"
+                <TextBlock x:Name="CollectionIcon" Text="&#xE8F1;" FontFamily="{StaticResource IconFont}" FontSize="13"
                            Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center"
-                           Margin="0,0,8,0" Visibility="Collapsed" />
-                <ComboBox x:Name="CollectionBox" ToolTip="Show only the films on one of your collections" Width="170" Margin="0,0,14,0" Visibility="Collapsed"
+                           Margin="4,0,8,0" Visibility="Collapsed" />
+                <ComboBox x:Name="CollectionBox" ToolTip="Show only the films on one of your collections" Width="170" Margin="0,0,10,0" Visibility="Collapsed"
                           SelectionChanged="CollectionBox_SelectionChanged"
                           AutomationProperties.Name="Collection" />
-                <TextBlock Text="&#xE8CB;" FontFamily="Segoe MDL2 Assets" FontSize="13"
+                <TextBlock Text="&#xE8CB;" FontFamily="{StaticResource IconFont}" FontSize="13"
                            Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center"
-                           Margin="0,0,8,0" />
+                           Margin="4,0,8,0" />
                 <ComboBox x:Name="SortBox" ToolTip="Change the order films are listed in" Width="180" SelectionChanged="SortBox_SelectionChanged"
                           AutomationProperties.Name="Sort order" />
             </StackPanel>
         </Grid>
 
-        <!-- Content -->
-        <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto" Padding="24,0,10,0">
+        <!-- Content. The top padding is headroom for a lifted card and its
+             focus ring, which would otherwise be clipped by the scroll edge. -->
+        <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto" Padding="40,6,24,0">
             <StackPanel>
 
                 <!-- Continue watching -->
-                <StackPanel x:Name="ContinuePanel" Visibility="Collapsed" Margin="0,0,0,22">
-                    <TextBlock Text="Continue watching" FontSize="15" FontWeight="SemiBold"
-                               Foreground="{StaticResource TextBrush}" Margin="0,0,0,10" />
-                    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                <StackPanel x:Name="ContinuePanel" Visibility="Collapsed" Margin="0,0,0,14">
+                    <TextBlock Text="Continue watching" Style="{StaticResource SectionLabel}" />
+                    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"
+                                  Padding="0,6,0,0" Margin="0,-6,0,0">
                         <ItemsControl x:Name="ContinueList">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
@@ -177,30 +185,31 @@
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate DataType="{x:Type models:MovieItem}">
                                     <Button Style="{StaticResource MovieCard}" Click="MovieCard_Click"
+                                            MouseEnter="MovieCard_Hover" GotKeyboardFocus="MovieCard_Hover"
                                             Tag="{Binding}" AutomationProperties.Name="{Binding Name}">
                                         <StackPanel>
-                                            <Border Height="120" Background="{StaticResource BgDeepBrush}" CornerRadius="12,12,0,0">
+                                            <Border Style="{StaticResource CardFrame}">
                                                 <Grid>
-                                                    <TextBlock Text="&#xE714;" FontFamily="Segoe MDL2 Assets" FontSize="34"
-                                                               Foreground="{StaticResource TextMutedBrush}" Opacity="0.55"
+                                                    <TextBlock Text="&#xE714;" FontFamily="{StaticResource IconFont}" FontSize="32"
+                                                               Foreground="{StaticResource TextFaintBrush}"
                                                                HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                                    <Border CornerRadius="12,12,0,0">
+                                                    <Border CornerRadius="11">
                                                         <Border.Background>
                                                             <ImageBrush ImageSource="{Binding Thumbnail}" Stretch="UniformToFill" />
                                                         </Border.Background>
                                                     </Border>
+                                                    <!-- Resume point, drawn on the frame's lower edge. -->
                                                     <ProgressBar Value="{Binding ProgressFraction, Mode=OneWay}" Maximum="1"
-                                                                 Height="4" VerticalAlignment="Bottom"
-                                                                 Background="#66000000" Foreground="{StaticResource AccentBrush}"
-                                                                 BorderThickness="0" />
+                                                                 Height="4" VerticalAlignment="Bottom" Margin="10,0,10,9"
+                                                                 Background="#59000000" Foreground="{StaticResource AccentBrush}" />
                                                 </Grid>
                                             </Border>
-                                            <StackPanel Margin="14,10,14,12">
+                                            <StackPanel Margin="8,10,8,6">
                                                 <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold"
                                                            Foreground="{StaticResource TextBrush}"
                                                            TextTrimming="CharacterEllipsis" />
                                                 <TextBlock Text="{Binding ResumeText}" FontSize="11.5" Margin="0,4,0,0"
-                                                           Foreground="{StaticResource AccentBrush}" />
+                                                           Foreground="{StaticResource AccentLightBrush}" />
                                             </StackPanel>
                                         </StackPanel>
                                     </Button>
@@ -210,11 +219,11 @@
                     </ScrollViewer>
                 </StackPanel>
 
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,10" VerticalAlignment="Center">
-                    <TextBlock x:Name="AllHeader" Text="All movies" FontSize="15" FontWeight="SemiBold"
-                               Foreground="{StaticResource TextBrush}" Visibility="Collapsed" />
-                    <TextBlock x:Name="FilterCount" Text="" FontSize="12" Margin="10,0,0,0"
-                               VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" />
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock x:Name="AllHeader" Text="All movies" Style="{StaticResource SectionLabel}"
+                               Visibility="Collapsed" />
+                    <TextBlock x:Name="FilterCount" Text="" FontSize="12" Margin="10,2,0,12"
+                               VerticalAlignment="Top" Foreground="{StaticResource TextFaintBrush}" />
                 </StackPanel>
 
                 <Grid>
@@ -227,6 +236,7 @@
                         <ItemsControl.ItemTemplate>
                             <DataTemplate DataType="{x:Type models:MovieItem}">
                                 <Button Style="{StaticResource MovieCard}" Click="MovieCard_Click"
+                                        MouseEnter="MovieCard_Hover" GotKeyboardFocus="MovieCard_Hover"
                                         Tag="{Binding}" AutomationProperties.Name="{Binding Name}">
                                     <Button.ContextMenu>
                                         <!-- Items show/hide per card kind in CardMenu_Opened. -->
@@ -247,23 +257,23 @@
                                         </ContextMenu>
                                     </Button.ContextMenu>
                                     <StackPanel>
-                                        <Border Height="120" Background="{StaticResource BgDeepBrush}" CornerRadius="12,12,0,0">
+                                        <Border Style="{StaticResource CardFrame}">
                                             <Grid>
-                                                <TextBlock Text="&#xE714;" FontFamily="Segoe MDL2 Assets" FontSize="34"
-                                                           Foreground="{StaticResource TextMutedBrush}" Opacity="0.55"
+                                                <TextBlock Text="&#xE714;" FontFamily="{StaticResource IconFont}" FontSize="32"
+                                                           Foreground="{StaticResource TextFaintBrush}"
                                                            HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                                <Border CornerRadius="12,12,0,0">
+                                                <Border CornerRadius="11">
                                                     <Border.Background>
                                                         <ImageBrush ImageSource="{Binding Thumbnail}" Stretch="UniformToFill" />
                                                     </Border.Background>
                                                 </Border>
                                                 <!-- Streaming shortcut: launches the service, never plays here.
                                                      Sits above the poster so it stays legible if one is ever set. -->
-                                                <Border Background="#CC0E0604" CornerRadius="9" Padding="8,3"
-                                                        HorizontalAlignment="Left" VerticalAlignment="Top" Margin="7"
+                                                <Border Style="{StaticResource PosterChip}"
+                                                        HorizontalAlignment="Left" VerticalAlignment="Top"
                                                         Visibility="{Binding ShortcutBadgeVisibility}">
                                                     <StackPanel Orientation="Horizontal">
-                                                        <TextBlock Text="&#xE7B5;" FontFamily="Segoe MDL2 Assets"
+                                                        <TextBlock Text="&#xE7B5;" FontFamily="{StaticResource IconFont}"
                                                                    FontSize="9" VerticalAlignment="Center"
                                                                    Foreground="{StaticResource AccentWarmBrush}" />
                                                         <TextBlock Text="{Binding Service}" FontSize="10.5" Margin="6,0,0,0"
@@ -272,34 +282,33 @@
                                                     </StackPanel>
                                                 </Border>
                                                 <!-- Vault film: streamed from the server, nothing stored here. -->
-                                                <Border Background="#CC0E0604" CornerRadius="9" Padding="8,3"
-                                                        HorizontalAlignment="Left" VerticalAlignment="Top" Margin="7"
+                                                <Border Style="{StaticResource PosterChip}"
+                                                        HorizontalAlignment="Left" VerticalAlignment="Top"
                                                         Visibility="{Binding ServerBadgeVisibility}"
                                                         ToolTip="Streams from the Vault server">
                                                     <StackPanel Orientation="Horizontal">
-                                                        <TextBlock Text="&#xE753;" FontFamily="Segoe MDL2 Assets"
+                                                        <TextBlock Text="&#xE753;" FontFamily="{StaticResource IconFont}"
                                                                    FontSize="9" VerticalAlignment="Center"
-                                                                   Foreground="{StaticResource AccentBrush}" />
+                                                                   Foreground="{StaticResource AccentLightBrush}" />
                                                         <TextBlock Text="Vault" FontSize="10.5" Margin="6,0,0,0"
                                                                    FontWeight="SemiBold"
-                                                                   Foreground="{StaticResource AccentBrush}" />
+                                                                   Foreground="{StaticResource TextBrush}" />
                                                     </StackPanel>
                                                 </Border>
                                                 <!-- Times-watched badge -->
-                                                <Border Background="#CC0E0604" CornerRadius="9" Padding="7,2"
-                                                        HorizontalAlignment="Right" VerticalAlignment="Top" Margin="7"
+                                                <Border Style="{StaticResource PosterChip}" Padding="8,2"
+                                                        HorizontalAlignment="Right" VerticalAlignment="Top"
                                                         Visibility="{Binding WatchBadgeVisibility}"
                                                         ToolTip="{Binding WatchTooltip}">
                                                     <TextBlock Text="{Binding WatchBadgeText}" FontSize="11"
-                                                               FontWeight="Bold" Foreground="{StaticResource AccentBrush}" />
+                                                               FontWeight="Bold" Foreground="{StaticResource TextBrush}" />
                                                 </Border>
                                                 <ProgressBar Value="{Binding ProgressFraction, Mode=OneWay}" Maximum="1"
-                                                             Height="4" VerticalAlignment="Bottom"
-                                                             Background="Transparent" Foreground="{StaticResource AccentBrush}"
-                                                             BorderThickness="0" />
+                                                             Height="4" VerticalAlignment="Bottom" Margin="10,0,10,9"
+                                                             Background="Transparent" Foreground="{StaticResource AccentBrush}" />
                                             </Grid>
                                         </Border>
-                                        <StackPanel Margin="14,10,14,12">
+                                        <StackPanel Margin="8,10,8,6">
                                             <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold"
                                                        Foreground="{StaticResource TextBrush}"
                                                        TextTrimming="CharacterEllipsis" />
@@ -313,16 +322,22 @@
                     </ItemsControl>
 
                     <!-- Empty / no-results state -->
-                    <StackPanel x:Name="EmptyState" VerticalAlignment="Center" HorizontalAlignment="Center"
-                                Visibility="Collapsed" Margin="0,60,0,0">
-                        <TextBlock x:Name="EmptyGlyph" Text="&#xE8B7;" FontFamily="Segoe MDL2 Assets" FontSize="44"
-                                   Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" />
-                        <TextBlock x:Name="EmptyTitle" Text="No folder selected" FontSize="19" FontWeight="SemiBold"
-                                   Foreground="{StaticResource TextBrush}" HorizontalAlignment="Center" Margin="0,16,0,6" />
-                        <TextBlock x:Name="EmptyText" Text="Choose the folder where your movies live — only video files will be listed."
-                                   FontSize="13" Foreground="{StaticResource TextMutedBrush}" TextAlignment="Center"
-                                   TextWrapping="Wrap" MaxWidth="360" />
-                    </StackPanel>
+                    <Border x:Name="EmptyState" Style="{StaticResource GlassPanel}" Padding="40,34"
+                            VerticalAlignment="Top" HorizontalAlignment="Center"
+                            Visibility="Collapsed" Margin="0,50,16,0">
+                        <StackPanel>
+                            <Border Width="64" Height="64" CornerRadius="17" Background="{StaticResource TileTealBrush}"
+                                    HorizontalAlignment="Center">
+                                <TextBlock x:Name="EmptyGlyph" Text="&#xEC50;" FontFamily="{StaticResource IconFont}" FontSize="28"
+                                           Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock x:Name="EmptyTitle" Text="No folder selected" FontSize="19" FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextBrush}" HorizontalAlignment="Center" Margin="0,18,0,6" />
+                            <TextBlock x:Name="EmptyText" Text="Choose the folder where your movies live — only video files will be listed."
+                                       FontSize="13" Foreground="{StaticResource TextMutedBrush}" TextAlignment="Center"
+                                       TextWrapping="Wrap" MaxWidth="360" />
+                        </StackPanel>
+                    </Border>
                 </Grid>
             </StackPanel>
         </ScrollViewer>

@@ -32,14 +32,23 @@ public static class TvPage
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Vault Movies</title>
 <style>
+  /* Smoked glass over a dimmed film still, the same look as the desktop app
+     (see Theme.xaml there). Nothing on this page can blur what is behind it —
+     backdrop-filter is Chromium 76, a long way past the sets this runs on — so
+     the still is softened ONCE into a small canvas (softenArt) and every
+     panel is plain translucency on top of that. It reads as frosted glass and
+     costs the television nothing per frame. */
   :root {
-    --bg:#1A0D09; --deep:#0E0604; --surface:#24100B; --line:#43281F;
-    --text:#F6ECE5; --muted:#D9C0B3; --accent:#C8442A; --warm:#F0A070;
-    /* Focus has its own colour, and deliberately not the accent. The accent
-       fills the selected shelf chip, tints the selected layout, and draws the
-       resume bar — so a red ring meant "you are here" in the same red that
-       already meant "this one is chosen", and from across a room they were the
-       same thing. Blue is nothing else on this page. */
+    --bg:#0B0D12; --deep:#06070A;
+    --glass:rgba(255,255,255,.08); --glass-hi:rgba(255,255,255,.17);
+    --line:rgba(255,255,255,.12); --line-hi:rgba(255,255,255,.3);
+    --smoke:rgba(20,22,28,.72); --smoke-hi:rgba(44,48,58,.86);
+    --text:#F4F6FA; --muted:#A6AFBD; --faint:#6F7887;
+    --warm:#F5C77E; --danger:#FF7A7A; --ok:#5FD88E;
+    /* Focus has its own colour, and nothing else on this page uses it. A ring
+       that shares its colour with "this one is chosen" or "this is how far you
+       got" stops meaning "you are here" from across a room. Chosen things are
+       white instead, and progress is white. */
     --focus:#005ED9;
   }
   * { box-sizing:border-box; }
@@ -53,30 +62,56 @@ public static class TvPage
     font-family:'Segoe UI',Roboto,system-ui,-apple-system,sans-serif;
     -webkit-font-smoothing:antialiased;
   }
+
+  /* ---- the wallpaper ---- */
+  /* A dusk sky until there is a film to show, then the film under the
+     highlight, faded in over it. Two canvases so one can fade into the next. */
+  #wall { position:fixed; left:0; top:0; right:0; bottom:0; z-index:0; overflow:hidden;
+    background:
+      radial-gradient(ellipse 62% 78% at 78% 28%, rgba(122,60,36,.6), rgba(42,23,18,.28) 46%, rgba(11,13,18,0) 78%),
+      radial-gradient(ellipse 70% 80% at 12% 94%, rgba(26,58,110,.62), rgba(15,30,58,.3) 50%, rgba(11,13,18,0) 82%),
+      radial-gradient(ellipse 55% 45% at 42% 4%, rgba(38,49,74,.7), rgba(11,13,18,0) 100%),
+      #0B0D12; }
+  #wall canvas { position:absolute; left:0; top:0; width:100%; height:100%; opacity:0;
+                 -webkit-transition:opacity .7s; transition:opacity .7s; }
+  #wall canvas.on { opacity:1; }
+  /* The scrim: the still is never shown at full strength, so white text reads
+     on whatever frame a film happens to have. Darker low down where the grid
+     is, and on the left where titles sit. */
+  #wall .scrim { position:absolute; left:0; top:0; right:0; bottom:0;
+    background:
+      linear-gradient(to right, rgba(7,8,11,.55), rgba(7,8,11,0) 62%),
+      linear-gradient(rgba(7,8,11,.5), rgba(7,8,11,.66) 45%, rgba(7,8,11,.9)); }
+
   /* Televisions overscan; nothing that matters sits in the outer edge. */
-  .screen { display:none; height:100%; padding:3.4rem 5rem; }
+  .screen { display:none; height:100%; padding:3.4rem 5rem; position:relative; z-index:1; }
   .screen.on { display:block; }
   .col { height:100%; display:flex; flex-direction:column; }
 
-  h1 { font-size:2.975rem; margin:0 0 .6rem; font-weight:700; }
+  h1 { font-size:3.4rem; margin:0 0 .6rem; font-weight:700; letter-spacing:-.02em; }
   .sub { color:var(--muted); font-size:1.725rem; margin:0 0 1.6rem; line-height:1.5; }
+  .sub b { color:var(--text); }
+
+  /* The time, top right, as on the set's own home screen. */
+  .clock { font-size:2.6rem; font-weight:300; color:var(--text); white-space:nowrap; }
+  #clockFixed { position:fixed; top:3.2rem; right:5rem; z-index:2; }
 
   /* Focus IS the interface here. It must never be subtle or absent.
      Two rings, not one. The blue is the highlight; the pale hairline inside it
      is what keeps the blue readable when it lands on top of a film still,
-     which is most of this screen. Blue against this background is about 3:1,
-     which is fine on a wall of dark brown and not fine against a bright frame
-     — the hairline gives it an edge to sit against either way. Drawn as a
-     shadow rather than a border so it costs the card no width: these are
-     percentage-width columns and a real border would reflow the grid. */
+     which is most of this screen. Blue on a dark wall is about 3:1, which is
+     fine on its own and not fine against a bright frame — the hairline gives
+     it an edge to sit against either way. Drawn as a shadow rather than a
+     border so it costs the card no width: these are percentage-width columns
+     and a real border would reflow the grid. */
   [data-f] { outline:none; }
-  [data-f].focus { box-shadow:0 0 0 .12rem var(--text), 0 0 0 .5rem var(--focus); }
+  [data-f].focus { box-shadow:0 0 0 .14rem var(--text), 0 0 0 .5rem var(--focus); }
 
   /* ---- sign in ---- */
   .url { font-size:2.975rem; font-weight:800; color:var(--warm); margin:.4rem 0 1.4rem; }
-  .entry { font-family:Consolas,monospace; font-size:3.975rem; font-weight:800; color:var(--accent);
+  .entry { font-family:Consolas,monospace; font-size:3.975rem; font-weight:800; color:var(--text);
            letter-spacing:.5rem; min-height:4.4rem; }
-  .entry .ph { color:var(--line); }
+  .entry .ph { color:var(--faint); }
   .keys { max-width:70rem; }
   /* Eleven keys across at 5.4rem with .5rem between them; the spacebar matches
      that span so the bottom of the keyboard lines up with the top of it. */
@@ -90,19 +125,23 @@ public static class TvPage
   .key {
     display:inline-flex; align-items:center; justify-content:center;
     width:5.4rem; height:5.4rem; margin:0 .5rem .5rem 0; padding:0;
-    background:var(--surface); border:1px solid var(--line); border-radius:.45rem;
+    background:var(--smoke); border:1px solid var(--line); border-radius:.9rem;
     font-size:1.875rem; font-weight:700; text-align:center; color:var(--text);
     font-family:inherit; vertical-align:top;
   }
+  .key.focus { background:var(--smoke-hi); }
   .key.act { color:var(--warm); font-size:1.425rem; }
   .krow { white-space:nowrap; }
-  .err { color:var(--accent); font-size:1.675rem; min-height:2rem; margin-top:1rem; }
+  .err { color:var(--danger); font-size:1.675rem; min-height:2rem; margin-top:1rem; }
 
   /* ---- library ---- */
-  .bar { flex:none; margin-bottom:1.2rem; }
-  .bar .who { float:right; color:var(--muted); font-size:1.575rem; padding-top:.6rem;
+  .bar { flex:none; margin-bottom:.6rem; }
+  .bar .clock { float:right; padding-top:.15rem; margin-left:1.6rem; }
+  .bar .who { float:right; color:var(--muted); font-size:1.575rem; padding-top:.45rem;
               text-align:right; }
   .whoname { margin-bottom:.5rem; }
+  /* "All films · 25", quietly, the way a set labels each row of its grid. */
+  .label { flex:none; color:var(--muted); font-size:1.6rem; font-weight:600; margin:.4rem 0 .2rem .7rem; }
   /* Collections. inline-block chips rather than flex, for the same reason the
      grid uses them: `gap` collapses to nothing on the sets this has to run on.
      Hidden entirely until a shelf exists, so a library nobody has organised
@@ -111,41 +150,45 @@ public static class TvPage
   .rail { margin-top:1rem; display:none; }
   .rail.on { display:block; }
   .chip {
-    display:inline-block; margin:0 .6rem .6rem 0; padding:.6rem 1.3rem;
-    background:var(--surface); border:1px solid var(--line); border-radius:1.4rem;
-    font-size:1.525rem; font-weight:600; color:var(--muted);
+    display:inline-block; margin:0 .6rem .6rem 0; padding:.6rem 1.4rem;
+    background:var(--glass); border:1px solid var(--line); border-radius:.75rem;
+    font-size:1.525rem; font-weight:600; color:var(--text);
     font-family:inherit; vertical-align:top;
   }
-  .chip.sel { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .chip.focus { background:var(--glass-hi); }
+  /* Chosen is white, never blue — see --focus. */
+  .chip.sel { background:var(--text); border-color:var(--text); color:var(--bg); }
   /* ---- dropdowns ---- */
-  .menu { display:none; position:fixed; z-index:50; background:var(--deep);
-          border:1px solid var(--line); border-radius:.8rem; padding:.6rem;
+  .menu { display:none; position:fixed; z-index:50; background:rgba(22,24,30,.97);
+          border:1px solid var(--line); border-radius:1.2rem; padding:.6rem;
           box-shadow:0 1.4rem 3.4rem rgba(0,0,0,.7); }
   .menu.on { display:block; }
   .mrow {
     display:block; width:100%; text-align:left; background:transparent; border:none;
     color:var(--text); font-family:inherit; font-size:1.525rem; padding:.9rem 1.4rem;
-    border-radius:.5rem; white-space:nowrap;
+    border-radius:.8rem; white-space:nowrap;
   }
-  .mrow[disabled] { color:var(--line); }
+  .mrow.focus { background:var(--glass-hi); }
+  .mrow[disabled] { color:var(--faint); }
   /* The layout choices show the shape they produce, with the words underneath
      rather than beside — a grid of squares reads as a picture of the result,
      and the label says which one it is. */
   .mrow.tile { text-align:center; padding:1.1rem 1.6rem; }
   .mrow.tile .lab { display:block; margin-top:.7rem; font-size:1.35rem; }
   .mrow.tile .sub2 { display:block; font-size:1.15rem; color:var(--muted); margin-top:.15rem; }
-  .mrow.sel .lab { color:var(--accent); font-weight:700; }
+  .mrow.sel .lab { color:var(--text); font-weight:700; }
+  .mrow.sel { background:var(--glass); }
   .caret { margin-left:.7rem; font-size:1.1rem; color:var(--muted); }
 
   /* The layout control sits at the far right of the shelf row. */
   .chip.layout { float:right; margin-right:0; padding:.55rem 1rem; }
   .gg { display:inline-block; line-height:0; }
-  .gg i { display:inline-block; background:var(--muted); margin:.09rem; vertical-align:top; }
+  .gg i { display:inline-block; background:var(--muted); margin:.09rem; vertical-align:top; border-radius:.08rem; }
   .gg3 i { width:.62rem; height:.62rem; }
   .gg4 i { width:.48rem; height:.48rem; }
   .gg5 i { width:.38rem; height:.38rem; }
   .gg6 i { width:.31rem; height:.31rem; }
-  .chip.layout.focus .gg i { background:var(--text); }
+  .chip.layout.focus .gg i, .mrow.sel .gg i { background:var(--text); }
 
   /* The padding is what stops the focus ring being shaved off. Cards sit flush
      against the edges of this box, and the ring is drawn OUTSIDE the card, so
@@ -158,11 +201,14 @@ public static class TvPage
      once. inline-block and percentage margins, never flex gap — gap collapses
      to nothing on the sets this has to run on and the grid silently loses all
      its spacing. */
+  /* A tile of smoked glass: the frame inside it, the title under the frame. */
   .card {
     display:inline-block; vertical-align:top;
-    background:transparent; border:none; padding:0; text-align:left; color:inherit;
+    background:var(--smoke); border:1px solid var(--line); border-radius:1.1rem;
+    padding:.55rem .55rem .9rem; text-align:left; color:inherit;
     font-family:inherit;
   }
+  .card.focus { background:var(--smoke-hi); }
   .cols3 .card { width:31.3%; margin:0 3% 2rem 0; }
   .cols3 .card:nth-child(3n) { margin-right:0; }
   .cols4 .card { width:23.5%; margin:0 2% 1.9rem 0; }
@@ -173,39 +219,36 @@ public static class TvPage
   .cols6 .card:nth-child(6n) { margin-right:0; }
 
   /* The number in the corner of each card, and the digits typed to reach it. */
-  .idx { position:absolute; right:.4rem; bottom:.4rem; background:rgba(14,6,4,.88);
+  .idx { position:absolute; right:.45rem; bottom:.45rem; background:rgba(6,7,10,.72);
          color:var(--text); font-size:1.225rem; font-weight:700;
-         padding:.15rem .5rem; border-radius:.3rem; }
+         padding:.15rem .55rem; border-radius:.4rem; }
   .jump { position:fixed; left:50%; top:50%; transform:translate(-50%,-50%);
-          background:rgba(14,6,4,.95); border:2px solid var(--accent); border-radius:1rem;
-          padding:1.6rem 3rem; font-size:4rem; font-weight:800; color:var(--accent);
-          display:none; letter-spacing:.4rem; }
+          background:rgba(22,24,30,.95); border:1px solid var(--line-hi); border-radius:1.4rem;
+          padding:1.6rem 3rem; font-size:4rem; font-weight:800; color:var(--text);
+          display:none; letter-spacing:.4rem; box-shadow:0 1.4rem 3.4rem rgba(0,0,0,.6); }
   .jump.on { display:block; }
   /* 16:9, because these are frames lifted out of the films themselves, not
      printed poster art. A 2:3 portrait box cropped a 2.39:1 frame down to a
      narrow vertical strip — the thin, distorted slivers this used to show.
      padding-top is the portable way to hold a ratio; aspect-ratio is far too
      new for the sets this has to run on. */
-  .thumb { position:relative; width:100%; padding-top:56.25%; background:var(--surface);
-           border-radius:.5rem; background-size:cover; background-position:center; overflow:hidden; }
+  .thumb { position:relative; width:100%; padding-top:56.25%; background:var(--deep);
+           border-radius:.7rem; background-size:cover; background-position:center; overflow:hidden; }
   .thumb .glyph { position:absolute; left:0; top:42%; width:100%; text-align:center;
-                  font-size:3.375rem; color:var(--line); }
-  /* The title reserves two lines so cards keep a common height, but the box was
-     taller than the two lines it holds, which left a gap under every one-line
-     title. min-height sized to the line height closes it without letting a long
-     title push its card out of line with the rest of the row. */
+                  font-size:3.375rem; color:var(--faint); }
   /* No reserved second line. The box used to hold two lines whatever the title
      was, which left a short one floating above a gap before the runtime. It
      sizes to its text now and is capped at two lines, so a long title still
      cannot push its card out of step with the row. Cards are top-aligned, so
      uneven heights cost nothing. */
-  .name { font-size:1.525rem; font-weight:600; margin-top:.55rem; line-height:1.25;
+  .name { font-size:1.525rem; font-weight:600; margin:.7rem .4rem 0; line-height:1.25;
           max-height:3.8rem; overflow:hidden; }
-  .meta { font-size:1.375rem; color:var(--muted); margin-top:-.15rem; }
-  .badge { position:absolute; left:.4rem; top:.4rem; background:rgba(14,6,4,.9); color:var(--warm);
-           font-size:1.225rem; padding:.25rem .5rem; border-radius:.35rem; font-weight:700; }
-  .resume { position:absolute; left:0; right:0; bottom:0; height:.35rem; background:rgba(0,0,0,.55); }
-  .resume i { display:block; height:100%; background:var(--accent); }
+  .meta { font-size:1.375rem; color:var(--muted); margin:.1rem .4rem 0; }
+  .badge { position:absolute; left:.45rem; top:.45rem; background:rgba(6,7,10,.78); color:var(--warm);
+           font-size:1.225rem; padding:.25rem .6rem; border-radius:.45rem; font-weight:700; }
+  .resume { position:absolute; left:.7rem; right:.7rem; bottom:.7rem; height:.35rem;
+            background:rgba(0,0,0,.55); border-radius:.2rem; overflow:hidden; }
+  .resume i { display:block; height:100%; background:var(--text); }
 
   /* ---- collections ---- */
   .shlist { flex:1; min-height:0; overflow-y:auto; padding:.65rem; }
@@ -215,47 +258,54 @@ public static class TvPage
      highlight is. */
   .shrow {
     display:block; width:100%; max-width:46rem; text-align:left; margin:0 0 .7rem;
-    padding:1.1rem 1.5rem; background:var(--surface); border:1px solid var(--line);
-    border-radius:.6rem; color:var(--text); font-size:1.775rem; font-family:inherit;
+    padding:1.1rem 1.6rem; background:var(--smoke); border:1px solid var(--line);
+    border-radius:1rem; color:var(--text); font-size:1.775rem; font-family:inherit;
   }
-  .shrow .tick { color:var(--accent); font-weight:700; margin-right:1rem; }
+  .shrow.focus { background:var(--smoke-hi); }
+  .shrow .tick { color:var(--ok); font-weight:700; margin-right:1rem; }
   .shrow.new { color:var(--warm); }
 
   /* ---- detail ---- */
-  /* Text on the left, the film on the right. Two columns rather than a title
-     stranded at the top of an empty screen. */
-  /* Both columns centred against each other rather than the text riding at the
-     top of an otherwise empty screen. */
+  /* Text on the left, the film on the right, both centred against each other
+     rather than the text riding at the top of an otherwise empty screen. The
+     wall behind is the same film, softened, so the page is all one picture. */
   .dwrap { display:flex; flex:1; min-height:0; align-items:center; }
   .dtext { flex:1; min-width:0; padding-right:3.5rem; }
   .dart { flex:none; width:52%; position:relative;
-          padding-top:29.25%; background:var(--surface); border-radius:.8rem;
+          padding-top:29.25%; background:var(--deep); border-radius:1.2rem;
           background-size:cover; background-position:center; overflow:hidden;
-          box-shadow:0 1.2rem 3rem rgba(0,0,0,.55); }
+          border:1px solid var(--line);
+          box-shadow:0 1.6rem 4rem rgba(0,0,0,.6); }
   .dart .glyph { position:absolute; left:0; top:40%; width:100%; text-align:center;
-                 font-size:4.375rem; color:var(--line); }
+                 font-size:4.375rem; color:var(--faint); }
   .dmeta { color:var(--muted); font-size:1.675rem; margin:.6rem 0; }
   .warn { color:var(--warm); font-size:1.625rem; margin:1rem 0; max-width:52rem; line-height:1.55; }
-  .btn { display:inline-block; background:var(--accent); color:#fff; border:none; border-radius:.5rem;
-         padding:1.1rem 2.6rem; font-size:1.725rem; font-weight:700; font-family:inherit; margin:1.4rem .7rem 0 0; }
-  .btn.ghost { background:transparent; border:1px solid var(--line); color:var(--text); }
+  /* The action a screen wants pressed is white, as on every television's own
+     Play button; the rest are glass. */
+  .btn { display:inline-block; background:var(--text); color:var(--bg); border:1px solid var(--text);
+         border-radius:.75rem; padding:1.1rem 2.6rem; font-size:1.725rem; font-weight:700;
+         font-family:inherit; margin:1.4rem .9rem 0 0; }
+  .btn.ghost { background:var(--glass); border-color:var(--line); color:var(--text); }
+  .btn.ghost.focus { background:var(--glass-hi); }
   .btn[disabled] { opacity:.4; }
 
   /* ---- player ---- */
   #player { padding:0; background:#000; }
   #player.on { position:relative; }
   video { width:100%; height:100%; background:#000; display:block; }
-  #hud { position:absolute; left:0; right:0; bottom:0; padding:2rem 4rem 2.6rem;
-         background:linear-gradient(transparent,rgba(14,6,4,.95)); transition:opacity .25s; }
+  #hud { position:absolute; left:0; right:0; bottom:0; padding:3rem 4rem 2.6rem;
+         background:linear-gradient(rgba(0,0,0,0),rgba(0,0,0,.88)); transition:opacity .25s; }
   #hud.hide { opacity:0; }
-  #hud .t { font-size:2.175rem; font-weight:700; }
-  #hud .times { font-size:1.475rem; color:var(--muted); margin:.8rem 0 .5rem; }
+  #hud .t { font-size:2.375rem; font-weight:700; }
+  #hud .times { font-size:1.475rem; color:var(--muted); margin:.8rem 0 .6rem; }
   #hud .times .right { float:right; }
-  .track { height:.4rem; background:rgba(255,255,255,.22); border-radius:.2rem; overflow:hidden; clear:both; }
-  .track i { display:block; height:100%; background:var(--accent); }
+  .track { height:.45rem; background:rgba(255,255,255,.24); border-radius:.25rem; overflow:hidden; clear:both; }
+  .track i { display:block; height:100%; background:var(--text); border-radius:.25rem; }
   /* Positioned against #hud, its parent, so it fades with the rest of the HUD
      instead of sitting over the picture for the whole film. */
-  #hint { position:absolute; top:.7rem; right:4rem; color:var(--muted); font-size:1.425rem; }
+  #hint { position:absolute; top:.9rem; right:4rem; color:var(--muted); font-size:1.425rem;
+          background:rgba(20,22,28,.7); border:1px solid var(--line); border-radius:.6rem;
+          padding:.35rem 1.2rem; }
   .center { text-align:center; color:var(--muted); font-size:1.775rem; padding-top:6rem; }
 
   /* Shown while the server repackages a film the television cannot open as it
@@ -264,7 +314,7 @@ public static class TvPage
   #prep { display:none; position:absolute; left:0; right:0; top:38%; text-align:center; }
   #prep.on { display:block; }
   #prep .pt { font-size:2.275rem; font-weight:700; }
-  #prep .pp { font-size:3.575rem; font-weight:700; color:var(--accent); margin:1.4rem 0 1rem; }
+  #prep .pp { font-size:3.575rem; font-weight:700; color:var(--text); margin:1.4rem 0 1rem; }
   #prep .ps { font-size:1.575rem; color:var(--muted); }
 </style>
 </head>
@@ -272,6 +322,11 @@ public static class TvPage
      moment on load with no active element at all, and a television browser
      reads that as "this page does not want the keys". -->
 <body tabindex="-1">
+
+<!-- The wallpaper every screen sits on. See softenArt. -->
+<div id="wall"><canvas id="wallA" width="256" height="144"></canvas><canvas id="wallB" width="256" height="144"></canvas><div class="scrim"></div></div>
+<!-- The library carries its own clock in its header; every other screen uses this one. -->
+<div class="clock" id="clockFixed"></div>
 
 <section id="signin" class="screen on"><div class="col">
   <h1>Sign in to Vault Movies</h1>
@@ -289,8 +344,9 @@ public static class TvPage
 </div></section>
 
 <section id="library" class="screen"><div class="col">
-  <div class="bar"><span class="who" id="who"></span><h1>Your library</h1>
+  <div class="bar"><span class="clock" id="clockBar"></span><span class="who" id="who"></span><h1>Your library</h1>
     <div class="rail" id="rail"></div></div>
+  <div class="label" id="gridLabel"></div>
   <div class="grid" id="grid"></div>
   <!-- Shows the digits as they are typed, so pressing 1 then 4 is visibly on
        its way to 14 rather than looking like it jumped to 1 and stuck. -->
@@ -441,6 +497,9 @@ public static class TvPage
       var el = $(all[i]);
       if (all[i] === name) el.className = 'screen on'; else el.className = 'screen';
     }
+    $('clockFixed').style.display = (name === 'library' || name === 'player') ? 'none' : '';
+    // Nothing has been chosen on these, so they get the plain dusk.
+    if (name === 'signin' || name === 'gate') showWall(null);
     focusFirst(true);
   }
 
@@ -465,6 +524,8 @@ public static class TvPage
     // focused at once.
     clearFocusRing();
     el.className += ' focus';
+    var art = el.getAttribute('data-art');
+    if (art) wallSoon(art);
     // Move real DOM focus too, not only the ring. Without this the document's
     // active element never leaves <body>, so a television's own spatial
     // navigation and its voice guidance have nothing to work with — and on a
@@ -1034,6 +1095,7 @@ public static class TvPage
   function centerMessage(text, label, fn) {
     var g = $('grid');
     g.innerHTML = '';
+    $('gridLabel').textContent = '';
     var msg = document.createElement('div');
     msg.className = 'center';
     msg.textContent = text;
@@ -1078,6 +1140,7 @@ public static class TvPage
       // webOS and Tizen — so a screen with nothing focusable is a set that has
       // to be power-cycled.
       g.innerHTML = '';
+      $('gridLabel').textContent = S.shelf ? S.shelf.name : '';
       var msg = document.createElement('div');
       msg.className = 'center';
       msg.textContent = 'Nothing on this shelf yet.';
@@ -1099,6 +1162,8 @@ public static class TvPage
 
     applyCols();
     g.innerHTML = '';
+    $('gridLabel').textContent = (S.shelf ? S.shelf.name : 'All films') + '  \u00b7  ' +
+      items.length + (items.length === 1 ? ' film' : ' films');
     for (var i = 0; i < items.length; i++) {
       (function (it, idx) {
         var seen = S.resume[it.filmKey];
@@ -1106,6 +1171,7 @@ public static class TvPage
         var b = document.createElement('button');
         b.className = 'card';
         b.setAttribute('data-f', '');
+        if (it.artUrl) b.setAttribute('data-art', it.artUrl);
         if (idx === 0) b.setAttribute('data-first', '');
         b.innerHTML =
           '<div class="thumb"><span class="glyph">&#127916;</span>' +
@@ -1150,7 +1216,86 @@ public static class TvPage
       artCache[url] = URL.createObjectURL(b);
       el.style.backgroundImage = 'url("' + artCache[url] + '")';
       if (gl) gl.style.display = 'none';
+      if (wallWanted === url) showWall(url);
     })['catch'](function () {});
+  }
+
+  // ---- the wallpaper ----------------------------------------------------
+  //
+  // The film under the highlight, softened and dimmed, behind the whole page —
+  // the way a television's own home screen takes on whatever tile is lit.
+  //
+  // The softening is done once per film, into a 256-pixel canvas, by halving
+  // the picture down to almost nothing and doubling it back up. Each step is
+  // the browser's own smoothing, and a run of them is a blur: no ctx.filter
+  // (Chromium 52, and slow where it exists) and no CSS filter, which a 2018
+  // set would re-run over a full-screen layer every frame. The canvas is then
+  // stretched to the screen, and since there is nothing sharp left in it to
+  // stretch, it stays smooth.
+  var wallWanted = null, wallShown = null, wallTimer = null, wallTop = 'wallA';
+
+  function softenArt(img, out) {
+    var w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+    if (!w || !h) return false;
+    // Cover the 16:9 canvas, cropping the middle of the frame.
+    var sw = w, sh = Math.round(w * 9 / 16);
+    if (sh > h) { sh = h; sw = Math.round(h * 16 / 9); }
+    var cur = document.createElement('canvas'), cw = 256, ch = 144;
+    cur.width = cw; cur.height = ch;
+    cur.getContext('2d').drawImage(img, (w - sw) / 2, (h - sh) / 2, sw, sh, 0, 0, cw, ch);
+    function step(nw, nh) {
+      var n = document.createElement('canvas');
+      n.width = nw; n.height = nh;
+      n.getContext('2d').drawImage(cur, 0, 0, nw, nh);
+      cur = n; cw = nw; ch = nh;
+    }
+    while (cw > 32) step(cw / 2, ch / 2);
+    while (cw < 256) step(cw * 2, ch * 2);
+    var ctx = out.getContext('2d');
+    ctx.clearRect(0, 0, out.width, out.height);
+    ctx.drawImage(cur, 0, 0, out.width, out.height);
+    return true;
+  }
+
+  // Waits for the highlight to settle, so sweeping along a row does not
+  // flicker through every film on the way past.
+  function wallSoon(url) {
+    wallWanted = url;
+    clearTimeout(wallTimer);
+    wallTimer = setTimeout(function () { showWall(url); }, 320);
+  }
+
+  function showWall(url) {
+    wallWanted = url;
+    clearTimeout(wallTimer);
+    if (url === wallShown) return;
+    if (!url) {
+      wallShown = null;
+      $('wallA').className = ''; $('wallB').className = '';
+      return;
+    }
+    // Not fetched yet: loadArt calls back here when it is.
+    if (!artCache[url]) return;
+    var img = new Image();
+    img.onload = function () {
+      if (wallWanted !== url) return;   // the highlight moved on while this decoded
+      var next = wallTop === 'wallA' ? 'wallB' : 'wallA';
+      if (!softenArt(img, $(next))) return;
+      $(next).className = 'on';
+      $(wallTop).className = '';
+      wallTop = next;
+      wallShown = url;
+    };
+    img.src = artCache[url];
+  }
+
+  // ---- the clock --------------------------------------------------------
+  function tickClock() {
+    var d = new Date(), txt;
+    try { txt = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); }
+    catch (e) { txt = d.getHours() + ':' + pad2(d.getMinutes()); }
+    $('clockFixed').textContent = txt;
+    $('clockBar').textContent = txt;
   }
 
   // ---- detail -----------------------------------------------------------
@@ -1164,7 +1309,7 @@ public static class TvPage
     art.style.backgroundImage = '';
     var gl = art.getElementsByClassName('glyph')[0];
     if (gl) gl.style.display = '';
-    if (it.artUrl) loadArt(art, it.artUrl);
+    if (it.artUrl) { loadArt(art, it.artUrl); showWall(it.artUrl); }
     var bits = [];
     if (it.durationMs) bits.push(fmt(it.durationMs));
     if (it.videoCodec) bits.push(String(it.videoCodec).toUpperCase());
@@ -1669,6 +1814,8 @@ public static class TvPage
 
   // ---- boot -------------------------------------------------------------
   rescale();
+  tickClock();
+  setInterval(tickClock, 5000);
   armBackTrap();
   buildKeys(); renderEntry();
   try { S.refresh = localStorage.getItem(LS); } catch (e) { S.memoryOnly = true; }

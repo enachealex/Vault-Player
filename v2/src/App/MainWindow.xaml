@@ -2,6 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        xmlns:views="clr-namespace:VideoPlayer.App.Views"
         Title="Vault Movies"
         Icon="Assets/app.ico"
         Width="1280" Height="800" MinWidth="860" MinHeight="560"
@@ -29,6 +30,10 @@
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
+            <!-- The wallpaper, under the title bar as well as the content: the
+                 window is one canvas, not a strip of chrome above a canvas. -->
+            <views:AmbientBackdrop x:Name="Ambient" Grid.RowSpan="2" />
+
             <Border x:Name="TitleBar" Grid.Row="0" Height="38"
                     Background="{StaticResource TitleBarBrush}"
                     BorderBrush="{StaticResource TitleBarLineBrush}" BorderThickness="0,0,0,1">
@@ -42,8 +47,13 @@
                     <!-- Brand mark + title -->
                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center"
                                 Margin="14,0,0,0">
-                        <Border Width="16" Height="16" CornerRadius="5"
-                                Background="{StaticResource AccentBrush}" />
+                        <!-- The app icon in miniature. -->
+                        <Border Width="18" Height="18" CornerRadius="5"
+                                Background="{StaticResource BrandBrush}">
+                            <TextBlock Text="&#xE768;" FontFamily="{StaticResource IconFont}" FontSize="8"
+                                       Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                       Margin="1,0,0,0" />
+                        </Border>
                         <TextBlock x:Name="TitleText" Text="Vault Movies" FontSize="12.5"
                                    FontFamily="{StaticResource DisplayFont}"
                                    FontWeight="SemiBold" Foreground="{StaticResource TextBrush}"

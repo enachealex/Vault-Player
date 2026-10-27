@@ -24,41 +24,43 @@ public static class SetupPage
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Run your own Vault library</title>
 <style>
-  :root { --bg:#1A0D09; --surface:#24100B; --line:#43281F;
-          --text:#F6ECE5; --muted:#D9C0B3; --accent:#C8442A; --warm:#F0A070; }
+  /* The app's palette: smoked glass on a dusk sky. */
+  :root { --bg:#0B0D12; --surface:rgba(255,255,255,.06); --line:rgba(255,255,255,.12);
+          --text:#F4F6FA; --muted:#A6AFBD; --accent:#005ED9; --link:#6CB2FF;
+          --warm:#F5C77E; --danger:#FF7A7A; }
   * { box-sizing:border-box; }
-  body { margin:0; background:var(--bg); color:var(--text); line-height:1.6;
+  body { margin:0; background:radial-gradient(ellipse 70% 60% at 82% 8%, rgba(122,60,36,.5), rgba(11,13,18,0) 70%), radial-gradient(ellipse 80% 70% at 8% 100%, rgba(26,58,110,.5), rgba(11,13,18,0) 70%), #0B0D12; background-attachment:fixed; color:var(--text); line-height:1.6;
          font-family:'Segoe UI',Roboto,system-ui,-apple-system,sans-serif; }
   .wrap { max-width:46rem; margin:0 auto; padding:3rem 1.5rem 5rem; }
   h1 { font-size:2rem; margin:0 0 .4rem; }
-  h2 { font-size:1.3rem; margin:3rem 0 .2rem; color:var(--warm); }
+  h2 { font-size:1.3rem; margin:3rem 0 .2rem; color:var(--text); }
   h3 { font-size:1.02rem; margin:1.8rem 0 .4rem; }
   p, li { color:var(--muted); }
   li { margin:.4rem 0; }
   ol, ul { padding-left:1.3rem; }
   code { background:var(--surface); border:1px solid var(--line); border-radius:.3rem;
          padding:.15rem .4rem; font-size:.9em; color:var(--text); word-break:break-word; }
-  pre { background:var(--surface); border:1px solid var(--line); border-radius:.5rem;
+  pre { background:rgba(0,0,0,.35); border:1px solid var(--line); border-radius:.8rem;
         padding:.9rem 1rem; overflow-x:auto; }
   pre code { background:none; border:none; padding:0; word-break:normal; }
   .lead { font-size:1.05rem; }
-  .card { background:var(--surface); border:1px solid var(--line); border-radius:.8rem;
-          padding:1.2rem 1.4rem; margin:1.2rem 0; }
+  .card { background:var(--surface); border:1px solid var(--line); border-radius:1.2rem;
+          padding:1.3rem 1.5rem; margin:1.2rem 0; }
   .card h3 { margin-top:0; }
   .tag { display:inline-block; font-size:.72rem; font-weight:700; letter-spacing:.06em;
          text-transform:uppercase; color:var(--bg); background:var(--warm);
-         border-radius:.3rem; padding:.15rem .5rem; margin-left:.5rem;
+         border-radius:.35rem; padding:.15rem .5rem; margin-left:.5rem;
          vertical-align:.15em; }
   .note { border-left:3px solid var(--warm); padding:.2rem 0 .2rem 1rem; margin:1.4rem 0; }
-  .warn { border-left:3px solid var(--accent); padding:.2rem 0 .2rem 1rem; margin:1.4rem 0; }
+  .warn { border-left:3px solid var(--danger); padding:.2rem 0 .2rem 1rem; margin:1.4rem 0; }
   table { border-collapse:collapse; width:100%; margin:1rem 0; font-size:.94rem; }
   th, td { text-align:left; padding:.55rem .7rem; border-bottom:1px solid var(--line);
            color:var(--muted); vertical-align:top; }
   th { color:var(--text); font-size:.78rem; text-transform:uppercase; letter-spacing:.05em; }
-  .privacy { background:var(--surface); border:1px solid var(--line); border-radius:.8rem;
+  .privacy { background:var(--surface); border:1px solid var(--line); border-radius:1.2rem;
              padding:1.4rem 1.5rem; margin:3rem 0 0; }
   .privacy h2 { margin-top:0; }
-  a { color:var(--warm); }
+  a { color:var(--link); }
 </style>
 </head>
 <body>

@@ -357,16 +357,24 @@ app.MapGet("/invite/{code}", (string code) =>
         <title>You're invited — Vault Movies</title>
         <style>
           body { margin:0; min-height:100vh; display:grid; place-items:center;
-                 background:#1A0D09; color:#F6ECE5; font-family:'Segoe UI',system-ui,sans-serif; }
-          .card { text-align:center; padding:40px 48px; max-width:460px; }
-          .dot { width:22px; height:22px; border-radius:7px; background:#C8442A; margin:0 auto 18px; }
+                 background:radial-gradient(ellipse 70% 60% at 82% 8%, rgba(122,60,36,.5), rgba(11,13,18,0) 70%), radial-gradient(ellipse 80% 70% at 8% 100%, rgba(26,58,110,.5), rgba(11,13,18,0) 70%), #0B0D12; background-attachment:fixed;
+                 color:#F4F6FA; font-family:'Segoe UI',system-ui,sans-serif; }
+          .card { text-align:center; padding:38px 40px; margin:16px; max-width:460px;
+                  background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.12);
+                  border-radius:26px; }
+          /* The app icon: a rounded rust square with a play mark. */
+          .dot { width:46px; height:46px; border-radius:13px; margin:0 auto 18px;
+                 background:linear-gradient(135deg,#E35A3C,#B9381F);
+                 display:flex; align-items:center; justify-content:center; }
+          .dot::after { content:''; border-left:14px solid #fff; border-top:9px solid transparent;
+                        border-bottom:9px solid transparent; margin-left:4px; }
           h1 { font-size:22px; margin:0 0 6px; }
-          .code { font-family:Consolas,monospace; font-size:28px; font-weight:bold; color:#C8442A;
+          .code { font-family:Consolas,monospace; font-size:28px; font-weight:bold; color:#F4F6FA;
                   letter-spacing:2px; margin:18px 0 6px; user-select:all; }
-          p { color:#D9C0B3; font-size:14px; line-height:1.55; margin:8px 0; }
-          ol { text-align:left; color:#D9C0B3; font-size:14px; line-height:1.7; }
-          .btn { display:inline-block; margin-top:14px; padding:12px 26px; border-radius:10px;
-                 background:#C8442A; color:#fff; text-decoration:none; font-weight:600; font-size:15px; }
+          p { color:#A6AFBD; font-size:14px; line-height:1.55; margin:8px 0; }
+          ol { text-align:left; color:#A6AFBD; font-size:14px; line-height:1.7; }
+          .btn { display:inline-block; margin-top:14px; padding:12px 26px; border-radius:12px;
+                 background:#F4F6FA; color:#0B0D12; text-decoration:none; font-weight:700; font-size:15px; }
         </style>
         </head>
         <body>

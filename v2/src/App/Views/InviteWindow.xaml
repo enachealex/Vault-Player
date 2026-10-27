@@ -1,20 +1,21 @@
 <Window x:Class="VideoPlayer.App.Views.InviteWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="clr-namespace:VideoPlayer.App.Helpers"
+        ui:Glass.Window="True"
         Title="Invite a friend"
         Width="440" SizeToContent="Height" ResizeMode="NoResize"
         WindowStartupLocation="CenterOwner"
         Background="{StaticResource BgBrush}"
         FontFamily="{StaticResource BodyFont}">
     <StackPanel Margin="24">
-        <TextBlock Text="Invite a friend" FontSize="19" FontWeight="Bold"
-                   FontFamily="{StaticResource DisplayFont}" Foreground="{StaticResource TextBrush}" />
+        <TextBlock Text="Invite a friend" FontSize="19" FontWeight="Bold" Foreground="{StaticResource TextBrush}" />
         <TextBlock FontSize="12" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"
                    Margin="0,6,0,16"
                    Text="They scan this with their phone — it explains everything and carries the code. Registering with it unlocks your films immediately, no approval step. One use, expires in a week." />
 
         <TextBlock x:Name="ErrorText" FontSize="12" TextWrapping="Wrap"
-                   Foreground="{StaticResource AccentBrush}" Margin="0,0,0,10" Visibility="Collapsed" />
+                   Foreground="{StaticResource DangerBrush}" Margin="0,0,0,10" Visibility="Collapsed" />
 
         <!-- The QR itself, on white: scanners want contrast, not theming. -->
         <Border Background="White" CornerRadius="12" Padding="14" HorizontalAlignment="Center">
@@ -23,7 +24,7 @@
         </Border>
 
         <TextBlock x:Name="CodeText" FontFamily="Consolas" FontSize="22" FontWeight="Bold"
-                   Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center"
+                   Foreground="{StaticResource TextBrush}" HorizontalAlignment="Center"
                    Margin="0,14,0,2" />
         <TextBlock x:Name="ExpiryText" FontSize="11.5" Foreground="{StaticResource TextMutedBrush}"
                    HorizontalAlignment="Center" />

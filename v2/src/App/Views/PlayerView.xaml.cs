@@ -288,11 +288,11 @@ public partial class PlayerView : UserControl, IDisposable
         });
         var toast = new Border
         {
-            Background = new SolidColorBrush(Color.FromArgb(0xE6, 0x16, 0x1A, 0x22)),
+            Background = (Brush)FindResource("GlassDarkBrush"),
             BorderBrush = (Brush)FindResource("LineBrush"),
             BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(10),
-            Padding = new Thickness(14, 9, 14, 9),
+            CornerRadius = (CornerRadius)FindResource("ButtonRadius"),
+            Padding = new Thickness(18, 9, actionLabel is null ? 18 : 7, 9),
             Margin = new Thickness(0, 0, 0, 8),
             Child = panel,
         };
@@ -530,7 +530,7 @@ public partial class PlayerView : UserControl, IDisposable
     {
         AutoplayBtn.Background = Autoplay
             ? (Brush)FindResource("AccentBrush")
-            : (Brush)FindResource("SurfaceAltBrush");
+            : (Brush)FindResource("SurfaceBrush");
     }
 
     // ---- Chapters ----------------------------------------------------------

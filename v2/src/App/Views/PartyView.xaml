@@ -2,13 +2,12 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <Grid>
-        <Button Style="{StaticResource GhostButton}" Click="HomeBtn_Click" AutomationProperties.Name="Home"
-                HorizontalAlignment="Left" VerticalAlignment="Top" Margin="24,18,0,0" Padding="12,8">
-            <StackPanel Orientation="Horizontal">
-                <TextBlock Text="&#xE72B;" FontFamily="Segoe MDL2 Assets" FontSize="14"
-                           VerticalAlignment="Center" Margin="0,0,8,0" />
-                <TextBlock Text="Home" />
-            </StackPanel>
+        <Button Style="{StaticResource IconButton}" Click="HomeBtn_Click" AutomationProperties.Name="Home"
+                ToolTip="Back to the start screen"
+                Width="42" Height="42" Background="{StaticResource SurfaceBrush}"
+                BorderBrush="{StaticResource LineBrush}"
+                HorizontalAlignment="Left" VerticalAlignment="Top" Margin="40,16,0,0">
+            <TextBlock Text="&#xE72B;" FontFamily="{StaticResource IconFont}" FontSize="15" />
         </Button>
 
         <!-- Mode chooser -->
@@ -16,13 +15,12 @@
             <!-- A friend invited you: everything needed to join in one tap. -->
             <StackPanel x:Name="InvitationsPanel" Visibility="Collapsed" Margin="0,0,0,26"
                         MinWidth="360" MaxWidth="440">
-                <TextBlock Text="INVITATIONS" FontSize="11" FontWeight="Bold"
-                           Foreground="{StaticResource TextMutedBrush}" Margin="2,0,0,8" />
+                <TextBlock Text="Invitations" Style="{StaticResource SectionLabel}" Margin="2,0,0,8" />
                 <ItemsControl x:Name="InvitationsList">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <Border Background="{StaticResource SurfaceBrush}" CornerRadius="10" Padding="14,11"
-                                    BorderBrush="{StaticResource AccentBrush}" BorderThickness="1" Margin="0,0,0,8">
+                            <Border Background="{StaticResource AccentSoftBrush}" CornerRadius="16" Padding="16,12,10,12"
+                                    BorderBrush="#66005ED9" BorderThickness="1" Margin="0,0,0,8">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
@@ -53,22 +51,24 @@
                 </ItemsControl>
             </StackPanel>
 
-            <TextBlock Text="&#xE716;" FontFamily="Segoe MDL2 Assets" FontSize="44"
-                       Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" />
-            <TextBlock Text="Watch Party" FontSize="26" FontWeight="Bold"
-                       FontFamily="{StaticResource DisplayFont}"
-                       Foreground="{StaticResource TextBrush}" HorizontalAlignment="Center" Margin="0,16,0,6" />
+            <!-- The same tile the home screen opened this from. -->
+            <Border Width="76" Height="76" CornerRadius="20" Background="{StaticResource TileVioletBrush}"
+                    HorizontalAlignment="Center">
+                <TextBlock Text="&#xE716;" FontFamily="{StaticResource IconFont}" FontSize="32"
+                           Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <TextBlock Text="Watch Party" Style="{StaticResource PageTitle}" FontSize="32"
+                       HorizontalAlignment="Center" Margin="0,18,0,6" />
             <TextBlock Text="Host a movie for friends, or join someone's session."
                        FontSize="13" Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Center" Margin="0,0,0,26" />
 
             <!-- Signed in: the account name is the party identity, so there's no
                  nickname to pick. Shown instead of the nickname panels below. -->
-            <Border x:Name="SignedInPanel" Visibility="Collapsed"
-                    Background="{StaticResource SurfaceBrush}" CornerRadius="10" Padding="16,12"
-                    BorderBrush="{StaticResource LineBrush}" BorderThickness="1" MinWidth="320">
+            <Border x:Name="SignedInPanel" Visibility="Collapsed" Style="{StaticResource GlassPanel}"
+                    Padding="18,13" MinWidth="340">
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                    <TextBlock Text="&#xE77B;" FontFamily="Segoe MDL2 Assets" FontSize="15"
-                               Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" />
+                    <TextBlock Text="&#xE77B;" FontFamily="{StaticResource IconFont}" FontSize="15"
+                               Foreground="{StaticResource AccentLightBrush}" VerticalAlignment="Center" />
                     <StackPanel Margin="12,0,0,0" VerticalAlignment="Center">
                         <TextBlock x:Name="SignedInName" FontSize="15" FontWeight="SemiBold"
                                    Foreground="{StaticResource TextBrush}" />
@@ -81,23 +81,21 @@
             <!-- Saved nicknames. Shown instead of the text box once there's at
                  least one, so returning users pick rather than retype. -->
             <StackPanel x:Name="SavedNamesPanel" Visibility="Collapsed">
-                <TextBlock Text="WHO ARE YOU TONIGHT?" FontSize="11" FontWeight="Bold"
-                           Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Center"
-                           Margin="0,0,0,10" />
+                <TextBlock Text="Who are you tonight?" Style="{StaticResource SectionLabel}"
+                           HorizontalAlignment="Center" Margin="0,0,0,10" />
                 <ItemsControl x:Name="NameCards" HorizontalAlignment="Center">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <Border Background="{StaticResource SurfaceBrush}" CornerRadius="10" Padding="14,10"
-                                    BorderBrush="{StaticResource LineBrush}" BorderThickness="1"
-                                    Margin="0,0,0,8" MinWidth="320">
+                            <Border Style="{StaticResource GlassPanel}" Padding="16,10,10,10"
+                                    Margin="0,0,0,8" MinWidth="340">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                                        <TextBlock Text="&#xE77B;" FontFamily="Segoe MDL2 Assets" FontSize="14"
-                                                   Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" />
+                                        <TextBlock Text="&#xE77B;" FontFamily="{StaticResource IconFont}" FontSize="14"
+                                                   Foreground="{StaticResource AccentLightBrush}" VerticalAlignment="Center" />
                                         <TextBlock Text="{Binding}" FontSize="15" FontWeight="SemiBold" Margin="10,0,0,0"
                                                    Foreground="{StaticResource TextBrush}" VerticalAlignment="Center" />
                                     </StackPanel>
@@ -123,7 +121,7 @@
                         HorizontalAlignment="Center" Click="NewName_Click"
                         AutomationProperties.Name="Use a new name">
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="&#xE710;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                        <TextBlock Text="&#xE710;" FontFamily="{StaticResource IconFont}" FontSize="12"
                                    VerticalAlignment="Center" Margin="0,0,8,0" />
                         <TextBlock Text="Use a new name" FontSize="13" />
                     </StackPanel>
@@ -132,12 +130,11 @@
 
             <!-- Name entry: first run, "use a new name", or editing one. -->
             <StackPanel x:Name="NameEntryPanel">
-                <TextBlock x:Name="NameEntryHeading" Text="PICK A USERNAME" FontSize="11" FontWeight="Bold"
-                           Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Center" Margin="0,0,0,8" />
-                <TextBox x:Name="NameBox" Width="260" Padding="12,9" FontSize="15" MaxLength="20"
+                <TextBlock x:Name="NameEntryHeading" Text="PICK A USERNAME" Style="{StaticResource FieldLabel}"
+                           HorizontalAlignment="Center" Margin="0,0,0,8" />
+                <TextBox x:Name="NameBox" Width="280" Padding="14,10" FontSize="15" MaxLength="20"
                          HorizontalContentAlignment="Center" HorizontalAlignment="Center"
-                         Background="{StaticResource SurfaceBrush}" Foreground="{StaticResource TextBrush}"
-                         BorderBrush="{StaticResource LineBrush}" TextChanged="NameBox_TextChanged"
+                         TextChanged="NameBox_TextChanged"
                          AutomationProperties.Name="Display name" />
                 <TextBlock x:Name="NameHint" Text="This is the name everyone in the party sees."
                            FontSize="11.5" Foreground="{StaticResource TextMutedBrush}"
@@ -177,8 +174,8 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
-            <TextBlock Grid.Row="0" Text="Pick the movie to host" FontSize="19" FontWeight="SemiBold"
-                       Foreground="{StaticResource TextBrush}" HorizontalAlignment="Center" Margin="0,0,0,14" />
+            <TextBlock Grid.Row="0" Text="Pick the movie to host" Style="{StaticResource PageTitle}" FontSize="26"
+                       HorizontalAlignment="Center" Margin="0,0,0,14" />
             <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" MaxWidth="560">
                 <StackPanel x:Name="PickList" />
             </ScrollViewer>
@@ -189,15 +186,15 @@
             <TextBlock x:Name="LobbyMovie" FontSize="15" Foreground="{StaticResource TextMutedBrush}"
                        HorizontalAlignment="Center" />
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,4">
-                <TextBlock x:Name="LobbyCode" FontSize="42" FontWeight="Bold" FontFamily="Consolas"
+                <TextBlock x:Name="LobbyCode" FontSize="46" FontWeight="Bold" FontFamily="Consolas"
                            VerticalAlignment="Center"
-                           Foreground="{StaticResource AccentBrush}" />
+                           Foreground="{StaticResource TextBrush}" />
                 <Button x:Name="CopyCodeBtn" Style="{StaticResource GhostButton}" Padding="12,8"
                         Margin="14,0,0,0" VerticalAlignment="Center" Click="CopyCode_Click"
                         ToolTip="Copy the room code so you can send it to someone"
                         AutomationProperties.Name="Copy code">
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock x:Name="CopyCodeGlyph" Text="&#xE8C8;" FontFamily="Segoe MDL2 Assets"
+                        <TextBlock x:Name="CopyCodeGlyph" Text="&#xE8C8;" FontFamily="{StaticResource IconFont}"
                                    FontSize="13" VerticalAlignment="Center" Margin="0,0,8,0" />
                         <TextBlock x:Name="CopyCodeLabel" Text="Copy" FontSize="13" />
                     </StackPanel>
@@ -207,7 +204,7 @@
                         ToolTip="Copy a link that opens Vault Movies straight into this room — paste it in any chat"
                         AutomationProperties.Name="Copy invite link">
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock x:Name="CopyInviteGlyph" Text="&#xE71B;" FontFamily="Segoe MDL2 Assets"
+                        <TextBlock x:Name="CopyInviteGlyph" Text="&#xE71B;" FontFamily="{StaticResource IconFont}"
                                    FontSize="13" VerticalAlignment="Center" Margin="0,0,8,0" />
                         <TextBlock x:Name="CopyInviteLabel" Text="Invite link" FontSize="13" />
                     </StackPanel>
@@ -215,10 +212,9 @@
             </StackPanel>
             <TextBlock x:Name="LobbyAddress" FontSize="13" Foreground="{StaticResource TextMutedBrush}"
                        HorizontalAlignment="Center" Margin="0,0,0,16" />
-            <Border Background="{StaticResource SurfaceBrush}" CornerRadius="10" Padding="16,10" MinWidth="280">
+            <Border Style="{StaticResource GlassPanel}" Padding="18,12" MinWidth="300">
                 <StackPanel>
-                    <TextBlock Text="IN THE ROOM" FontSize="11" Foreground="{StaticResource TextMutedBrush}"
-                               Margin="0,0,0,6" />
+                    <TextBlock Text="In the room" Style="{StaticResource FieldLabel}" Margin="0,0,0,6" />
                     <ItemsControl x:Name="RosterList">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
@@ -255,7 +251,7 @@
                         ToolTip="Send a friend this room in one tap (sign-in required)"
                         AutomationProperties.Name="Invite a friend">
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="&#xE8FA;" FontFamily="Segoe MDL2 Assets" FontSize="13"
+                        <TextBlock Text="&#xE8FA;" FontFamily="{StaticResource IconFont}" FontSize="13"
                                    VerticalAlignment="Center" Margin="0,0,8,0" />
                         <TextBlock x:Name="InviteBtnLabel" Text="Invite a friend" FontSize="13" />
                     </StackPanel>
@@ -276,21 +272,19 @@
 
         <!-- Guest: join form -->
         <StackPanel x:Name="JoinPanel" Visibility="Collapsed" VerticalAlignment="Center" HorizontalAlignment="Center">
-            <TextBlock Text="Join a session" FontSize="19" FontWeight="SemiBold"
-                       Foreground="{StaticResource TextBrush}" HorizontalAlignment="Center" Margin="0,0,0,16" />
+            <TextBlock Text="Join a session" Style="{StaticResource PageTitle}" FontSize="26"
+                       HorizontalAlignment="Center" Margin="0,0,0,20" />
             <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                 <TextBlock Text="Party server" Width="110" Foreground="{StaticResource TextMutedBrush}"
                            VerticalAlignment="Center" FontSize="13" />
-                <TextBox x:Name="HostAddressBox" Width="200" Padding="8,6" FontSize="13"
-                         Background="{StaticResource SurfaceBrush}" Foreground="{StaticResource TextBrush}"
-                         BorderBrush="{StaticResource LineBrush}" AutomationProperties.Name="Host address" />
+                <TextBox x:Name="HostAddressBox" Width="240" FontSize="13"
+                         AutomationProperties.Name="Host address" />
             </StackPanel>
             <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
                 <TextBlock Text="Room code" Width="110" Foreground="{StaticResource TextMutedBrush}"
                            VerticalAlignment="Center" FontSize="13" />
-                <TextBox x:Name="CodeBox" Width="200" Padding="8,6" FontSize="14" FontFamily="Consolas"
-                         CharacterCasing="Upper" Background="{StaticResource SurfaceBrush}"
-                         Foreground="{StaticResource TextBrush}" BorderBrush="{StaticResource LineBrush}"
+                <TextBox x:Name="CodeBox" Width="240" FontSize="15" FontFamily="Consolas"
+                         CharacterCasing="Upper"
                          AutomationProperties.Name="Room code entry" />
             </StackPanel>
             <TextBlock x:Name="JoinStatus" FontSize="12.5" Foreground="{StaticResource TextMutedBrush}"
@@ -307,15 +301,13 @@
                 Background="{StaticResource BgDeepBrush}">
             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                 <TextBlock x:Name="CountdownTitle" Text="" FontSize="20" FontWeight="SemiBold"
-                           FontFamily="{StaticResource DisplayFont}"
                            Foreground="{StaticResource TextBrush}" HorizontalAlignment="Center"
                            TextAlignment="Center" MaxWidth="620" TextWrapping="Wrap" />
                 <TextBlock x:Name="CountdownService" Text="" FontSize="13.5"
                            Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Center"
                            Margin="0,8,0,0" />
-                <TextBlock x:Name="CountdownNumber" Text="5" FontSize="132" FontWeight="Bold"
-                           FontFamily="{StaticResource DisplayFont}"
-                           Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center"
+                <TextBlock x:Name="CountdownNumber" Text="5" FontSize="140" FontWeight="Bold"
+                           Foreground="{StaticResource TextBrush}" HorizontalAlignment="Center"
                            Margin="0,4,0,4" />
                 <TextBlock x:Name="CountdownHint" Text="Get the title open and paused, then press play on zero."
                            FontSize="13" Foreground="{StaticResource TextMutedBrush}"

@@ -1,6 +1,8 @@
 <Window x:Class="VideoPlayer.App.Views.AddShortcutWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="clr-namespace:VideoPlayer.App.Helpers"
+        ui:Glass.Window="True"
         Title="Add streaming shortcut"
         Width="480" SizeToContent="Height" ResizeMode="NoResize"
         WindowStartupLocation="CenterOwner"
@@ -8,7 +10,6 @@
         FontFamily="{StaticResource BodyFont}">
     <StackPanel Margin="24">
         <TextBlock Text="Add streaming shortcut" FontSize="19" FontWeight="Bold"
-                   FontFamily="{StaticResource DisplayFont}"
                    Foreground="{StaticResource TextBrush}" />
         <TextBlock Text="A card in your library that opens the service. These titles are DRM-protected, so they play in the service's own app — not here."
                    FontSize="12" Foreground="{StaticResource TextMutedBrush}"
