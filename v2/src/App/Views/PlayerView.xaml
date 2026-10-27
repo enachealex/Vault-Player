@@ -210,69 +210,74 @@
                             <GradientStop Color="#00000000" Offset="1" />
                         </LinearGradientBrush>
                     </Grid.Background>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <Button Grid.Column="0" Style="{StaticResource IconButton}" Click="BackBtn_Click"
-                            Width="42" Height="42" Background="{StaticResource SurfaceBrush}"
-                            BorderBrush="{StaticResource LineBrush}"
-                            ToolTip="Back to your library (Esc)"
-                            AutomationProperties.Name="Back to library" Margin="18,14,6,30">
-                        <TextBlock Text="&#xE72B;" FontFamily="{StaticResource IconFont}" FontSize="15" />
-                    </Button>
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top" Margin="8,22,16,0">
-                        <TextBlock x:Name="TitleText" VerticalAlignment="Center"
-                                   FontSize="17" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}"
-                                   TextTrimming="CharacterEllipsis" />
-                        <!-- Guests only: makes it obvious you're a passenger, not the driver. -->
-                        <Border x:Name="SharedScreenBadge" Visibility="Collapsed" Margin="12,0,0,0"
-                                Background="{StaticResource AccentSoftBrush}" CornerRadius="{StaticResource ChipRadius}" Padding="11,4"
-                                BorderBrush="#66005ED9" BorderThickness="1">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#xE7F4;" FontFamily="{StaticResource IconFont}" FontSize="11"
-                                           VerticalAlignment="Center" Foreground="{StaticResource AccentLightBrush}" />
-                                <TextBlock x:Name="SharedScreenText" Text="" FontSize="11.5" Margin="7,0,0,0"
-                                           FontWeight="SemiBold" VerticalAlignment="Center"
-                                           Foreground="{StaticResource TextBrush}" />
-                            </StackPanel>
-                        </Border>
-                    </StackPanel>
-                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Top" Margin="0,14,0,0">
-                        <!-- Chat lives up here with Autoplay: both are about the session
-                             rather than the playhead, unlike everything in the bottom bar. -->
-                        <Button x:Name="ChatBtn" ToolTip="Show or hide the party chat" Style="{StaticResource GhostButton}"
-                                Click="ChatBtn_Click" AutomationProperties.Name="Party chat"
-                                Visibility="Collapsed" Margin="0,0,8,0" Padding="14,9">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#xE8BD;" FontFamily="{StaticResource IconFont}" FontSize="14"
-                                           VerticalAlignment="Center" Margin="0,0,8,0" />
-                                <TextBlock Text="Chat" />
-                            </StackPanel>
+                    <!-- The shade spans the window; its contents take the control bar's
+                         width and inset, so the back button and Autoplay sit over the
+                         bar's two ends instead of out in the corners. -->
+                    <Grid MaxWidth="1180" Margin="18,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Style="{StaticResource IconButton}" Click="BackBtn_Click"
+                                Width="42" Height="42" Background="{StaticResource SurfaceBrush}"
+                                BorderBrush="{StaticResource LineBrush}"
+                                ToolTip="Back to your library (Esc)"
+                                AutomationProperties.Name="Back to library" Margin="0,14,6,30">
+                            <TextBlock Text="&#xE72B;" FontFamily="{StaticResource IconFont}" FontSize="15" />
                         </Button>
-                        <Button x:Name="AutoplayBtn" ToolTip="When a film ends, start the next one in this folder automatically" Style="{StaticResource GhostButton}"
-                                Click="AutoplayBtn_Click" AutomationProperties.Name="Autoplay"
-                                Margin="0,0,18,0" Padding="14,9">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock x:Name="AutoplayGlyph" Text="&#xE8EE;" FontFamily="{StaticResource IconFont}" FontSize="14"
-                                           VerticalAlignment="Center" Margin="0,0,8,0" />
-                                <TextBlock Text="Autoplay" />
-                            </StackPanel>
-                        </Button>
-                    </StackPanel>
-                    <!-- Casting is broken and hidden until it is fixed. The code behind
-                         it is untouched, so restoring this is a one-line change. -->
-                    <Button x:Name="CastBtn" ToolTip="Play this on a TV or speaker on your network instead" Grid.Column="3" Style="{StaticResource GhostButton}" Click="CastBtn_Click"
-                            AutomationProperties.Name="Cast to device" Visibility="Collapsed"
-                            VerticalAlignment="Top" Margin="0,14,18,0" Padding="14,9">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock x:Name="CastGlyph" Text="&#xEC15;" FontFamily="{StaticResource IconFont}" FontSize="14"
-                                       VerticalAlignment="Center" Margin="0,0,8,0" />
-                            <TextBlock x:Name="CastLabel" Text="Cast" />
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top" Margin="8,22,16,0">
+                            <TextBlock x:Name="TitleText" VerticalAlignment="Center"
+                                       FontSize="17" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}"
+                                       TextTrimming="CharacterEllipsis" />
+                            <!-- Guests only: makes it obvious you're a passenger, not the driver. -->
+                            <Border x:Name="SharedScreenBadge" Visibility="Collapsed" Margin="12,0,0,0"
+                                    Background="{StaticResource AccentSoftBrush}" CornerRadius="{StaticResource ChipRadius}" Padding="11,4"
+                                    BorderBrush="#66005ED9" BorderThickness="1">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE7F4;" FontFamily="{StaticResource IconFont}" FontSize="11"
+                                               VerticalAlignment="Center" Foreground="{StaticResource AccentLightBrush}" />
+                                    <TextBlock x:Name="SharedScreenText" Text="" FontSize="11.5" Margin="7,0,0,0"
+                                               FontWeight="SemiBold" VerticalAlignment="Center"
+                                               Foreground="{StaticResource TextBrush}" />
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
-                    </Button>
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Top" Margin="0,14,0,0">
+                            <!-- Chat lives up here with Autoplay: both are about the session
+                                 rather than the playhead, unlike everything in the bottom bar. -->
+                            <Button x:Name="ChatBtn" ToolTip="Show or hide the party chat" Style="{StaticResource GhostButton}"
+                                    Click="ChatBtn_Click" AutomationProperties.Name="Party chat"
+                                    Visibility="Collapsed" Margin="0,0,8,0" Padding="14,9">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE8BD;" FontFamily="{StaticResource IconFont}" FontSize="14"
+                                               VerticalAlignment="Center" Margin="0,0,8,0" />
+                                    <TextBlock Text="Chat" />
+                                </StackPanel>
+                            </Button>
+                            <Button x:Name="AutoplayBtn" ToolTip="When a film ends, start the next one in this folder automatically" Style="{StaticResource GhostButton}"
+                                    Click="AutoplayBtn_Click" AutomationProperties.Name="Autoplay"
+                                    Padding="14,9">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock x:Name="AutoplayGlyph" Text="&#xE8EE;" FontFamily="{StaticResource IconFont}" FontSize="14"
+                                               VerticalAlignment="Center" Margin="0,0,8,0" />
+                                    <TextBlock Text="Autoplay" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                        <!-- Casting is broken and hidden until it is fixed. The code behind
+                             it is untouched, so restoring this is a one-line change. -->
+                        <Button x:Name="CastBtn" ToolTip="Play this on a TV or speaker on your network instead" Grid.Column="3" Style="{StaticResource GhostButton}" Click="CastBtn_Click"
+                                AutomationProperties.Name="Cast to device" Visibility="Collapsed"
+                                VerticalAlignment="Top" Margin="8,14,0,0" Padding="14,9">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock x:Name="CastGlyph" Text="&#xEC15;" FontFamily="{StaticResource IconFont}" FontSize="14"
+                                           VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <TextBlock x:Name="CastLabel" Text="Cast" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
                 </Grid>
 
                 <!-- Bottom: one floating pane of glass holding the timeline and
@@ -304,7 +309,8 @@
                             <TextBlock x:Name="DurationText" Grid.Column="2" VerticalAlignment="Center" Margin="14,0,0,0"
                                        FontSize="13" Typography.NumeralAlignment="Tabular"
                                        Foreground="{StaticResource TextMutedBrush}" Text="0:00" />
-                            <Popup x:Name="ScrubPopup" PlacementTarget="{Binding ElementName=Seek}" Placement="Relative"
+                            <!-- PlacementTarget is set in code, like VolumePopup's. -->
+                            <Popup x:Name="ScrubPopup" Placement="Relative"
                                    AllowsTransparency="True" IsHitTestVisible="False">
                                 <!-- Padding and the frame's width are what ShowScrubPopupAt
                                      centres against; change them together. -->
@@ -328,7 +334,8 @@
 
                         <!-- Buttons row: transport centred, utilities right, codec info left -->
                         <Grid Grid.Row="1" Margin="0,4,0,0">
-                            <TextBlock x:Name="InfoText" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="4,0,0,0"
+                            <!-- 2, like the seek row, so this starts under the clock. -->
+                            <TextBlock x:Name="InfoText" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="2,0,0,0"
                                        FontSize="11.5" Foreground="{StaticResource TextFaintBrush}" />
 
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
@@ -383,9 +390,13 @@
                                         Click="VolumeBtn_Click" AutomationProperties.Name="Volume">
                                     <TextBlock x:Name="MuteGlyph" Text="&#xE767;" FontFamily="{StaticResource IconFont}" FontSize="14" />
                                 </Button>
-                                <!-- StaysOpen=False closes it on any click elsewhere. -->
-                                <Popup x:Name="VolumePopup" PlacementTarget="{Binding ElementName=VolumeBtn}"
-                                       Placement="Top" VerticalOffset="-10" StaysOpen="False"
+                                <!-- StaysOpen=False closes it on any click elsewhere.
+                                     PlacementTarget is set in code, not with ElementName: the
+                                     VideoView moves everything in here into a window of its own,
+                                     where ElementName finds nothing, and a popup without a target
+                                     opens against its parent - here, the left end of this row. -->
+                                <Popup x:Name="VolumePopup"
+                                       Placement="Top" StaysOpen="False"
                                        AllowsTransparency="True" PopupAnimation="Fade">
                                     <Border x:Name="VolumePopupBody" Background="{StaticResource MenuBrush}"
                                             CornerRadius="14" Padding="8,14"

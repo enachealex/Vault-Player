@@ -11,7 +11,9 @@
         </Button>
 
         <!-- Mode chooser -->
-        <StackPanel x:Name="ChoosePanel" VerticalAlignment="Center" HorizontalAlignment="Center">
+        <!-- One width for the whole column, so the account card, the name box and
+             the two buttons all share the same left and right edges. -->
+        <StackPanel x:Name="ChoosePanel" VerticalAlignment="Center" HorizontalAlignment="Center" Width="380">
             <!-- A friend invited you: everything needed to join in one tap. -->
             <StackPanel x:Name="InvitationsPanel" Visibility="Collapsed" Margin="0,0,0,26"
                         MinWidth="360" MaxWidth="440">
@@ -65,7 +67,7 @@
             <!-- Signed in: the account name is the party identity, so there's no
                  nickname to pick. Shown instead of the nickname panels below. -->
             <Border x:Name="SignedInPanel" Visibility="Collapsed" Style="{StaticResource GlassPanel}"
-                    Padding="18,13" MinWidth="340">
+                    Padding="18,13">
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                     <TextBlock Text="&#xE77B;" FontFamily="{StaticResource IconFont}" FontSize="15"
                                Foreground="{StaticResource AccentLightBrush}" VerticalAlignment="Center" />
@@ -83,11 +85,11 @@
             <StackPanel x:Name="SavedNamesPanel" Visibility="Collapsed">
                 <TextBlock Text="Who are you tonight?" Style="{StaticResource SectionLabel}"
                            HorizontalAlignment="Center" Margin="0,0,0,10" />
-                <ItemsControl x:Name="NameCards" HorizontalAlignment="Center">
+                <ItemsControl x:Name="NameCards">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
                             <Border Style="{StaticResource GlassPanel}" Padding="16,10,10,10"
-                                    Margin="0,0,0,8" MinWidth="340">
+                                    Margin="0,0,0,8">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
@@ -132,8 +134,8 @@
             <StackPanel x:Name="NameEntryPanel">
                 <TextBlock x:Name="NameEntryHeading" Text="PICK A USERNAME" Style="{StaticResource FieldLabel}"
                            HorizontalAlignment="Center" Margin="0,0,0,8" />
-                <TextBox x:Name="NameBox" Width="280" Padding="14,10" FontSize="15" MaxLength="20"
-                         HorizontalContentAlignment="Center" HorizontalAlignment="Center"
+                <TextBox x:Name="NameBox" Padding="14,10" FontSize="15" MaxLength="20"
+                         HorizontalContentAlignment="Center"
                          TextChanged="NameBox_TextChanged"
                          AutomationProperties.Name="Display name" />
                 <TextBlock x:Name="NameHint" Text="This is the name everyone in the party sees."
@@ -150,12 +152,17 @@
                 </StackPanel>
             </StackPanel>
 
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,22,0,0">
-                <Button x:Name="HostBtn" Style="{StaticResource PrimaryButton}" Margin="0,0,12,0" Click="HostBtn_Click"
+            <Grid Margin="0,22,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Button x:Name="HostBtn" Grid.Column="0" Style="{StaticResource PrimaryButton}" Click="HostBtn_Click"
                         Content="Host a session" AutomationProperties.Name="Host a session" />
-                <Button x:Name="JoinBtn" Style="{StaticResource GhostButton}" Click="JoinBtn_Click"
+                <Button x:Name="JoinBtn" Grid.Column="2" Style="{StaticResource GhostButton}" Click="JoinBtn_Click"
                         Content="Join with room code" AutomationProperties.Name="Join with room code" />
-            </StackPanel>
+            </Grid>
 
             <!-- Only offered signed in: a private room admits only signed-in,
                  approved Vault accounts, so an anonymous host couldn't join

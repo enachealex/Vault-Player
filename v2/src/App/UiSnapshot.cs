@@ -69,10 +69,23 @@ public static class UiSnapshot
             Save(frame, Path.Combine(outDir, "library.png"));
         });
 
+        // IsMouseOver cannot be set from outside, so the lift a hover gives a
+        // card is applied by hand to the first card of each row. A scroll edge
+        // that clips it shows up here as a missing top border.
+        Try("library-hover", () =>
+        {
+            foreach (var list in new[] { library.ContinueList, library.MovieList })
+                if (FirstDescendant<Button>(list) is { } card) card.RenderTransform = new TranslateTransform(0, -4);
+            Save(frame, Path.Combine(outDir, "library-hover.png"));
+        });
+
         Try("home-with-film", () =>
         {
-            shell.Navigate(new HomeView());
+            var home = new HomeView();
+            shell.Navigate(home);
             Save(frame, Path.Combine(outDir, "home-with-film.png"));
+            home.SoloBtn.RenderTransform = new TranslateTransform(0, -4);
+            Save(frame, Path.Combine(outDir, "home-hover.png"));
         });
 
         Try("party", () =>
@@ -149,8 +162,7 @@ public static class UiSnapshot
                 });
                 dialog.Measure(new Size(width, double.PositiveInfinity));
                 var height = Math.Ceiling(window is SplashWindow ? window.Height : dialog.DesiredSize.Height);
-                Save(Frame(dialog, (int)width, (int)height), Path.Combine(outDir, $"dialog-{name}.png"));
-                window.Close();
+                Save(Frame(dialog, (int)width, (int)height), Path.Combine(outDir, $"dialog-{name}.png"));                window.Close();
             });
         }
 
@@ -161,6 +173,16 @@ public static class UiSnapshot
     private static ImageSource? FirstStill(LibraryView library) =>
         (library.MovieList.ItemsSource as IEnumerable<MovieItem>)?
             .Select(m => m.Thumbnail).FirstOrDefault(t => t is not null);
+
+    private static T? FirstDescendant<T>(DependencyObject root) where T : DependencyObject
+    {
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if ((child as T ?? FirstDescendant<T>(child)) is { } found) return found;
+        }
+        return null;
+    }
 
     /// <summary>A fixed-size container carrying what the window would have given its content.</summary>
     private static Grid Frame(FrameworkElement content, int width, int height)

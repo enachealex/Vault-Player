@@ -62,6 +62,9 @@ public partial class PlayerView : UserControl, IDisposable
     public PlayerView(MovieItem movie, IReadOnlyList<MovieItem>? playlist = null, PartySession? party = null)
     {
         InitializeComponent();
+        // See the comment on VolumePopup in the XAML for why these are not bindings.
+        VolumePopup.PlacementTarget = VolumeBtn;
+        ScrubPopup.PlacementTarget = Seek;
         _movie = movie;
         _party = party;
         _playlist = playlist ?? new[] { movie };
@@ -375,8 +378,10 @@ public partial class PlayerView : UserControl, IDisposable
 
     private void ShowScrubPopupAt(double fraction)
     {
-        var width = ScrubThumbBorder.Visibility == Visibility.Visible ? 106 : 30;
-        ScrubPopup.HorizontalOffset = fraction * Seek.ActualWidth - width;
+        // Measured rather than assumed: a short time like 0:02 is narrower than
+        // 1:23:45, and a fixed half-width left it sitting off the pointer.
+        ScrubPopup.Child.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        ScrubPopup.HorizontalOffset = fraction * Seek.ActualWidth - ScrubPopup.Child.DesiredSize.Width / 2;
         ScrubPopup.VerticalOffset = ScrubThumbBorder.Visibility == Visibility.Visible ? -140 : -36;
         ScrubPopup.IsOpen = true;
     }
@@ -600,9 +605,7 @@ public partial class PlayerView : UserControl, IDisposable
             menu.Items.Add(clear);
         }
 
-        menu.PlacementTarget = ChaptersBtn;
-        menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Top;
-        menu.IsOpen = true;
+        OpenAboveBar(menu, ChaptersBtn);
     }
 
     /// <summary>Jump to an absolute position on whichever sink is active.</summary>
@@ -829,7 +832,7 @@ public partial class PlayerView : UserControl, IDisposable
 
     private int? _restoreSpu;
 
-    private static void ShowTrackMenu(Button anchor, TrackDescription[] tracks, int currentId,
+    private void ShowTrackMenu(Button anchor, TrackDescription[] tracks, int currentId,
         Action<int> select, MenuItem? extra = null)
     {
         var menu = new ContextMenu();
@@ -849,8 +852,24 @@ public partial class PlayerView : UserControl, IDisposable
             menu.Items.Add(new Separator());
             menu.Items.Add(extra);
         }
+        OpenAboveBar(menu, anchor);
+    }
+
+    /// <summary>
+    /// How far up a popup has to go to clear the whole control bar. Placement
+    /// Top on its own stops just above the button, which is over the seek row.
+    /// </summary>
+    private double AboveBarOffset(FrameworkElement anchor) =>
+        -anchor.TranslatePoint(new Point(0, 0), ControlBar).Y - 10;
+
+    /// <summary>Open a control-bar menu above the bar, centred on its button.</summary>
+    private void OpenAboveBar(ContextMenu menu, FrameworkElement anchor)
+    {
         menu.PlacementTarget = anchor;
         menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Top;
+        menu.VerticalOffset = AboveBarOffset(anchor);
+        // Its width is only known once it is up; moving it then is not visible.
+        menu.Opened += (_, _) => menu.HorizontalOffset = (anchor.ActualWidth - menu.ActualWidth) / 2;
         menu.IsOpen = true;
     }
 
@@ -874,9 +893,7 @@ public partial class PlayerView : UserControl, IDisposable
             };
             menu.Items.Add(item);
         }
-        menu.PlacementTarget = RateBtn;
-        menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Top;
-        menu.IsOpen = true;
+        OpenAboveBar(menu, RateBtn);
     }
 
     private void UpdateRateUi() =>
@@ -954,8 +971,44 @@ public partial class PlayerView : UserControl, IDisposable
         else ShowVolumePopup();
     }
 
+    /// <summary>
+    /// For --preview-window only: pause, and hold a popup open so a screenshot
+    /// can show where it lands. Called repeatedly, because the volume popup
+    /// closes itself when no pointer comes near it.
+    /// </summary>
+    internal void HoldForPreview(string popup)
+    {
+        if (_player?.IsPlaying == true) _player.SetPause(true);
+        if (popup == "volume") ShowVolumePopup();
+        else if (popup == "scrub")
+        {
+            ScrubText.Text = TimeText.Text;
+            ShowScrubPopupAt(0.5);
+        }
+        else if (!_previewMenuShown)
+        {
+            // A menu is built afresh on every open, so it is opened only once.
+            _previewMenuShown = true;
+            var none = new RoutedEventArgs();
+            switch (popup)
+            {
+                case "speed": RateBtn_Click(RateBtn, none); break;
+                case "audio": AudioBtn_Click(AudioBtn, none); break;
+                case "subtitles": SubsBtn_Click(SubsBtn, none); break;
+                case "chapters": ChaptersBtn_Click(ChaptersBtn, none); break;
+            }
+        }
+    }
+
+    private bool _previewMenuShown;
+
     private void ShowVolumePopup()
     {
+        // Placement Top lines up left edges; centred over the button reads as
+        // belonging to it.
+        VolumePopupBody.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        VolumePopup.HorizontalOffset = (VolumeBtn.ActualWidth - VolumePopupBody.DesiredSize.Width) / 2;
+        VolumePopup.VerticalOffset = AboveBarOffset(VolumeBtn);
         VolumePopup.IsOpen = true;
         _volumeAwaySince = DateTime.UtcNow; // closes on its own if nobody comes near
     }
@@ -1086,12 +1139,14 @@ public partial class PlayerView : UserControl, IDisposable
         {
             using var media = _player.Media;
             if (media is null) return "";           // not parsed yet; try again next tick
-            var audio = media.Tracks.FirstOrDefault(t => t.TrackType == TrackType.Audio);
-            if (audio is { } a)
-            {
-                _trackInfo = $"{FourCc(a.Codec)} {a.Data.Audio.Channels}ch";
-                _trackInfoResolved = true;
-            }
+            // MediaTrack is a struct, so FirstOrDefault never comes back empty:
+            // a film with no audio got a blank track and read "0ch".
+            var tracks = media.Tracks;
+            if (tracks.Length == 0) return "";      // not parsed yet; try again next tick
+            var audio = Array.FindIndex(tracks, t => t.TrackType == TrackType.Audio);
+            if (audio >= 0)
+                _trackInfo = $"{FourCc(tracks[audio].Codec)} {tracks[audio].Data.Audio.Channels}ch";
+            _trackInfoResolved = true;
         }
         catch
         {

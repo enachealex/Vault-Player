@@ -51,6 +51,47 @@ public partial class LibraryView : UserControl, IDisposable
 
     public LibraryView() : this(null) { }
 
+    /// <summary>
+    /// Width of a card in the grid, worked out from the grid's own width so
+    /// whole columns fill it and its right edge lines up with the header's.
+    /// Fixed-width cards left a ragged gap down the right of up to a card.
+    /// </summary>
+    public static readonly DependencyProperty CardWidthProperty = DependencyProperty.Register(
+        nameof(CardWidth), typeof(double), typeof(LibraryView), new PropertyMetadata(220.0));
+
+    public double CardWidth
+    {
+        get => (double)GetValue(CardWidthProperty);
+        private set => SetValue(CardWidthProperty, value);
+    }
+
+    /// <summary>The picture's height on a grid card: 16:9 of whatever width the card has.</summary>
+    public static readonly DependencyProperty CardFrameHeightProperty = DependencyProperty.Register(
+        nameof(CardFrameHeight), typeof(double), typeof(LibraryView), new PropertyMetadata(116.0));
+
+    public double CardFrameHeight
+    {
+        get => (double)GetValue(CardFrameHeightProperty);
+        private set => SetValue(CardFrameHeightProperty, value);
+    }
+
+    private const double MinCardWidth = 220, CardGap = 16;
+    /// <summary>The card's padding and edge, both sides: what is not picture.</summary>
+    private const double CardChrome = 14;
+
+    private void MovieList_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (!e.WidthChanged) return;
+        // The list is one gap wider than the content (a negative margin), so the
+        // last card's own right margin hangs outside and the card meets the edge.
+        var width = MovieList.ActualWidth;
+        var columns = Math.Max(1, (int)(width / (MinCardWidth + CardGap)));
+        // Whole pixels: a fractional width blurs every card's edge, and rounding
+        // up would wrap the last card onto the next row.
+        CardWidth = Math.Floor(width / columns - CardGap);
+        CardFrameHeight = Math.Round((CardWidth - CardChrome) * 9 / 16);
+    }
+
     public LibraryView(Action<MovieItem>? onPick)
     {
         InitializeComponent();

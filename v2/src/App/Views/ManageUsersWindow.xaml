@@ -73,10 +73,10 @@
         <Grid Grid.Row="2" Margin="0,14,0,0">
             <!-- The invite is how people are SUPPOSED to arrive: approval
                  granted up front, no pending queue. -->
-            <Button Style="{StaticResource PrimaryButton}" Padding="12,7" HorizontalAlignment="Left"
+            <Button Style="{StaticResource GhostButton}" Padding="12,7" HorizontalAlignment="Left"
                     Click="Invite_Click" AutomationProperties.Name="Invite a friend">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="&#xE8FB;" FontFamily="{StaticResource IconFont}" FontSize="13"
+                    <TextBlock Text="&#xE8FA;" FontFamily="{StaticResource IconFont}" FontSize="13"
                                VerticalAlignment="Center" Margin="0,0,8,0" />
                     <TextBlock Text="Invite a friend" FontSize="12.5" />
                 </StackPanel>

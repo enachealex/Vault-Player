@@ -14,7 +14,7 @@
                    Foreground="{StaticResource TextMutedBrush}" FontSize="12" TextWrapping="Wrap"
                    Margin="0,6,0,16" />
 
-        <TextBox x:Name="NameBox" MaxLength="60" FontSize="14" Padding="10,8"
+        <TextBox x:Name="NameBox" MaxLength="60" FontSize="14" Padding="10,9"
                  KeyDown="NameBox_KeyDown" AutomationProperties.Name="Collection name" />
         <TextBlock x:Name="ErrorText" Foreground="{StaticResource DangerBrush}" FontSize="12"
                    Margin="0,8,0,0" Visibility="Collapsed" TextWrapping="Wrap" />

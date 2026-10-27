@@ -5,8 +5,8 @@
     <UserControl.Resources>
         <!-- The frame on a card: rounded inside the card's own padding, so the
              glass shows as an even rim all the way round. -->
+        <!-- Its height comes from CardFrameHeight, so the picture stays 16:9. -->
         <Style x:Key="CardFrame" TargetType="Border">
-            <Setter Property="Height" Value="117" />
             <Setter Property="CornerRadius" Value="11" />
             <Setter Property="Background" Value="{StaticResource BgDeepBrush}" />
             <Setter Property="ClipToBounds" Value="True" />
@@ -168,27 +168,39 @@
             </StackPanel>
         </Grid>
 
-        <!-- Content. The top padding is headroom for a lifted card and its
-             focus ring, which would otherwise be clipped by the scroll edge. -->
-        <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto" Padding="40,6,24,0">
-            <StackPanel>
+        <!-- Content. The margin is headroom for a lifted card and its focus
+             ring. It has to be on the content: a ScrollViewer's Padding insets
+             the area that clips, so room left there is outside the clip. -->
+        <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="40,8,24,0">
 
                 <!-- Continue watching -->
                 <StackPanel x:Name="ContinuePanel" Visibility="Collapsed" Margin="0,0,0,14">
                     <TextBlock Text="Continue watching" Style="{StaticResource SectionLabel}" />
+                    <!-- Pulled out by 8 on three sides and the row pushed back in, so
+                         the cards sit where they would anyway with room to lift. -->
                     <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"
-                                  Padding="0,6,0,0" Margin="0,-6,0,0">
-                        <ItemsControl x:Name="ContinueList">
+                                  Margin="-8,-8,-8,0">
+                        <ScrollViewer.Resources>
+                            <!-- Its scroll bar comes back in by the same 8, to line up with the cards. -->
+                            <Style TargetType="ScrollBar" BasedOn="{StaticResource {x:Type ScrollBar}}">
+                                <Setter Property="Margin" Value="8,0,8,0" />
+                            </Style>
+                        </ScrollViewer.Resources>
+                        <ItemsControl x:Name="ContinueList" Margin="8,8,8,0">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate DataType="{x:Type models:MovieItem}">
+                                    <!-- Sized like the grid's cards so the two rows' columns line up. -->
                                     <Button Style="{StaticResource MovieCard}" Click="MovieCard_Click"
                                             MouseEnter="MovieCard_Hover" GotKeyboardFocus="MovieCard_Hover"
+                                            Width="{Binding CardWidth, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                             Tag="{Binding}" AutomationProperties.Name="{Binding Name}">
                                         <StackPanel>
-                                            <Border Style="{StaticResource CardFrame}">
+                                            <Border Style="{StaticResource CardFrame}"
+                                                    Height="{Binding CardFrameHeight, RelativeSource={RelativeSource AncestorType=UserControl}}">
                                                 <Grid>
                                                     <TextBlock Text="&#xE714;" FontFamily="{StaticResource IconFont}" FontSize="32"
                                                                Foreground="{StaticResource TextFaintBrush}"
@@ -227,7 +239,7 @@
                 </StackPanel>
 
                 <Grid>
-                    <ItemsControl x:Name="MovieList">
+                    <ItemsControl x:Name="MovieList" Margin="0,0,-16,0" SizeChanged="MovieList_SizeChanged">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <WrapPanel />
@@ -237,6 +249,7 @@
                             <DataTemplate DataType="{x:Type models:MovieItem}">
                                 <Button Style="{StaticResource MovieCard}" Click="MovieCard_Click"
                                         MouseEnter="MovieCard_Hover" GotKeyboardFocus="MovieCard_Hover"
+                                        Width="{Binding CardWidth, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                         Tag="{Binding}" AutomationProperties.Name="{Binding Name}">
                                     <Button.ContextMenu>
                                         <!-- Items show/hide per card kind in CardMenu_Opened. -->
@@ -257,7 +270,8 @@
                                         </ContextMenu>
                                     </Button.ContextMenu>
                                     <StackPanel>
-                                        <Border Style="{StaticResource CardFrame}">
+                                        <Border Style="{StaticResource CardFrame}"
+                                                Height="{Binding CardFrameHeight, RelativeSource={RelativeSource AncestorType=UserControl}}">
                                             <Grid>
                                                 <TextBlock Text="&#xE714;" FontFamily="{StaticResource IconFont}" FontSize="32"
                                                            Foreground="{StaticResource TextFaintBrush}"

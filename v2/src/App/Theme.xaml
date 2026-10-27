@@ -489,7 +489,9 @@
                                                 <ColumnDefinition Width="*" />
                                                 <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
-                                            <TextBlock Grid.Column="0" Margin="16,9,8,9" VerticalAlignment="Center"
+                                            <!-- 12 + the 1px edge: the same inset as the
+                                                 text in a text box (10 padding + 2 + 1). -->
+                                            <TextBlock Grid.Column="0" Margin="12,9,8,9" VerticalAlignment="Center"
                                                        Foreground="{StaticResource TextBrush}" FontSize="13"
                                                        TextTrimming="CharacterEllipsis"
                                                        Text="{Binding SelectionBoxItem, RelativeSource={RelativeSource AncestorType=ComboBox}}" />
@@ -561,7 +563,11 @@
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
                             CornerRadius="11" SnapsToDevicePixels="True">
-                        <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"
+                        <!-- No Margin from Padding here: WPF already hands a text
+                             box's Padding to its content host, so binding it again
+                             padded every field twice and made each one ~18px taller
+                             than the dropdowns and buttons beside it. -->
+                        <ScrollViewer x:Name="PART_ContentHost"
                                       Focusable="False" VerticalAlignment="Center"
                                       HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden" />
                     </Border>
@@ -595,7 +601,8 @@
                 <ControlTemplate TargetType="PasswordBox">
                     <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="11">
-                        <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"
+                        <!-- Padding is applied by WPF itself, as for TextBox above. -->
+                        <ScrollViewer x:Name="PART_ContentHost"
                                       Focusable="False" VerticalAlignment="Center"
                                       HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden" />
                     </Border>
@@ -617,7 +624,7 @@
         </Style.Triggers>
     </Style>
     <Style x:Key="FieldText" TargetType="TextBox" BasedOn="{StaticResource AppTextBox}">
-        <Setter Property="Padding" Value="11,10" />
+        <Setter Property="Padding" Value="10,9" />
         <Setter Property="FontSize" Value="13.5" />
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderThickness" Value="0" />
@@ -806,6 +813,8 @@
          tile it is pointing at. -->
     <Style x:Key="MovieCard" TargetType="Button">
         <Setter Property="Cursor" Value="Hand" />
+        <!-- The library grid overrides this to fill its columns exactly. -->
+        <Setter Property="Width" Value="220" />
         <Setter Property="Margin" Value="0,0,16,18" />
         <Setter Property="FocusVisualStyle" Value="{StaticResource TileFocusVisual}" />
         <Setter Property="RenderTransform">
@@ -817,7 +826,7 @@
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
                     <Border x:Name="Bd" Background="{StaticResource SurfaceBrush}" CornerRadius="16"
-                            BorderBrush="{StaticResource LineBrush}" BorderThickness="1" Width="220"
+                            BorderBrush="{StaticResource LineBrush}" BorderThickness="1"
                             Padding="6">
                         <ContentPresenter />
                     </Border>
@@ -1005,7 +1014,9 @@
     <ControlTemplate x:Key="VerticalSliderTemplate" TargetType="Slider">
         <Grid Background="Transparent" MinWidth="22">
             <Border x:Name="Rail" Width="4" CornerRadius="2" Background="#38FFFFFF" HorizontalAlignment="Center" />
-            <Track x:Name="PART_Track" IsDirectionReversed="True">
+            <!-- Not reversed: a vertical Track already runs bottom to top. It is
+                 the vertical ScrollBar that reverses its Track, to run downwards. -->
+            <Track x:Name="PART_Track" IsDirectionReversed="{TemplateBinding IsDirectionReversed}">
                 <Track.DecreaseRepeatButton>
                     <RepeatButton x:Name="Fill" Style="{StaticResource SliderFillButton}" Command="Slider.DecreaseLarge"
                                   Width="4" HorizontalAlignment="Center" />

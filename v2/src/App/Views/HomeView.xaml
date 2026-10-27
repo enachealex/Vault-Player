@@ -41,8 +41,11 @@
             </StackPanel>
         </Grid>
 
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="-8,26,-8,0" Padding="8,4,8,0">
-            <StackPanel>
+        <!-- The headroom for a lifted tile and its focus ring is a margin on the
+             content, not Padding: a ScrollViewer's Padding insets the area that
+             clips, so room left there is outside the clip and does nothing. -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="-8,22,-8,0">
+            <StackPanel Margin="8,8,8,0">
                 <TextBlock Text="Watch" Style="{StaticResource SectionLabel}" />
                 <WrapPanel>
                     <Button x:Name="SoloBtn" Style="{StaticResource LaunchTile}" Width="300" Padding="24,26"

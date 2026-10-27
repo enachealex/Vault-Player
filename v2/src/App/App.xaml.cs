@@ -70,6 +70,12 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        // Every check and preview below can run while the real app is open,
+        // on the same settings file, so none of them may write it.
+        if (e.Args.Any(a => a is "--selftest" or "--check-replay" or "--list-dlna" or "--check-windows"
+                or "--snapshot-ui" or "--preview-window" or "--list-renderers"))
+            Services.Settings.ReadOnly = true;
+
         // Headless verification mode: `--selftest <video> [outPath]` plays the
         // file without any UI, checks decode/seek behaviour, writes a JSON
         // report, and exits. Used to prove codec support automatically.
@@ -187,23 +193,48 @@ public partial class App : Application
         // WPF's. Opens without activating, closes itself, and is meant to be
         // launched through run-quiet onto a second monitor.
         //   --preview-window <home|library> [dialog] [seconds]
+        //   --preview-window player <film> [volume|scrub|speed|audio|subtitles|chapters] [seconds]
+        // The player is the one screen --snapshot-ui only approximates: the
+        // VideoView moves its overlay into a window of its own, and popups are
+        // placed in that one. Give it a film with no audio track.
         var pw = Array.IndexOf(e.Args, "--preview-window");
         if (pw >= 0 && pw + 1 < e.Args.Length)
         {
             _headless = true;
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
-            var dialog = pw + 2 < e.Args.Length && !int.TryParse(e.Args[pw + 2], out _) ? e.Args[pw + 2] : null;
+            var screen = e.Args[pw + 1];
+            var words = e.Args[(pw + 2)..].Where(a => !int.TryParse(a, out _)).ToList();
+            var film = screen == "player" && words.Count > 0 ? words[0] : null;
+            var dialog = words.Skip(film is null ? 0 : 1).FirstOrDefault();
             var seconds = int.TryParse(e.Args[^1], out var sec) ? sec : 12;
 
             var main = new MainWindow { ShowActivated = false };
-            if (e.Args[pw + 1] == "library") main.Navigate(new Views.LibraryView());
+            if (screen == "library") main.Navigate(new Views.LibraryView());
             main.Show();
+            Views.PlayerView? player = null;
+            if (film is not null)
+            {
+                player = new Views.PlayerView(new Models.MovieItem
+                {
+                    Name = Path.GetFileNameWithoutExtension(film),
+                    Path = film,
+                    SizeBytes = new FileInfo(film).Length,
+                });
+                main.Navigate(player);
+            }
 
             // After the launcher has had time to park the main window, so the
             // dialog opens centred over it rather than where it started.
             var later = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
             later.Tick += (_, _) =>
             {
+                if (player is not null)
+                {
+                    // Kept ticking: the volume popup closes itself when no pointer is near.
+                    later.Interval = TimeSpan.FromMilliseconds(400);
+                    player.HoldForPreview(dialog ?? "");
+                    return;
+                }
                 later.Stop();
                 Window? box = dialog switch
                 {

@@ -188,9 +188,17 @@ public class Settings
     /// restarting the app mid-write was enough to lose saved names, resume
     /// positions and watch counts permanently.
     /// </summary>
+    /// <summary>
+    /// Set by the headless checks and previews. They run beside the real app,
+    /// against the same file, and a Save from one would write its own copy of
+    /// everything over whatever the viewer has changed since it started.
+    /// </summary>
+    public static bool ReadOnly { get; set; }
+
     public static Settings Load()
     {
         if (TryRead(FilePath, out var settings)) return settings!;
+        if (ReadOnly) return TryRead(BackupPath, out var copy) ? copy! : new Settings();
 
         // The main file is missing or unreadable. Keep whatever is there for
         // inspection rather than letting the next Save overwrite it.
@@ -229,6 +237,7 @@ public class Settings
 
     public void Save()
     {
+        if (ReadOnly) return;
         try
         {
             // Keep the resume store bounded.
