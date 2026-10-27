@@ -75,6 +75,22 @@ public partial class App : Application
             return;
         }
 
+        // Headless: prove what a finished film does, and what revives it.
+        //   --check-replay <video>
+        var rp = Array.IndexOf(e.Args, "--check-replay");
+        if (rp >= 0 && rp + 1 < e.Args.Length)
+        {
+            // Off the startup thread, like --list-dlna above: this one sleeps
+            // while it waits for a film to finish, and libVLC's own callbacks
+            // have nowhere to land on a blocked WPF dispatcher.
+            var file = e.Args[rp + 1];
+            var vlcArgs = e.Args.Length > rp + 2 ? e.Args[(rp + 2)..] : null;
+            var code = System.Threading.Tasks.Task.Run(() => ReplayTest.Run(file, vlcArgs))
+                .GetAwaiter().GetResult();
+            Shutdown(code);
+            return;
+        }
+
         // Headless DLNA scan: --list-dlna [out.json] [seconds]
         var d = Array.IndexOf(e.Args, "--list-dlna");
         if (d >= 0)

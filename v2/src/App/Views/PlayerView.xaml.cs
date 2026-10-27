@@ -649,9 +649,44 @@ public partial class PlayerView : UserControl, IDisposable
         }
         if (_player is null) return;
         if (_player.IsPlaying) _player.Pause();
-        else _player.Play();
+        else ResumeOrRestart();
         PushPartyState(force: true);
     }
+
+    /// <summary>
+    /// True once libVLC has finished with the current media.
+    ///
+    /// A film that has played to the end is not merely paused. libVLC treats
+    /// Ended and Stopped as terminal states and silently ignores Play() in
+    /// both — the only way back is a fresh Media, which is what StartPlayback
+    /// builds. Nothing said so, which is why a finished film left the play
+    /// button, the spacebar, a click on the picture and the whole seek bar
+    /// doing nothing at all, with the controls still looking perfectly alive.
+    /// </summary>
+    private bool NeedsRestart =>
+        _player is null || _player.State is VLCState.Ended or VLCState.Stopped
+                        or VLCState.Error or VLCState.NothingSpecial;
+
+    /// <summary>
+    /// Get playback going again from <paramref name="atMs"/>, whichever side of
+    /// that terminal state we are on. Every control that can start a film goes
+    /// through here so none of them can forget the distinction again.
+    /// </summary>
+    private void ResumeOrRestart(long atMs = 0)
+    {
+        if (_player is null) return;
+        if (NeedsRestart) StartPlayback(atMs);
+        else _player.Play();
+    }
+
+    /// <summary>
+    /// The film's length in ms, from libVLC when it has one and from the
+    /// catalogue otherwise. A finished player does keep reporting its length,
+    /// so the fallback is only for the cases that never got one — a player
+    /// torn down, or a film libVLC never managed to open.
+    /// </summary>
+    private long KnownDurationMs =>
+        _player is { Length: > 0 } p ? p.Length : _movie.DurationMs ?? 0;
 
     private void Back10_Click(object sender, RoutedEventArgs e) => SeekBy(-10_000);
     private void Fwd10_Click(object sender, RoutedEventArgs e) => SeekBy(10_000);
@@ -668,11 +703,23 @@ public partial class PlayerView : UserControl, IDisposable
             return;
         }
         if (_player is null) return;
+        if (NeedsRestart)
+        {
+            // Measured from the end of the film: a finished player reports a
+            // Time of zero, so "back ten seconds" taken from the playhead
+            // would land ten seconds before the start.
+            ResumeOrRestart(Math.Max(0, KnownDurationMs + deltaMs));
+            return;
+        }
         _player.Time = Math.Max(0, _player.Time + deltaMs);
     }
 
     private void PrevBtn_Click(object sender, RoutedEventArgs e)
     {
+        // A finished film is at its end, however much libVLC now reports, so
+        // Previous replays it rather than skipping back past it.
+        if (!DlnaActive && NeedsRestart) { ResumeOrRestart(); return; }
+
         var timeMs = DlnaActive ? (long)_dlnaPos.TotalMilliseconds : _player?.Time ?? 0;
         if (timeMs > 3000 || _index == 0)
         {
@@ -728,7 +775,18 @@ public partial class PlayerView : UserControl, IDisposable
             _ = DlnaService.SeekAsync(_dlnaDevice!, target);
             return;
         }
-        if (_player is null || _player.Length <= 0) return;
+        if (_player is null) return;
+        if (NeedsRestart)
+        {
+            // Dragging the bar after the credits is the most natural way to
+            // ask for a scene again, and it did nothing at all: assigning
+            // Position is ignored in this state exactly like Play() is. The
+            // length is still reported, so it was never a missing duration.
+            var durationMs = KnownDurationMs;
+            if (durationMs > 0) ResumeOrRestart((long)(durationMs * fraction));
+            return;
+        }
+        if (_player.Length <= 0) return;
         _player.Position = (float)fraction;
     }
 
@@ -1061,10 +1119,30 @@ public partial class PlayerView : UserControl, IDisposable
 
     private void FullscreenBtn_Click(object sender, RoutedEventArgs e) => ToggleFullscreen();
 
+    /// <summary>
+    /// A click on the picture plays or pauses; a double-click goes fullscreen.
+    ///
+    /// The two have to be reconciled, because WPF delivers the single click
+    /// first and only then the double: left alone, every double-click went
+    /// fullscreen with the film quietly paused behind it. Rather than delay
+    /// the pause by the double-click interval — which would put a visible lag
+    /// on the most-used control in the app — the toggle happens immediately
+    /// and the second click undoes it.
+    /// </summary>
     private void VideoArea_MouseDown(object sender, MouseButtonEventArgs e)
     {
-        if (e.ClickCount == 2) ToggleFullscreen();
-        else if (e.ClickCount == 1) TogglePlay();
+        if (e.ClickCount == 2)
+        {
+            // Only for a player we own. A guest's click is a request sent to
+            // the host, and asking twice in a row would say two things and
+            // put both in the chat.
+            if (!PartyGuest && !DlnaActive) TogglePlay();
+            ToggleFullscreen();
+        }
+        else if (e.ClickCount == 1)
+        {
+            TogglePlay();
+        }
     }
 
 
