@@ -26,6 +26,33 @@ public static class WatchPage
 {
     public static string Render() => Template;
 
+    /// <summary>
+    /// The web app manifest. With it, Chrome on Android and desktop offers
+    /// "Install app"; an iPhone's "Add to Home Screen" uses the apple-touch-icon
+    /// and apple-mobile-web-app metas in the page instead, which is why both exist.
+    /// Scope is the whole site so the /link and /join pages a person reaches
+    /// from inside the app stay inside its window.
+    /// </summary>
+    public const string Manifest = """
+{
+  "name": "Vault Movies",
+  "short_name": "Vault",
+  "description": "Your film library, anywhere.",
+  "id": "/watch",
+  "start_url": "/watch",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0B0D12",
+  "theme_color": "#0B0D12",
+  "icons": [
+    { "src": "/watch/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/watch/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/watch/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
+""";
+
     private const string Template = """
 <!doctype html>
 <html lang="en">
@@ -37,6 +64,9 @@ public static class WatchPage
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Vault">
+<link rel="manifest" href="/watch/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/watch/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="/watch/favicon-64.png">
 <title>Vault Movies</title>
 <style>
   /* The same smoked glass over film stills as the desktop app and the TV page.
@@ -244,6 +274,14 @@ public static class WatchPage
   #detail .facts dt { color:var(--faint); }
   #detail .facts dd { margin:0; color:var(--muted); }
 
+  /* ---- install tip ---- */
+  #installTip { position:fixed; inset:0; z-index:50; display:flex; align-items:center; justify-content:center;
+                padding:16px; background:rgba(4,5,8,.72); }
+  #installTip .steps { margin:0 0 16px; padding-left:22px; line-height:1.6; font-size:15px; }
+  #installTip .steps li { margin-bottom:6px; }
+  #installTip .share { vertical-align:-3px; margin:0 2px; }
+  #installTip p { font-size:14px; }
+
   /* ---- player ---- */
   #player { position:fixed; inset:0; z-index:60; background:#000; }
   #player video { width:100%; height:100%; display:block; background:#000; }
@@ -316,6 +354,7 @@ public static class WatchPage
         <span class="avatar" id="avatar"></span><span class="name" id="whoName"></span></button>
       <div class="menu" id="whoMenu" hidden>
         <div class="lbl" id="whoLbl"></div>
+        <button id="installBtn" hidden>Install app</button>
         <button id="reloadBtn">Refresh library</button>
         <button id="signoutBtn">Sign out</button>
       </div>
@@ -352,6 +391,23 @@ public static class WatchPage
       <div class="actions" id="dActions"></div>
       <dl class="facts" id="dFacts"></dl>
     </div>
+  </div>
+</div>
+
+<!-- ---- how to install on an iPhone (Safari has no install prompt a page can open) ---- -->
+<div id="installTip" hidden role="dialog" aria-modal="true" aria-labelledby="tipTitle">
+  <div class="panel">
+    <span class="logo" aria-hidden="true"></span>
+    <h1 id="tipTitle">Put Vault on your home screen</h1>
+    <ol class="steps">
+      <li>Tap the <b>Share</b> button <svg class="share" width="16" height="20" viewBox="0 0 16 20" fill="none" stroke="currentColor"
+        stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M8 13V1.5M4 5l4-3.8L12 5M5 8H2.5v10.5h11V8H11"/></svg> in Safari&rsquo;s toolbar.</li>
+      <li>Scroll down and tap <b>Add to Home Screen</b>.</li>
+      <li>Tap <b>Add</b>. Vault opens full screen, like any other app.</li>
+    </ol>
+    <p class="muted">You&rsquo;ll sign in once more inside the app; after that it remembers you.</p>
+    <button class="btn" id="tipClose">Got it</button>
   </div>
 </div>
 
@@ -892,6 +948,35 @@ public static class WatchPage
   $('signoutBtn').addEventListener('click', () => { setMenu(false); signOut(false); });
   $('reloadBtn').addEventListener('click', () => { setMenu(false); enter(); });
 
+  // ---- installing as an app ------------------------------------------------------
+  // Already installed (opened from the home screen): nothing to offer.
+  // Chrome/Edge: they hand over an install prompt we can open from the menu.
+  // iPhone/iPad Safari: no prompt exists, so the menu item shows the steps.
+  const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  let installPrompt = null;
+  if (!standalone && isIOS) $('installBtn').hidden = false;
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    installPrompt = e;
+    if (!standalone) $('installBtn').hidden = false;
+  });
+  window.addEventListener('appinstalled', () => { installPrompt = null; $('installBtn').hidden = true; });
+  $('installBtn').addEventListener('click', async () => {
+    setMenu(false);
+    if (installPrompt) {
+      const p = installPrompt; installPrompt = null;
+      p.prompt();
+      try { const { outcome } = await p.userChoice; if (outcome === 'accepted') $('installBtn').hidden = true; } catch {}
+      return;
+    }
+    $('installTip').hidden = false;
+    $('tipClose').focus();
+  });
+  $('tipClose').addEventListener('click', () => { $('installTip').hidden = true; });
+  $('installTip').addEventListener('click', e => { if (e.target === $('installTip')) $('installTip').hidden = true; });
+
   window.addEventListener('scroll', () => {
     $('top').classList.toggle('solid', window.scrollY > 40);
   }, { passive:true });
@@ -1100,6 +1185,7 @@ public static class WatchPage
       else if (e.key === 'f') { try { document.fullscreenElement ? document.exitFullscreen() : $('player').requestFullscreen(); } catch {} }
       return;
     }
+    if (e.key === 'Escape' && !$('installTip').hidden) { $('installTip').hidden = true; return; }
     if (e.key === 'Escape' && !$('detail').hidden) { closeDetail(); return; }
     if (e.key === '/' && !$('app').hidden && document.activeElement !== $('q')) { e.preventDefault(); $('q').focus(); }
   });

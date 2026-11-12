@@ -23,4 +23,9 @@
     <None Include="tv/vaultmovies.ipk" CopyToOutputDirectory="PreserveNewest" Condition="Exists('tv/vaultmovies.ipk')" />
   </ItemGroup>
 
+  <!-- Home-screen icons for the /watch web app. Made by scripts/make-vault-icons.js. -->
+  <ItemGroup>
+    <None Include="watch/*.png" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

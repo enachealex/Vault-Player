@@ -296,6 +296,25 @@ app.MapGet("/watch", (HttpContext ctx) =>
     return Results.Content(VideoPlayer.Rendezvous.WatchPage.Render(), "text/html; charset=utf-8");
 });
 
+// What makes /watch installable: "Add to Home Screen" on an iPhone reads the
+// apple-touch-icon link in the page; Android and desktop Chrome read this.
+app.MapGet("/watch/manifest.webmanifest", () => Results.Text(
+    VideoPlayer.Rendezvous.WatchPage.Manifest, "application/manifest+json; charset=utf-8"));
+
+// The icons. A fixed list rather than a path parameter, so nothing outside
+// the folder can be named.
+foreach (var icon in new[] { "apple-touch-icon.png", "icon-192.png", "icon-512.png",
+                             "icon-maskable-512.png", "favicon-64.png" })
+{
+    app.MapGet($"/watch/{icon}", (HttpContext ctx) =>
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "watch", icon);
+        if (!File.Exists(path)) return Results.NotFound();
+        ctx.Response.Headers.CacheControl = "public, max-age=86400";
+        return Results.File(path, "image/png");
+    });
+}
+
 // The bare hostname is where a person typing the address lands; it had nothing
 // to show before. Send them to the library.
 app.MapGet("/", () => Results.Redirect("/watch"));
