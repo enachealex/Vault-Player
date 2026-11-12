@@ -1174,32 +1174,105 @@ public partial class PlayerView : UserControl, IDisposable
 
     private void FullscreenBtn_Click(object sender, RoutedEventArgs e) => ToggleFullscreen();
 
+    private readonly Helpers.VideoClickTracker _clicks = new();
+    private bool _playingBeforeClick;
+    private long _skipTargetMs;
+    private long _skipTotalMs;
+    private DispatcherTimer? _skipBadgeTimer;
+
     /// <summary>
-    /// A click on the picture plays or pauses; a double-click goes fullscreen.
+    /// A click on the picture plays or pauses. A double-click on the left or
+    /// right third skips ten seconds, and each further click there skips again;
+    /// a double-click in the middle goes fullscreen.
     ///
-    /// The two have to be reconciled, because WPF delivers the single click
-    /// first and only then the double: left alone, every double-click went
-    /// fullscreen with the film quietly paused behind it. Rather than delay
-    /// the pause by the double-click interval — which would put a visible lag
-    /// on the most-used control in the app — the toggle happens immediately
-    /// and the second click undoes it.
+    /// WPF delivers the first click of a double-click as a single click. Rather
+    /// than delay the pause by the double-click interval — which would put a
+    /// visible lag on the most-used control in the app — the toggle happens
+    /// immediately and the second click undoes it.
     /// </summary>
     private void VideoArea_MouseDown(object sender, MouseButtonEventArgs e)
     {
-        if (e.ClickCount == 2)
+        var area = (FrameworkElement)sender;
+        var fraction = area.ActualWidth > 0 ? e.GetPosition(area).X / area.ActualWidth : 0.5;
+
+        switch (_clicks.Click(fraction, e.ClickCount, !PartyGuest, Environment.TickCount64))
         {
-            // Only for a player we own. A guest's click is a request sent to
-            // the host, and asking twice in a row would say two things and
-            // put both in the chat.
-            if (!PartyGuest && !DlnaActive) TogglePlay();
-            ToggleFullscreen();
-        }
-        else if (e.ClickCount == 1)
-        {
-            TogglePlay();
+            case Helpers.VideoClickAction.TogglePlay:
+                // A finished film restarts on this click, and should stay playing.
+                _playingBeforeClick = _player?.IsPlaying == true || NeedsRestart;
+                TogglePlay();
+                break;
+            case Helpers.VideoClickAction.UndoToggleAndFullscreen:
+                if (!DlnaActive) UndoClickToggle();
+                ToggleFullscreen();
+                break;
+            case Helpers.VideoClickAction.Fullscreen:
+                ToggleFullscreen();
+                break;
+            case Helpers.VideoClickAction.UndoToggleAndStartSkip:
+                UndoClickToggle();
+                _skipTargetMs = DlnaActive ? (long)_dlnaPos.TotalMilliseconds : _player?.Time ?? 0;
+                _skipTotalMs = 0;
+                SkipFromClick();
+                break;
+            case Helpers.VideoClickAction.ContinueSkip:
+                SkipFromClick();
+                break;
         }
     }
 
+    /// <summary>
+    /// Put playback back as it was before the first click. Sets the state rather
+    /// than toggling it: libVLC reports a pause late, so a fast second click
+    /// can read the old state and toggle the wrong way.
+    /// </summary>
+    private void UndoClickToggle()
+    {
+        if (DlnaActive) { TogglePlay(); return; }
+        _player?.SetPause(!_playingBeforeClick);
+        PushPartyState(force: true);
+    }
+
+    /// <summary>
+    /// One skip in the current streak. Steps from a running target, not the
+    /// playhead: libVLC's time lags behind a seek, so reading it between quick
+    /// clicks would lose skips.
+    /// </summary>
+    private void SkipFromClick()
+    {
+        var current = DlnaActive ? (long)_dlnaPos.TotalMilliseconds : _player?.Time ?? 0;
+        var target = Math.Max(0, _skipTargetMs + _clicks.Side * 10_000);
+        if (KnownDurationMs > 0) target = Math.Min(target, Math.Max(0, KnownDurationMs - 1000));
+
+        _skipTotalMs += target - _skipTargetMs;
+        _skipTargetMs = target;
+        SeekBy(target - current);
+        PushPartyState(force: true);
+        ShowSkipBadge();
+    }
+
+    private void ShowSkipBadge()
+    {
+        var seconds = _skipTotalMs / 1000;
+        SkipBadgeText.Text = seconds >= 0 ? $"+{seconds}s" : $"−{-seconds}s";
+        SkipBadge.HorizontalAlignment = _clicks.Side < 0 ? HorizontalAlignment.Left : HorizontalAlignment.Right;
+        SkipBadge.Visibility = Visibility.Visible;
+
+        _skipBadgeTimer ??= new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(Helpers.VideoClickTracker.StreakWindowMs),
+        };
+        _skipBadgeTimer.Tick -= HideSkipBadge;
+        _skipBadgeTimer.Tick += HideSkipBadge;
+        _skipBadgeTimer.Stop();
+        _skipBadgeTimer.Start();
+    }
+
+    private void HideSkipBadge(object? sender, EventArgs e)
+    {
+        _skipBadgeTimer?.Stop();
+        SkipBadge.Visibility = Visibility.Collapsed;
+    }
 
     private void ToggleFullscreen()
     {
@@ -1661,6 +1734,7 @@ public partial class PlayerView : UserControl, IDisposable
     public void Dispose()
     {
         _uiTimer.Stop();
+        _skipBadgeTimer?.Stop();
         // A grab still running would otherwise outlive the view it was for.
         _scrubFrames?.Dispose();
         MainWindow.Instance.PreviewKeyDown -= OnKeyDown;

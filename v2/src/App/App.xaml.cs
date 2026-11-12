@@ -158,6 +158,7 @@ public partial class App : Application
                 ("ManageUsersWindow", () => new Views.ManageUsersWindow()),
                 ("AddShortcutWindow", () => new Views.AddShortcutWindow()),
                 ("InviteWindow", () => new Views.InviteWindow()),
+                ("PlayerView", () => new Window { Content = new Views.PlayerView(new Models.MovieItem { Name = "check", Path = "check.mp4" }) }),
                 ("NameCollectionWindow", () => new Views.NameCollectionWindow()),
                 ("StreamingBrowserWindow", () => new Views.StreamingBrowserWindow("about:blank")),
             })

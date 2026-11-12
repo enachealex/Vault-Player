@@ -51,6 +51,15 @@
                      free, and the next panel added cannot reintroduce the bug. -->
                 <Border Background="Transparent" MouseLeftButtonDown="VideoArea_MouseDown" />
 
+                <!-- How far a double-click has skipped. Not hit-testable, so the
+                     next click on that side reaches the catcher underneath. -->
+                <Border x:Name="SkipBadge" Visibility="Collapsed" IsHitTestVisible="False"
+                        Style="{StaticResource OverlayCard}" Padding="24,14" Margin="80,0"
+                        VerticalAlignment="Center">
+                    <TextBlock x:Name="SkipBadgeText" FontSize="26" FontWeight="Bold"
+                               Foreground="{StaticResource TextBrush}" />
+                </Border>
+
                 <!-- Pausing a party brings the lobby back: the room code and who
                      is in it are exactly what you need when someone is late or
                      dropped out. Hidden again the moment playback resumes. -->
@@ -170,6 +179,8 @@
                             <TextBlock Text="Back / forward 5 seconds" Style="{StaticResource ShortcutWhat}" />
                             <TextBlock Text="J / L" Style="{StaticResource ShortcutKey}" />
                             <TextBlock Text="Back / forward 10 seconds" Style="{StaticResource ShortcutWhat}" />
+                            <TextBlock Text="Double-click" Style="{StaticResource ShortcutKey}" />
+                            <TextBlock Text="Left / right of picture: skip 10 seconds" Style="{StaticResource ShortcutWhat}" />
                             <TextBlock Text="Page Up / Down" Style="{StaticResource ShortcutKey}" />
                             <TextBlock Text="Back / forward a minute" Style="{StaticResource ShortcutWhat}" />
                             <TextBlock Text="0 &#8211; 9" Style="{StaticResource ShortcutKey}" />
@@ -421,7 +432,7 @@
                                         </StackPanel>
                                     </Border>
                                 </Popup>
-                                <Button x:Name="FullscreenBtn" ToolTip="Fill the screen (F, or double-click the picture)" Style="{StaticResource BarButton}"
+                                <Button x:Name="FullscreenBtn" ToolTip="Fill the screen (F, or double-click the middle of the picture)" Style="{StaticResource BarButton}"
                                         Click="FullscreenBtn_Click" AutomationProperties.Name="Fullscreen">
                                     <TextBlock x:Name="FullscreenGlyph" Text="&#xE740;" FontFamily="{StaticResource IconFont}" FontSize="14" />
                                 </Button>
