@@ -284,6 +284,22 @@ app.MapGet("/tv", (HttpContext ctx) =>
         "text/html; charset=utf-8");
 });
 
+// ---- The library in any browser ---------------------------------------------
+// Phones, tablets and computers away from home: a streaming-service home screen
+// over the same catalogue, stream URLs and resume sync the TV and the desktop
+// app use. Never cached, for the same reason as /tv — the response is the app.
+app.MapGet("/watch", (HttpContext ctx) =>
+{
+    ctx.Response.Headers.CacheControl = "no-store, no-cache, must-revalidate";
+    ctx.Response.Headers.Pragma = "no-cache";
+    ctx.Response.Headers.Expires = "0";
+    return Results.Content(VideoPlayer.Rendezvous.WatchPage.Render(), "text/html; charset=utf-8");
+});
+
+// The bare hostname is where a person typing the address lands; it had nothing
+// to show before. Send them to the library.
+app.MapGet("/", () => Results.Redirect("/watch"));
+
 // ---- The television app, as an installable package ------------------------
 // LG televisions cannot install anything from a file downloaded in their own
 // browser, and webOS has no add-to-home-screen. Sideloading from a PC over the
