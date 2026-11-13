@@ -9,21 +9,34 @@ public static class AppServices
     private static readonly Lazy<LibVLC> _libVlc = new(() =>
     {
         Core.Initialize();
-        return new LibVLC("--no-video-title-show");
+        if (PluginCache.IsCurrent()) return new LibVLC("--no-video-title-show");
+
+        // A stale cache costs the same full scan as none at all, and libVLC
+        // never writes the result back by itself. Have the scan this launch
+        // pays for anyway rewrite it, so it happens once rather than on every
+        // launch until the next update. Normally the install and update hooks
+        // got there first; this catches a hook that ran out of time, and the
+        // portable zip, which is unzipped rather than installed.
+        var vlc = new LibVLC("--no-video-title-show", "--reset-plugins-cache");
+        PluginCache.MarkCurrent();
+        return vlc;
     });
 
     public static LibVLC LibVlc => _libVlc.Value;
 
     /// <summary>
-    /// Build libVLC's plugin cache (plugins.dat) once, at pack time, then exit.
+    /// Build libVLC's plugin cache (plugins.dat) into the bundled plugins folder.
     /// Without the cache, libVLC scans all ~320 native plugin DLLs on every cold
     /// start — ~12 seconds. With it, startup reads one file. `--reset-plugins-cache`
-    /// forces a fresh scan and writes the cache into the bundled plugins folder.
+    /// forces a fresh scan and writes the cache. Run after Velopack installs or
+    /// updates the app, because extraction re-stamps every plugin's modified time
+    /// and a cache built before that never matches. See <see cref="PluginCache"/>.
     /// </summary>
     public static void GeneratePluginCache()
     {
         Core.Initialize();
-        using var _ = new LibVLC("--reset-plugins-cache");
+        using (new LibVLC("--reset-plugins-cache")) { }
+        PluginCache.MarkCurrent();
     }
 
     public static Settings Settings { get; } = Settings.Load();

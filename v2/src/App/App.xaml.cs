@@ -15,7 +15,16 @@ public partial class App : Application
 
         // Must run before anything else touches the app: this handles the
         // install/update/uninstall hooks and can exit the process outright.
-        VelopackApp.Build().Run();
+        //
+        // Extracting an install or update re-stamps every file's modified
+        // time, and libVLC's plugin cache records them, so build the cache
+        // here, while Velopack waits. It has taken 2-10 s; the update hook is
+        // killed at 15 s (install: 30 s), and a cache still stale on first
+        // launch is rebuilt then instead.
+        VelopackApp.Build()
+            .OnAfterInstallFastCallback(_ => TryGeneratePluginCache())
+            .OnAfterUpdateFastCallback(_ => TryGeneratePluginCache())
+            .Run();
         Services.StartupTrace.Mark("VelopackApp.Run");
 
         // A film stopping dead with no explanation is the worst outcome, so
@@ -47,6 +56,17 @@ public partial class App : Application
             LogCrash("task", e.Exception);
             e.SetObserved();
         };
+    }
+
+    /// <summary>
+    /// For the install and update hooks. Nothing here is worth an unhandled
+    /// exception, which would put Windows' crash dialog in front of somebody
+    /// installing the app over a cache that the first launch can rebuild.
+    /// </summary>
+    private static void TryGeneratePluginCache()
+    {
+        try { Services.AppServices.GeneratePluginCache(); }
+        catch (Exception ex) { LogCrash("plugin cache", ex); }
     }
 
     private static void LogCrash(string where, Exception? ex)
@@ -258,7 +278,8 @@ public partial class App : Application
         }
 
         // Headless: build the libVLC plugin cache into the bundled plugins
-        // folder, then exit. Run once at pack time so shipped copies start fast.
+        // folder, then exit. Installed copies do this in the Velopack hooks
+        // above; this is for rebuilding one by hand.
         if (Array.IndexOf(e.Args, "--gen-plugin-cache") >= 0)
         {
             try { Services.AppServices.GeneratePluginCache(); Shutdown(0); }
