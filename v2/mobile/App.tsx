@@ -15,6 +15,7 @@ import { SignInScreen } from './src/screens/SignInScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { DetailScreen } from './src/screens/DetailScreen';
 import { PlayerScreen } from './src/screens/PlayerScreen';
+import { UpdateBanner } from './src/UpdateBanner';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -162,6 +163,7 @@ export default function App() {
             )}
           </View>
         ))}
+        <UpdateBanner hidden={top?.name === 'player'} />
       </>
     );
   }

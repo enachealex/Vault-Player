@@ -237,6 +237,7 @@ app.MapCatalogApi();
 app.MapCollectionsApi();
 app.MapUploadApi();
 app.MapLinkApi();
+app.MapAppUpdateApi();
 
 // Throw away any web copy left half-written by a previous run, before anything
 // can start writing a new one. Synchronous and first: it is the one moment when
