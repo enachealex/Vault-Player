@@ -170,6 +170,7 @@ public class CatalogScanner(IServiceScopeFactory scopes, ILogger<CatalogScanner>
                         row.DurationMs = null;
                         row.VideoCodec = row.AudioCodec = null;
                         DeleteArt(row);
+                        Captions.Delete(row.ItemKey);
                     }
                 }
                 else
@@ -206,7 +207,21 @@ public class CatalogScanner(IServiceScopeFactory scopes, ILogger<CatalogScanner>
             // Anything not seen this sweep is gone from the disk. Rows are cheap
             // to rebuild, so drop them rather than accumulate tombstones.
             var vanished = existing.Values.Where(x => !seen.Contains(x.ItemKey)).ToList();
-            foreach (var row in vanished) DeleteArt(row);
+
+            // Every film gone at once is an unmounted disk, not a cleared-out
+            // library: the empty mount point looks exactly like a folder whose
+            // films were all deleted. Dropping the rows would throw away every
+            // poster and leave the library blank until the next sweep after the
+            // disk returns. Emptying a library on purpose is rare enough that
+            // leaving its rows until a restart costs nothing.
+            if (seen.Count == 0 && existing.Count > 0)
+            {
+                log.LogWarning(
+                    "No films found in {Root}, which held {Count} last time; treating it as not mounted and keeping the catalogue.",
+                    root, existing.Count);
+                vanished.Clear();
+            }
+            foreach (var row in vanished) { DeleteArt(row); Captions.Delete(row.ItemKey); }
             db.CatalogItems.RemoveRange(vanished);
 
             await db.SaveChangesAsync(ct);
@@ -214,6 +229,19 @@ public class CatalogScanner(IServiceScopeFactory scopes, ILogger<CatalogScanner>
             log.LogInformation(
                 "Catalogue scan finished in {Seconds:0.0}s: {Total} films ({Added} new, {Gone} removed).",
                 started.Elapsed.TotalSeconds, seen.Count, added, vanished.Count);
+
+            // Captions last, and outside what clients see as "scanning": each
+            // new film is read end to end once, which takes minutes on a large
+            // file, and the library is complete without them.
+            IsScanning = false;
+            var rows = await db.CatalogItems.AsNoTracking().ToListAsync(ct);
+            foreach (var row in rows)
+            {
+                if (ct.IsCancellationRequested) break;
+                if (!Captions.Pending(row.ItemKey)) continue;
+                if (ResolveFile(row) is not { } path) continue;
+                await Captions.ExtractAsync(row.ItemKey, path, RunAsync, log, ct);
+            }
         }
         catch (Exception ex)
         {

@@ -296,6 +296,7 @@ public static class TvPage
   #hud { position:absolute; left:0; right:0; bottom:0; padding:3rem 4rem 2.6rem;
          background:linear-gradient(rgba(0,0,0,0),rgba(0,0,0,.88)); transition:opacity .25s; }
   #hud.hide { opacity:0; }
+  video::cue { font-size:2.4rem; line-height:1.3; color:#fff; background:rgba(0,0,0,.62); }
   #hud .t { font-size:2.375rem; font-weight:700; }
   #hud .times { font-size:1.475rem; color:var(--muted); margin:.8rem 0 .6rem; }
   #hud .times .right { float:right; }
@@ -390,7 +391,7 @@ public static class TvPage
   <div id="hud">
     <!-- Inside the HUD, not beside it: bumpHud only fades #hud, so a sibling
          would sit over the picture for the whole film. -->
-    <div id="hint">OK pause &middot; &#9664; &#9654; skip 10s &middot; Back exit</div>
+    <div id="hint">OK pause &middot; &#9664; &#9654; skip 10s<span id="ccHint"></span> &middot; Back exit</div>
     <div class="t" id="pTitle"></div>
     <div class="times"><span id="pAt">0:00</span><span class="right" id="pLeft"></span></div>
     <div class="track"><i id="pBar" style="width:0"></i></div>
@@ -595,7 +596,8 @@ public static class TvPage
     var playing = S.screen === 'player';
     if (k === 'ArrowLeft' || c === 37) { if (playing) seekBy(-10); else move(-1, 0); }
     else if (k === 'ArrowRight' || c === 39) { if (playing) seekBy(10); else move(1, 0); }
-    else if (k === 'ArrowUp' || c === 38) { if (!playing) move(0, -1); }
+    else if (k === 'ArrowUp' || c === 38) { if (playing) toggleCaptions(); else move(0, -1); }
+    else if (c === 460 || k === 'Subtitle' || ((k === 'c' || k === 'C') && playing)) { if (playing) toggleCaptions(); }
     else if (k === 'ArrowDown' || c === 40) { if (!playing) move(0, 1); }
     else if (k === 'Enter' || c === 13) activate();
     else if (BACK.indexOf(c) >= 0 || k === 'Backspace' || k === 'Escape' || k === 'GoBack') handleBack(VIA_KEY);
@@ -1702,7 +1704,7 @@ public static class TvPage
         }
         if (j.ready && j.playlistUrl) {
           $('prep').className = '';
-          begin(j.playlistUrl, startMs);
+          begin(j.playlistUrl.replace('/master.m3u8?', '/index.m3u8?'), startMs);
           return;
         }
         $('prepPct').textContent = j.percent > 0 ? j.percent + '%' : 'Starting…';
@@ -1716,6 +1718,7 @@ public static class TvPage
   function begin(src, startMs) {
     v.src = src;
     began = true;
+    attachCaptions(S.film);
     // Held so it can be taken off again. A listener that only removes itself
     // when it fires survives a viewer who backs out before the film loads, and
     // then seeks the NEXT film to this one's position — which the periodic save
@@ -1731,6 +1734,59 @@ public static class TvPage
     bumpHud();
     saveTimer = setInterval(function () { pushResume(false); }, 20000);
   }
+  // ---- captions ---------------------------------------------------------
+  // English text captions, when the film has any, as a WebVTT <track>. On or
+  // off is remembered on this television: it is a property of who watches here.
+  var CC_KEY = 'vault.tv.captions', ccTrack = null;
+  function captionsWanted() { try { return localStorage.getItem(CC_KEY) === 'on'; } catch (e) { return false; } }
+  function attachCaptions(it) {
+    detachCaptions();
+    if (!it || !it.captionsUrl) { $('ccHint').textContent = ''; return; }
+    ccTrack = document.createElement('track');
+    ccTrack.kind = 'subtitles';
+    ccTrack.label = 'English';
+    ccTrack.srclang = 'en';
+    ccTrack.src = it.captionsUrl;
+    v.appendChild(ccTrack);
+    // Cues exist only once the file has loaded; place them then.
+    ccTrack.addEventListener('load', applyCaptions);
+    applyCaptions();
+    // Some players reset track modes once the media loads; say it again.
+    v.addEventListener('loadedmetadata', applyCaptions);
+  }
+  function detachCaptions() {
+    v.removeEventListener('loadedmetadata', applyCaptions);
+    if (ccTrack && ccTrack.parentNode) ccTrack.parentNode.removeChild(ccTrack);
+    ccTrack = null;
+  }
+  function applyCaptions() {
+    var on = captionsWanted();
+    // Turn off anything else the player found, so captions never show twice.
+    for (var i = 0; i < v.textTracks.length; i++) {
+      var t = v.textTracks[i];
+      t.mode = ccTrack && t === ccTrack.track && on ? 'showing' : 'disabled';
+    }
+    if (ccTrack) $('ccHint').textContent = ' · ▲ captions ' + (on ? 'on' : 'off');
+    placeCaptions();
+  }
+  // The video draws captions along its bottom edge, which is exactly where the
+  // controls sit, under their dark gradient. While the controls are up the
+  // captions move above them; when the controls fade they go back down.
+  function placeCaptions() {
+    if (!ccTrack || !ccTrack.track || !ccTrack.track.cues) return;
+    var up = $('hud').className !== 'hide';
+    var cues = ccTrack.track.cues;
+    for (var i = 0; i < cues.length; i++) {
+      try { cues[i].line = up ? -5 : 'auto'; } catch (e) {}
+    }
+  }
+  function toggleCaptions() {
+    if (!ccTrack) return;
+    try { localStorage.setItem(CC_KEY, captionsWanted() ? 'off' : 'on'); } catch (e) {}
+    applyCaptions();
+    bumpHud();
+  }
+
   function togglePlay() {
     if (v.paused) { var p = v.play(); if (p && p['catch']) p['catch'](function () {}); }
     else v.pause();
@@ -1758,8 +1814,11 @@ public static class TvPage
   }
   function bumpHud() {
     $('hud').className = '';
+    placeCaptions();
     clearTimeout(hudTimer);
-    hudTimer = setTimeout(function () { if (!v.paused) $('hud').className = 'hide'; }, 4000);
+    hudTimer = setTimeout(function () {
+      if (!v.paused) { $('hud').className = 'hide'; placeCaptions(); }
+    }, 4000);
   }
   v.addEventListener('timeupdate', function () {
     var d = filmDuration();
@@ -1806,6 +1865,7 @@ public static class TvPage
     if (began) pushResume(false);
     began = false;
 
+    detachCaptions();
     v.pause(); v.removeAttribute('src'); v.load();
     try { if (document.exitFullscreen && document.fullscreenElement) document.exitFullscreen(); } catch (e) {}
     show('library');

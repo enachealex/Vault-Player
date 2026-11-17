@@ -255,6 +255,31 @@ app.Logger.LogInformation("Serving films from {Root}", VideoPlayer.Rendezvous.Va
 // answering /health and hosting parties long before that finishes.
 _ = Task.Run(() => app.Services.GetRequiredService<CatalogScanner>().ScanAsync());
 
+// Then keep looking. Films also arrive by being copied straight onto the disk
+// (a ripped DVD, a file dropped over SSH), and nothing announces those. A
+// sweep only probes files it has not seen, so repeating it is cheap, and the
+// scanner's own gate means a sweep still running is never doubled.
+_ = Task.Run(async () =>
+{
+    var scanner = app.Services.GetRequiredService<CatalogScanner>();
+    using var timer = new PeriodicTimer(TimeSpan.FromMinutes(5));
+    try
+    {
+        while (await timer.WaitForNextTickAsync(app.Lifetime.ApplicationStopping))
+        {
+            try { await scanner.ScanAsync(app.Lifetime.ApplicationStopping); }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                app.Logger.LogWarning(ex, "Periodic catalogue scan failed.");
+            }
+        }
+    }
+    catch (OperationCanceledException)
+    {
+        // Shutting down.
+    }
+});
+
 var rooms = new ConcurrentDictionary<string, Room>();
 var pulls = new ConcurrentDictionary<string, PendingPull>();
 

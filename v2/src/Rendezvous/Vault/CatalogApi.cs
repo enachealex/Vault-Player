@@ -28,7 +28,8 @@ namespace VideoPlayer.Rendezvous.Vault;
 public record CatalogItemDto(string ItemKey, string Name, long SizeBytes, long? DurationMs,
     string ContentType, string FilmKey, bool WebPlayable, string? VideoCodec, string? AudioCodec,
     string StreamUrl, string? ArtUrl, long AddedAt,
-    bool HlsAvailable, string? HlsVideoCodec, string HlsUrl);
+    bool HlsAvailable, string? HlsVideoCodec, string HlsUrl,
+    string? CaptionsUrl = null);
 
 /// <summary>Where a film's web copy stands. See <see cref="HlsRemuxer"/>.</summary>
 public record HlsStatusDto(string State, int Percent, bool Ready, string? Error, string? PlaylistUrl);
@@ -124,6 +125,9 @@ public class MediaTokens(IConfiguration cfg)
 
 public static class CatalogApi
 {
+    private const string MasterName = "master.m3u8";
+    private const string SubtitlePlaylistName = "subs_en.m3u8";
+
     /// <summary>
     /// The film library is gated on the owner's approval, not on merely having
     /// an account — an account exists the moment someone passes the sign-up
@@ -174,7 +178,13 @@ public static class CatalogApi
                     x.ArtFile is null ? null : $"/api/v1/catalog/{x.ItemKey}/art",
                     x.AddedAt,
                     HlsRemuxer.CanRemux(x), HlsRemuxer.RemuxVideoCodec(x),
-                    $"/api/v1/catalog/{x.ItemKey}/hls");
+                    $"/api/v1/catalog/{x.ItemKey}/hls",
+                    // WebVTT for players that take a caption file beside the
+                    // video (a television's video element). Phones get the same
+                    // captions inside the stream instead; see the master playlist.
+                    Captions.Has(x.ItemKey)
+                        ? $"/hls/{x.ItemKey}/en.vtt?t={Uri.EscapeDataString(token)}"
+                        : null);
             }).ToArray();
 
             return Results.Ok(new CatalogDto(dtos, scanner.IsScanning, scanner.LastScanAt,
@@ -272,7 +282,9 @@ public static class CatalogApi
             var token = media.Mint(item.ItemKey, uid!);
             return Results.Ok(new HlsStatusDto(status.State, status.Percent, status.Ready, status.Error,
                 status.Ready
-                    ? $"/hls/{item.ItemKey}/{HlsRemuxer.PlaylistName}?t={Uri.EscapeDataString(token)}"
+                    // With captions, the master playlist, which adds them as a
+                    // subtitle track; without, the film's own playlist as before.
+                    ? $"/hls/{item.ItemKey}/{(Captions.Has(item.ItemKey) ? MasterName : HlsRemuxer.PlaylistName)}?t={Uri.EscapeDataString(token)}"
                     : null));
         }).RequireAuthorization();
 
@@ -286,6 +298,29 @@ public static class CatalogApi
                 return Results.StatusCode(StatusCodes.Status403Forbidden);
             if (!await ApprovedAsync(db, userId))
                 return Results.StatusCode(StatusCodes.Status403Forbidden);
+
+            // Captions and the playlists that point at them are made here rather
+            // than by ffmpeg, so they come before the cached-file lookup.
+            if (file is "en.vtt" or MasterName or SubtitlePlaylistName)
+            {
+                if (Captions.FileFor(key) is not { } vtt) return Results.NotFound();
+                var query = "?t=" + Uri.EscapeDataString(ctx.Request.Query["t"]!);
+                ctx.Response.Headers.CacheControl = "no-store";
+                if (file == "en.vtt") return Results.File(vtt, "text/vtt; charset=utf-8");
+
+                var film = await db.CatalogItems.AsNoTracking().FirstOrDefaultAsync(x => x.ItemKey == key);
+                if (film is null) return Results.NotFound();
+                if (file == SubtitlePlaylistName)
+                    return Results.Text(Captions.SubtitlePlaylist(film.DurationMs ?? 0, query),
+                        "application/vnd.apple.mpegurl");
+
+                // Only a hint for players with a single variant: a converted DVD
+                // runs around 2 Mbit/s, a copied film at its own rate.
+                var bandwidth = HlsRemuxer.RemuxVideoCodec(film) != film.VideoCodec || film.DurationMs is not > 0
+                    ? 3_000_000L
+                    : Math.Max(1_000_000L, film.SizeBytes * 8 * 1000 / film.DurationMs.Value);
+                return Results.Text(Captions.MasterPlaylist(bandwidth, query), "application/vnd.apple.mpegurl");
+            }
 
             // A viewer who seeks just past the write head waits rather than gets
             // a 404, which players treat as fatal.
