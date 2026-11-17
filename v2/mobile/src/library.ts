@@ -20,6 +20,8 @@ export type Film = {
   hlsAvailable: boolean;
   hlsVideoCodec: string | null;
   hlsUrl: string;
+  /** WebVTT English captions, when the film has text captions. */
+  captionsUrl?: string | null;
 };
 
 export type Shelf = {

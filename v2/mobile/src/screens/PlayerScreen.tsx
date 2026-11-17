@@ -12,7 +12,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, BackHandler, Pressable, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useEventListener } from 'expo';
-import { VideoView, useVideoPlayer, type VideoSource } from 'expo-video';
+import { VideoView, useVideoPlayer, type SubtitleTrack, type VideoSource } from 'expo-video';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { NavigationBar } from 'expo-navigation-bar';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -39,6 +39,10 @@ export function PlayerScreen({ film, startMs, prevRow, onExit, onSaved }: {
   const player = useVideoPlayer(null, p => { p.timeUpdateEventInterval = 1; });
   const [phase, setPhase] = useState<Phase>({ kind: 'loading' });
   const [chrome, setChrome] = useState(true);
+  // Captions arrive as a subtitle track inside the server's stream (expo-video
+  // cannot load a separate caption file). Off until asked for.
+  const [subtitleTracks, setSubtitleTracks] = useState<SubtitleTrack[]>([]);
+  const [captionsOn, setCaptionsOn] = useState(false);
 
   const route = useRef(routeFor(film));
   const pendingSeek = useRef<number | null>(startMs / 1000);
@@ -146,6 +150,20 @@ export function PlayerScreen({ film, startMs, prevRow, onExit, onSaved }: {
         text: (error?.message ? error.message + '\n\n' : '') + 'This film may only play in the Vault Movies desktop app.' });
     }
   });
+  useEventListener(player, 'sourceLoad', ({ availableSubtitleTracks }) =>
+    setSubtitleTracks(availableSubtitleTracks ?? []));
+  useEventListener(player, 'availableSubtitleTracksChange', ({ availableSubtitleTracks }) =>
+    setSubtitleTracks(availableSubtitleTracks ?? []));
+  // Follows the native controls too, which can switch captions on their own.
+  useEventListener(player, 'subtitleTrackChange', ({ subtitleTrack }) => setCaptionsOn(!!subtitleTrack));
+
+  function toggleCaptions() {
+    bumpChrome();
+    if (captionsOn) { player.subtitleTrack = null; return; }
+    const english = subtitleTracks.find(t => t.language?.toLowerCase().startsWith('en'));
+    player.subtitleTrack = english ?? subtitleTracks[0] ?? null;
+  }
+
   useEventListener(player, 'playingChange', ({ isPlaying }) => {
     if (isPlaying) { started.current = true; bumpChrome(); }
     else { setChrome(true); saveRef.current(false); }
@@ -235,6 +253,13 @@ export function PlayerScreen({ film, startMs, prevRow, onExit, onSaved }: {
             <Ionicons name="chevron-back" size={22} color={C.text} />
           </Pressable>
           <Text style={styles.title} numberOfLines={1}>{film.name}</Text>
+          {subtitleTracks.length > 0 && (
+            <Pressable onPress={toggleCaptions} style={[styles.back, captionsOn && styles.ccOn]} hitSlop={8}
+              accessibilityRole="switch" accessibilityState={{ checked: captionsOn }}
+              accessibilityLabel={captionsOn ? 'Captions on' : 'Captions off'}>
+              <Ionicons name={captionsOn ? 'text' : 'text-outline'} size={20} color={C.text} />
+            </Pressable>
+          )}
         </View>
       )}
     </View>
@@ -252,6 +277,7 @@ const styles = StyleSheet.create({
     width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center',
     backgroundColor: 'rgba(11,13,18,0.6)', borderWidth: 1, borderColor: C.line,
   },
-  title: { color: C.text, fontSize: 16, fontWeight: '700', flexShrink: 1,
+  ccOn: { backgroundColor: '#005ED9', borderColor: '#005ED9' },
+  title: { color: C.text, fontSize: 16, fontWeight: '700', flexShrink: 1, flexGrow: 1,
     textShadowColor: 'rgba(0,0,0,0.8)', textShadowRadius: 6 },
 });
