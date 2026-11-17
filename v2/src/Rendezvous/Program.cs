@@ -359,7 +359,7 @@ app.MapGet("/tv/app.ipk", () =>
     var path = Path.Combine(AppContext.BaseDirectory, "tv", "vaultmovies.ipk");
     return File.Exists(path)
         ? Results.File(path, "application/octet-stream",
-                       fileDownloadName: "com.jumpvault.vaultmovies_1.0.0_all.ipk")
+                       fileDownloadName: "com.jumpvault.vaultmovies_1.0.1_all.ipk")
         : Results.NotFound();
 });
 

@@ -67,7 +67,7 @@ From this directory:
 
 ```bash
 ares-package .
-ares-install --device tv com.jumpvault.vaultmovies_1.0.0_all.ipk
+ares-install --device tv com.jumpvault.vaultmovies_1.0.1_all.ipk
 ```
 
 The tile appears on the TV's home screen. `ares-launch --device tv com.jumpvault.vaultmovies`

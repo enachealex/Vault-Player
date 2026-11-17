@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#E8603F"/>
+      <stop offset="1" stop-color="#A9331B"/>
+    </linearGradient>
+    <linearGradient id="steel" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#D9DEE6"/>
+      <stop offset="0.5" stop-color="#8C95A4"/>
+      <stop offset="1" stop-color="#4A515E"/>
+    </linearGradient>
+    <linearGradient id="doorFace" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#5A6270"/>
+      <stop offset="0.45" stop-color="#C3CAD5"/>
+      <stop offset="1" stop-color="#6E7685"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.25" r="0.85">
+      <stop offset="0" stop-color="#3A2A1E"/>
+      <stop offset="1" stop-color="#0C0D12"/>
+    </radialGradient>
+    <clipPath id="inside"><circle cx="440" cy="520" r="268"/></clipPath>
+  </defs>
+
+  <!-- tile -->
+  <rect width="1024" height="1024" rx="200" fill="url(#tile)"/>
+
+  <!-- vault frame -->
+  <circle cx="440" cy="520" r="330" fill="#2B2F38"/>
+  <circle cx="440" cy="520" r="318" fill="url(#steel)"/>
+  <circle cx="440" cy="520" r="282" fill="#2B2F38"/>
+  <!-- bolts on the frame -->
+  <g fill="#3A3F4A">
+    <circle cx="440" cy="219" r="13"/><circle cx="440" cy="821" r="13"/>
+    <circle cx="139" cy="520" r="13"/>
+    <circle cx="227" cy="307" r="13"/><circle cx="227" cy="733" r="13"/>
+    <circle cx="653" cy="307" r="13"/><circle cx="653" cy="733" r="13"/>
+  </g>
+
+  <!-- the open interior: shelves of films -->
+  <g clip-path="url(#inside)">
+    <rect x="160" y="240" width="560" height="560" fill="url(#glow)"/>
+
+    <!-- top shelf: cases -->
+    <g>
+      <rect x="236" y="300" width="44" height="118" rx="5" fill="#F5C77E"/>
+      <rect x="286" y="290" width="40" height="128" rx="5" fill="#F4F6FA"/>
+      <rect x="332" y="306" width="46" height="112" rx="5" fill="#3FA7A0"/>
+      <rect x="384" y="296" width="40" height="122" rx="5" fill="#E35A3C"/>
+      <rect x="430" y="310" width="44" height="108" rx="5" fill="#F5C77E"/>
+      <rect x="480" y="294" width="40" height="124" rx="5" fill="#7FB3FF"/>
+      <rect x="526" y="304" width="44" height="114" rx="5" fill="#F4F6FA"/>
+      <rect x="576" y="300" width="40" height="118" rx="5" fill="#E35A3C"/>
+    </g>
+    <rect x="160" y="418" width="560" height="18" fill="#C9A46A"/>
+
+    <!-- middle shelf: cases and a film reel -->
+    <g>
+      <rect x="200" y="470" width="44" height="122" rx="5" fill="#E35A3C"/>
+      <rect x="250" y="480" width="40" height="112" rx="5" fill="#F4F6FA"/>
+      <rect x="296" y="466" width="44" height="126" rx="5" fill="#F5C77E"/>
+      <circle cx="420" cy="530" r="62" fill="#D9DEE6"/>
+      <circle cx="420" cy="530" r="16" fill="#2B2F38"/>
+      <g fill="#2B2F38">
+        <circle cx="420" cy="494" r="15"/><circle cx="420" cy="566" r="15"/>
+        <circle cx="389" cy="512" r="15"/><circle cx="451" cy="512" r="15"/>
+        <circle cx="389" cy="548" r="15"/><circle cx="451" cy="548" r="15"/>
+      </g>
+      <rect x="500" y="476" width="40" height="116" rx="5" fill="#3FA7A0"/>
+      <rect x="546" y="468" width="44" height="124" rx="5" fill="#F4F6FA"/>
+      <rect x="596" y="482" width="40" height="110" rx="5" fill="#F5C77E"/>
+      <rect x="642" y="472" width="44" height="120" rx="5" fill="#E35A3C"/>
+    </g>
+    <rect x="160" y="592" width="560" height="18" fill="#C9A46A"/>
+
+    <!-- bottom shelf: cases -->
+    <g>
+      <rect x="236" y="646" width="44" height="120" rx="5" fill="#7FB3FF"/>
+      <rect x="286" y="656" width="40" height="110" rx="5" fill="#F5C77E"/>
+      <rect x="332" y="642" width="44" height="124" rx="5" fill="#F4F6FA"/>
+      <rect x="382" y="652" width="40" height="114" rx="5" fill="#E35A3C"/>
+      <rect x="428" y="644" width="44" height="122" rx="5" fill="#3FA7A0"/>
+      <rect x="478" y="656" width="40" height="110" rx="5" fill="#F4F6FA"/>
+      <rect x="524" y="648" width="44" height="118" rx="5" fill="#F5C77E"/>
+      <rect x="574" y="660" width="40" height="106" rx="5" fill="#7FB3FF"/>
+    </g>
+    <rect x="160" y="766" width="560" height="18" fill="#C9A46A"/>
+  </g>
+
+  <!-- hinge -->
+  <rect x="752" y="380" width="34" height="70" rx="10" fill="#3A3F4A"/>
+  <rect x="752" y="590" width="34" height="70" rx="10" fill="#3A3F4A"/>
+
+  <!-- the door, swung open toward us on the right -->
+  <ellipse cx="862" cy="520" rx="118" ry="336" fill="#2B2F38"/>
+  <ellipse cx="856" cy="520" rx="104" ry="318" fill="url(#doorFace)"/>
+  <ellipse cx="856" cy="520" rx="78" ry="250" fill="none" stroke="#4A515E" stroke-width="10"/>
+  <!-- wheel handle -->
+  <g stroke="#2B2F38" stroke-width="16" stroke-linecap="round">
+    <line x1="856" y1="420" x2="856" y2="620"/>
+    <line x1="818" y1="452" x2="894" y2="588"/>
+    <line x1="818" y1="588" x2="894" y2="452"/>
+  </g>
+  <ellipse cx="856" cy="520" rx="22" ry="62" fill="#2B2F38"/>
+  <ellipse cx="856" cy="520" rx="10" ry="28" fill="#D9DEE6"/>
+</svg>
