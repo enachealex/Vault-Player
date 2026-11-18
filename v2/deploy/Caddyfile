@@ -27,3 +27,10 @@
 		format console
 	}
 }
+
+# Other sites this machine serves through the same Caddy (and the same 80/443
+# router forward), one file each in deploy/sites/. They are not in the
+# repository because they name the owner's own hostnames; sites/README.md says
+# what goes there. A glob that matches nothing is fine, so a server with no
+# extra sites needs no files at all.
+import sites/*.caddy

@@ -19,10 +19,15 @@ services:
       - "443:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./sites:/etc/caddy/sites:ro   # extra sites; see sites/README.md
       - caddy_data:/data      # holds the certificates -- must persist
       - caddy_config:/config
     environment:
       - PARTY_DOMAIN=${PARTY_DOMAIN:?set PARTY_DOMAIN in deploy/.env}
+    # Lets an extra site proxy to a service published on the host itself
+    # (e.g. reverse_proxy host.docker.internal:8096).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - rendezvous
 
