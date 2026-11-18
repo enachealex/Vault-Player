@@ -134,30 +134,144 @@ public static class TvPage
   .krow { white-space:nowrap; }
   .err { color:var(--danger); font-size:1.675rem; min-height:2rem; margin-top:1rem; }
 
-  /* ---- library ---- */
-  .bar { flex:none; margin-bottom:.6rem; }
-  .bar .clock { float:right; padding-top:.15rem; margin-left:1.6rem; }
-  .bar .who { float:right; color:var(--muted); font-size:1.575rem; padding-top:.45rem;
-              text-align:right; }
-  .whoname { margin-bottom:.5rem; }
-  /* "All films · 25", quietly, the way a set labels each row of its grid. */
-  .label { flex:none; color:var(--muted); font-size:1.6rem; font-weight:600; margin:.4rem 0 .2rem .7rem; }
-  /* Collections. inline-block chips rather than flex, for the same reason the
-     grid uses them: `gap` collapses to nothing on the sets this has to run on.
-     Hidden entirely until a shelf exists, so a library nobody has organised
-     keeps the layout it had — and, more importantly, so Up from the first row
-     of films does not land on an invisible row of nothing. */
-  .rail { margin-top:1rem; display:none; }
-  .rail.on { display:block; }
-  .chip {
-    display:inline-block; margin:0 .6rem .6rem 0; padding:.6rem 1.4rem;
-    background:var(--glass); border:1px solid var(--line); border-radius:.75rem;
-    font-size:1.525rem; font-weight:600; color:var(--text);
-    font-family:inherit; vertical-align:top;
-  }
-  .chip.focus { background:var(--glass-hi); }
-  /* Chosen is white, never blue — see --focus. */
-  .chip.sel { background:var(--text); border-color:var(--text); color:var(--bg); }
+  /* ---- library: the frame every tab sits in ---- */
+  /* No padding of its own: the featured film runs edge to edge, and every
+     piece inside keeps the 5rem overscan margin for itself. */
+  #library { padding:0; overflow:hidden; }
+  /* Everything under the bar lives in #pageIn, which is slid with a transform
+     rather than scrolled. A transform is composited — the television moves
+     one finished layer instead of repainting the screen for every frame of
+     the slide — and it is the only smooth option on a 2018 set. */
+  #page { position:absolute; left:0; top:0; right:0; bottom:0; overflow:hidden; }
+  #pageIn { position:relative; min-height:100%;
+            -webkit-transition:-webkit-transform .32s ease-out; transition:transform .32s ease-out; }
+  /* Home is all picture and rows, on the plain background; the other tabs
+     let the softened wall show through. */
+  #pageIn.home { background:var(--bg); }
+
+  /* ---- the top bar ---- */
+  /* Steps out of the way once the page has slid down into the rows, the way
+     the set's own launcher does, and comes back when you return to the top. */
+  .nav { position:absolute; left:5rem; right:5rem; top:2.4rem; height:4.6rem; z-index:5;
+         -webkit-transition:opacity .25s; transition:opacity .25s; }
+  #library.down .nav { opacity:0; }
+  .logo { float:left; width:4.6rem; height:4.6rem; margin-right:1.4rem; border-radius:1rem; overflow:hidden; }
+  .logo svg { display:block; width:100%; height:100%; }
+  /* Glass. The fill alone has to read as glass, because backdrop-filter is
+     Chromium 76 and most sets this runs on will simply skip that line. */
+  .tabs { float:left; padding:.45rem; border-radius:1.1rem; white-space:nowrap;
+          background:rgba(14,16,22,.55); border:1px solid rgba(255,255,255,.14);
+          -webkit-backdrop-filter:blur(18px); backdrop-filter:blur(18px); }
+  .tab { display:inline-block; vertical-align:top; height:3.6rem; margin:0 .4rem 0 0; padding:0 1.6rem;
+         background:transparent; border:none; border-radius:.75rem; color:#C9CFD9;
+         font-family:inherit; font-size:1.45rem; font-weight:600; }
+  .tab:last-child { margin-right:0; }
+  /* The tab you are on is white, as chosen things are everywhere here; the
+     blue ring only ever says where the remote is. */
+  .tab.on { background:rgba(255,255,255,.16); color:#fff; }
+  .acct { float:right; width:4.6rem; height:4.6rem; margin-left:1.6rem; padding:0;
+          background:rgba(14,16,22,.55); border:1px solid rgba(255,255,255,.14); border-radius:1rem;
+          color:var(--text); font-family:inherit; font-size:1.7rem; font-weight:800; }
+  .nav .clock { float:right; font-size:2rem; font-weight:600; color:#E7EAF0; line-height:4.6rem; }
+
+  /* ---- the featured film ---- */
+  /* The box is only as tall as the words; the still itself runs the full
+     height of the screen, under the first row too, and the shade fades it
+     into the page. Two layers so one film can cross-fade into the next. */
+  .hero { position:relative; height:34rem; }
+  .hart { position:absolute; left:0; top:0; width:100%; height:100vh; opacity:0;
+          background-size:cover; background-position:center top;
+          -webkit-transition:opacity 1.2s; transition:opacity 1.2s; }
+  .hart.on { opacity:1; }
+  .hshade { position:absolute; left:0; top:0; width:100%; height:100vh; z-index:1;
+    background:
+      linear-gradient(to right, rgba(11,13,18,.92) 0%, rgba(11,13,18,.55) 38%, rgba(11,13,18,0) 65%),
+      linear-gradient(rgba(11,13,18,.5) 0%, rgba(11,13,18,0) 18%, rgba(11,13,18,0) 40%, rgba(11,13,18,.9) 66%, #0B0D12 82%); }
+  .hcopy { position:absolute; left:5rem; top:9.4rem; width:64rem; z-index:2; }
+  .kicker { font-size:1.15rem; font-weight:800; letter-spacing:.2em; color:var(--warm);
+            text-transform:uppercase; margin-bottom:1.3rem; }
+  .hcopy h1 { font-size:4.7rem; line-height:1.04; font-weight:800; letter-spacing:-.015em; margin:0;
+              text-shadow:0 .2rem 1.6rem rgba(0,0,0,.55); max-height:9.8rem; overflow:hidden; }
+  /* Year, runtime and the small outlined tags. */
+  .fmeta { color:#D5DAE3; font-size:1.45rem; margin:1.3rem 0 0; }
+  .fmeta .dot { opacity:.5; margin:0 .6rem; }
+  .tag { display:inline-block; font-size:1.05rem; font-weight:700; letter-spacing:.06em; line-height:1;
+         padding:.35rem .5rem; border-radius:.4rem; border:1px solid rgba(255,255,255,.35); color:#E7EAF0;
+         margin-left:.7rem; vertical-align:.1rem; }
+  .hcopy .btn { margin-top:2rem; }
+  /* Which of the featured films this is. Small squares, not pills. */
+  .hdots { position:absolute; left:5rem; top:31.2rem; z-index:2; line-height:0; }
+  .hdots i { display:inline-block; width:.7rem; height:.7rem; margin-right:.6rem; border-radius:.18rem;
+             background:rgba(255,255,255,.3); }
+  .hdots i.on { background:#fff; }
+
+  /* ---- rows of films ---- */
+  .rows { position:relative; z-index:2; padding-bottom:6rem; }
+  .row { margin-bottom:.6rem; }
+  .row h3 { margin:0 0 0 5rem; font-size:1.8rem; font-weight:700; }
+  /* The padding is room for a focused tile to grow into; the strip clips
+     everything else. Slid with a transform, for the same reason as #pageIn. */
+  .strip { overflow:hidden; padding:1.1rem 0 1.4rem 5rem; }
+  .strip-in { position:relative; white-space:nowrap;
+              -webkit-transition:-webkit-transform .22s ease-out; transition:transform .22s ease-out; }
+  .tile { display:inline-block; vertical-align:top; position:relative; width:19.9rem; margin:0 1.3rem 0 0;
+          padding:0; border:none; background:transparent; color:var(--text); font-family:inherit;
+          text-align:left; white-space:normal;
+          -webkit-transition:-webkit-transform .15s; transition:transform .15s; }
+  /* 16:9 by padding, because aspect-ratio is far too new for these sets.
+     The percentage is of the tile's own width, which is why it sits on an
+     inner box rather than on the tile. */
+  .tbox { display:block; position:relative; padding-top:56.25%; border-radius:.95rem; overflow:hidden;
+          background:#151821; border:1px solid rgba(255,255,255,.06); }
+  .tglyph { position:absolute; left:0; top:28%; width:100%; text-align:center; font-size:2.6rem; color:var(--faint); }
+  .tart { position:absolute; left:0; top:0; width:100%; height:100%; background-size:cover; background-position:center; }
+  .tshade { position:absolute; left:0; top:0; width:100%; height:100%;
+            background:linear-gradient(rgba(0,0,0,0) 42%, rgba(0,0,0,.82)); }
+  .tt { position:absolute; left:1rem; right:1rem; bottom:.9rem; font-size:1.35rem; font-weight:700;
+        line-height:1.22; max-height:3.3rem; overflow:hidden; text-shadow:0 1px 3px #000; }
+  .tile.prog .tt { bottom:1.9rem; }
+  .tnew { position:absolute; left:.8rem; top:.8rem; background:#E35A3C; color:#fff; font-size:1rem;
+          font-weight:800; letter-spacing:.08em; line-height:1; padding:.35rem .55rem; border-radius:.45rem; }
+  .tapp { position:absolute; right:.8rem; top:.8rem; background:rgba(6,7,10,.78); color:var(--warm);
+          font-size:1rem; font-weight:700; line-height:1; padding:.35rem .55rem; border-radius:.45rem; }
+  .tbar { position:absolute; left:1rem; right:1rem; bottom:.9rem; height:.4rem; border-radius:.2rem;
+          background:rgba(255,255,255,.25); overflow:hidden; }
+  .tbar i { display:block; height:100%; background:#fff; }
+  /* A focused tile is lifted and ringed in white — it sits on a picture, and
+     white is what reads on every picture. Ring on the inner box, so it
+     follows the rounded corners. */
+  [data-f].tile.focus { box-shadow:none; z-index:3; -webkit-transform:scale(1.08); transform:scale(1.08); }
+  .tile.focus .tbox { box-shadow:0 0 0 .25rem #fff, 0 1.4rem 3.4rem rgba(0,0,0,.6); }
+
+  /* ---- Films, My List, search results: a grid of the same tiles ---- */
+  .gwrap { position:absolute; left:0; right:0; top:9rem; bottom:0; }
+  .ghead { margin:0 5rem; height:3.6rem; font-size:2.4rem; font-weight:800; white-space:nowrap; overflow:hidden; }
+  .ghead .n { color:var(--muted); font-size:1.6rem; font-weight:600; margin-left:1rem; }
+  /* The padding is what stops a lifted tile or its ring being shaved off by
+     the scroll clip. inline-block and percentage margins, never flex gap —
+     gap collapses to nothing on the sets this has to run on. */
+  .grid { position:absolute; left:0; right:0; top:3.6rem; bottom:0; overflow-y:auto; overflow-x:hidden;
+          padding:1.4rem 5rem 5rem; }
+  .grid::-webkit-scrollbar { display:none; }
+  .grid .tile { width:18.6%; margin:0 1.75% 2.2rem 0; }
+  .grid .tile:nth-child(5n) { margin-right:0; }
+  .grid.c4 .tile { width:23.5%; margin:0 2% 2.2rem 0; }
+  .grid.c4 .tile:nth-child(5n) { margin-right:2%; }
+  .grid.c4 .tile:nth-child(4n) { margin-right:0; }
+  .gwrap .center, .sright .center { padding-top:8rem; }
+
+  /* ---- search ---- */
+  .sleft { position:absolute; left:5rem; top:9rem; width:30rem; }
+  .sbox { height:4.8rem; line-height:4.8rem; padding:0 1.4rem; margin-bottom:1.2rem; border-radius:.95rem;
+          background:rgba(14,16,22,.55); border:1px solid rgba(255,255,255,.14);
+          font-size:1.8rem; font-weight:600; white-space:nowrap; overflow:hidden; }
+  .sbox .ph { color:var(--faint); font-weight:400; }
+  .skeys .key { width:4.5rem; height:4.5rem; font-size:1.6rem; margin:0 .44rem .44rem 0; border-radius:.75rem; }
+  .skeys .key.w2 { width:9.44rem; font-size:1.3rem; }
+  .sright { position:absolute; left:36rem; right:0; top:9rem; bottom:0; }
+  .sright .ghead { margin-left:1.4rem; }
+  .sright .grid { padding-left:1.4rem; }
+
   /* ---- dropdowns ---- */
   .menu { display:none; position:fixed; z-index:50; background:rgba(22,24,30,.97);
           border:1px solid var(--line); border-radius:1.2rem; padding:.6rem;
@@ -170,85 +284,6 @@ public static class TvPage
   }
   .mrow.focus { background:var(--glass-hi); }
   .mrow[disabled] { color:var(--faint); }
-  /* The layout choices show the shape they produce, with the words underneath
-     rather than beside — a grid of squares reads as a picture of the result,
-     and the label says which one it is. */
-  .mrow.tile { text-align:center; padding:1.1rem 1.6rem; }
-  .mrow.tile .lab { display:block; margin-top:.7rem; font-size:1.35rem; }
-  .mrow.tile .sub2 { display:block; font-size:1.15rem; color:var(--muted); margin-top:.15rem; }
-  .mrow.sel .lab { color:var(--text); font-weight:700; }
-  .mrow.sel { background:var(--glass); }
-  .caret { margin-left:.7rem; font-size:1.1rem; color:var(--muted); }
-
-  /* The layout control sits at the far right of the shelf row. */
-  .chip.layout { float:right; margin-right:0; padding:.55rem 1rem; }
-  .gg { display:inline-block; line-height:0; }
-  .gg i { display:inline-block; background:var(--muted); margin:.09rem; vertical-align:top; border-radius:.08rem; }
-  .gg3 i { width:.62rem; height:.62rem; }
-  .gg4 i { width:.48rem; height:.48rem; }
-  .gg5 i { width:.38rem; height:.38rem; }
-  .gg6 i { width:.31rem; height:.31rem; }
-  .chip.layout.focus .gg i, .mrow.sel .gg i { background:var(--text); }
-
-  /* The padding is what stops the focus ring being shaved off. Cards sit flush
-     against the edges of this box, and the ring is drawn OUTSIDE the card, so
-     without room to breathe the outer column loses its left or right edge and
-     the top and bottom rows lose theirs to the scroll clip — which reads as the
-     highlight being broken rather than as the card being at the edge. */
-  .grid { flex:1; min-height:0; overflow-y:auto; overflow-x:hidden; padding:.65rem; }
-  .grid::-webkit-scrollbar { display:none; }
-  /* Column count is a setting, so the widths are written per layout rather than
-     once. inline-block and percentage margins, never flex gap — gap collapses
-     to nothing on the sets this has to run on and the grid silently loses all
-     its spacing. */
-  /* A tile of smoked glass: the frame inside it, the title under the frame. */
-  .card {
-    display:inline-block; vertical-align:top;
-    background:var(--smoke); border:1px solid var(--line); border-radius:1.1rem;
-    padding:.55rem .55rem .9rem; text-align:left; color:inherit;
-    font-family:inherit;
-  }
-  .card.focus { background:var(--smoke-hi); }
-  .cols3 .card { width:31.3%; margin:0 3% 2rem 0; }
-  .cols3 .card:nth-child(3n) { margin-right:0; }
-  .cols4 .card { width:23.5%; margin:0 2% 1.9rem 0; }
-  .cols4 .card:nth-child(4n) { margin-right:0; }
-  .cols5 .card { width:18.4%; margin:0 1.9% 1.8rem 0; }
-  .cols5 .card:nth-child(5n) { margin-right:0; }
-  .cols6 .card { width:15.4%; margin:0 1.5% 1.7rem 0; }
-  .cols6 .card:nth-child(6n) { margin-right:0; }
-
-  /* The number in the corner of each card, and the digits typed to reach it. */
-  .idx { position:absolute; right:.45rem; bottom:.45rem; background:rgba(6,7,10,.72);
-         color:var(--text); font-size:1.225rem; font-weight:700;
-         padding:.15rem .55rem; border-radius:.4rem; }
-  .jump { position:fixed; left:50%; top:50%; transform:translate(-50%,-50%);
-          background:rgba(22,24,30,.95); border:1px solid var(--line-hi); border-radius:1.4rem;
-          padding:1.6rem 3rem; font-size:4rem; font-weight:800; color:var(--text);
-          display:none; letter-spacing:.4rem; box-shadow:0 1.4rem 3.4rem rgba(0,0,0,.6); }
-  .jump.on { display:block; }
-  /* 16:9, because these are frames lifted out of the films themselves, not
-     printed poster art. A 2:3 portrait box cropped a 2.39:1 frame down to a
-     narrow vertical strip — the thin, distorted slivers this used to show.
-     padding-top is the portable way to hold a ratio; aspect-ratio is far too
-     new for the sets this has to run on. */
-  .thumb { position:relative; width:100%; padding-top:56.25%; background:var(--deep);
-           border-radius:.7rem; background-size:cover; background-position:center; overflow:hidden; }
-  .thumb .glyph { position:absolute; left:0; top:42%; width:100%; text-align:center;
-                  font-size:3.375rem; color:var(--faint); }
-  /* No reserved second line. The box used to hold two lines whatever the title
-     was, which left a short one floating above a gap before the runtime. It
-     sizes to its text now and is capped at two lines, so a long title still
-     cannot push its card out of step with the row. Cards are top-aligned, so
-     uneven heights cost nothing. */
-  .name { font-size:1.525rem; font-weight:600; margin:.7rem .4rem 0; line-height:1.25;
-          max-height:3.8rem; overflow:hidden; }
-  .meta { font-size:1.375rem; color:var(--muted); margin:.1rem .4rem 0; }
-  .badge { position:absolute; left:.45rem; top:.45rem; background:rgba(6,7,10,.78); color:var(--warm);
-           font-size:1.225rem; padding:.25rem .6rem; border-radius:.45rem; font-weight:700; }
-  .resume { position:absolute; left:.7rem; right:.7rem; bottom:.7rem; height:.35rem;
-            background:rgba(0,0,0,.55); border-radius:.2rem; overflow:hidden; }
-  .resume i { display:block; height:100%; background:var(--text); }
 
   /* ---- collections ---- */
   .shlist { flex:1; min-height:0; overflow-y:auto; padding:.65rem; }
@@ -266,28 +301,49 @@ public static class TvPage
   .shrow.new { color:var(--warm); }
 
   /* ---- detail ---- */
-  /* Text on the left, the film on the right, both centred against each other
-     rather than the text riding at the top of an otherwise empty screen. The
-     wall behind is the same film, softened, so the page is all one picture. */
-  .dwrap { display:flex; flex:1; min-height:0; align-items:center; }
-  .dtext { flex:1; min-width:0; padding-right:3.5rem; }
-  .dart { flex:none; width:52%; position:relative;
-          padding-top:29.25%; background:var(--deep); border-radius:1.2rem;
+  /* A pane of glass over the film itself: the wall behind is this film,
+     softened and dimmed, and the still sits sharp inside the pane. "More from
+     your vault" runs along the bottom as an ordinary row. */
+  #detail { padding:0; }
+  .dpanel { position:absolute; left:5rem; right:5rem; top:4rem; padding:2.8rem 3rem; border-radius:1.4rem;
+            background:rgba(16,18,26,.72); border:1px solid rgba(255,255,255,.14);
+            -webkit-backdrop-filter:blur(30px) saturate(150%); backdrop-filter:blur(30px) saturate(150%);
+            box-shadow:0 2rem 5rem rgba(0,0,0,.45); }
+  .dpanel:after { content:''; display:block; clear:both; }
+  .dleft { float:left; width:61%; padding-right:2.6rem; }
+  .dright { float:right; width:39%; }
+  .dpanel h1 { font-size:3.6rem; line-height:1.08; font-weight:800; margin:0; max-height:7.8rem; overflow:hidden; }
+  .dart { position:relative; width:100%; padding-top:56.25%; background:var(--deep); border-radius:1rem;
           background-size:cover; background-position:center; overflow:hidden;
-          border:1px solid var(--line);
-          box-shadow:0 1.6rem 4rem rgba(0,0,0,.6); }
+          border:1px solid var(--line); box-shadow:0 1.6rem 4rem rgba(0,0,0,.5); }
   .dart .glyph { position:absolute; left:0; top:40%; width:100%; text-align:center;
                  font-size:4.375rem; color:var(--faint); }
-  .dmeta { color:var(--muted); font-size:1.675rem; margin:.6rem 0; }
-  .warn { color:var(--warm); font-size:1.625rem; margin:1rem 0; max-width:52rem; line-height:1.55; }
+  .dpanel .btn { margin:1.8rem .7rem 0 0; padding:0 1.8rem; font-size:1.5rem; }
+  .dprog { margin-top:1.3rem; color:var(--muted); font-size:1.3rem; white-space:nowrap; }
+  .dprog .bar { display:inline-block; width:22rem; height:.4rem; margin-right:1.2rem; vertical-align:middle;
+                background:rgba(255,255,255,.18); border-radius:.2rem; overflow:hidden; }
+  .dprog .bar i { display:block; height:100%; background:#fff; }
+  .dnote { color:var(--muted); font-size:1.4rem; margin-top:1.3rem; }
+  .facts { margin-top:1.4rem; font-size:1.4rem; line-height:1.55; }
+  .facts .k { display:inline-block; width:13rem; color:var(--faint); }
+  .warn { color:var(--warm); font-size:1.45rem; margin:1.2rem 0 0; line-height:1.5; }
+  .warn:empty, .dnote:empty, .dprog:empty { display:none; }
+  .dmore { position:absolute; left:0; right:0; bottom:1.6rem; }
   /* The action a screen wants pressed is white, as on every television's own
-     Play button; the rest are glass. */
+     Play button; the rest are glass. Rounded rectangles, never pills. */
   .btn { display:inline-block; background:var(--text); color:var(--bg); border:1px solid var(--text);
-         border-radius:.75rem; padding:1.1rem 2.6rem; font-size:1.725rem; font-weight:700;
-         font-family:inherit; margin:1.4rem .9rem 0 0; }
-  .btn.ghost { background:var(--glass); border-color:var(--line); color:var(--text); }
-  .btn.ghost.focus { background:var(--glass-hi); }
+         border-radius:.95rem; padding:0 2.4rem; height:4.7rem; line-height:4.5rem; font-size:1.6rem;
+         font-weight:700; font-family:inherit; margin:1.4rem .9rem 0 0; white-space:nowrap; vertical-align:top; }
+  .btn.ghost { background:rgba(255,255,255,.16); border-color:rgba(255,255,255,.18); color:var(--text); }
+  .btn.ghost.focus { background:rgba(255,255,255,.26); }
   .btn[disabled] { opacity:.4; }
+  /* A play triangle drawn with borders, and an "i" in a ring: no icon font
+     to load, and both are crisp at any size rescale() picks. */
+  .tri { display:inline-block; width:0; height:0; margin:0 1rem 0 0; vertical-align:-.05rem;
+         border-left:1.15rem solid currentColor; border-top:.68rem solid transparent; border-bottom:.68rem solid transparent; }
+  .ii { display:inline-block; width:1.7rem; height:1.7rem; line-height:1.45rem; margin:0 .9rem 0 0; text-align:center;
+        border:.16rem solid currentColor; border-radius:50%; font-size:1.1rem; font-weight:800; vertical-align:.05rem; }
+  .ico { display:inline-block; width:1.4rem; margin-right:.7rem; text-align:center; font-weight:800; }
 
   /* ---- player ---- */
   #player { padding:0; background:#000; }
@@ -344,29 +400,36 @@ public static class TvPage
   <div id="gateRow"></div>
 </div></section>
 
-<section id="library" class="screen"><div class="col">
-  <div class="bar"><span class="clock" id="clockBar"></span><span class="who" id="who"></span><h1>Your library</h1>
-    <div class="rail" id="rail"></div></div>
-  <div class="label" id="gridLabel"></div>
-  <div class="grid" id="grid"></div>
-  <!-- Shows the digits as they are typed, so pressing 1 then 4 is visibly on
-       its way to 14 rather than looking like it jumped to 1 and stuck. -->
-  <div class="jump" id="jump"></div>
-<div class="menu" id="menu"></div>
-</div></section>
-
-<section id="detail" class="screen"><div class="col">
-  <div class="dwrap">
-    <div class="dtext">
-      <h1 id="dTitle"></h1>
-      <div class="dmeta" id="dMeta"></div>
-      <div class="warn" id="dWarn"></div>
-      <div id="dRow"></div>
-    </div>
-    <!-- The film itself, rather than half a screen of nothing. -->
-    <div class="dart" id="dArt"><span class="glyph">&#127916;</span></div>
+<section id="library" class="screen">
+  <!-- Home, Films, My List and Search all draw into #pageIn; the bar stays put. -->
+  <div id="page"><div id="pageIn"></div></div>
+  <div class="nav" id="nav">
+    <div class="logo"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"> <defs> <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1"> <stop offset="0" stop-color="#E8603F"/> <stop offset="1" stop-color="#A9331B"/> </linearGradient> <linearGradient id="steel" x1="0" y1="0" x2="1" y2="1"> <stop offset="0" stop-color="#D9DEE6"/> <stop offset="0.5" stop-color="#8C95A4"/> <stop offset="1" stop-color="#4A515E"/> </linearGradient> <linearGradient id="doorFace" x1="0" y1="0" x2="1" y2="0"> <stop offset="0" stop-color="#5A6270"/> <stop offset="0.45" stop-color="#C3CAD5"/> <stop offset="1" stop-color="#6E7685"/> </linearGradient> <radialGradient id="glow" cx="0.5" cy="0.25" r="0.85"> <stop offset="0" stop-color="#3A2A1E"/> <stop offset="1" stop-color="#0C0D12"/> </radialGradient> <clipPath id="inside"><circle cx="440" cy="520" r="268"/></clipPath> </defs> <rect width="1024" height="1024" rx="200" fill="url(#tile)"/> <circle cx="440" cy="520" r="330" fill="#2B2F38"/> <circle cx="440" cy="520" r="318" fill="url(#steel)"/> <circle cx="440" cy="520" r="282" fill="#2B2F38"/> <g fill="#3A3F4A"> <circle cx="440" cy="219" r="13"/><circle cx="440" cy="821" r="13"/> <circle cx="139" cy="520" r="13"/> <circle cx="227" cy="307" r="13"/><circle cx="227" cy="733" r="13"/> <circle cx="653" cy="307" r="13"/><circle cx="653" cy="733" r="13"/> </g> <g clip-path="url(#inside)"> <rect x="160" y="240" width="560" height="560" fill="url(#glow)"/> <g> <rect x="236" y="300" width="44" height="118" rx="5" fill="#F5C77E"/> <rect x="286" y="290" width="40" height="128" rx="5" fill="#F4F6FA"/> <rect x="332" y="306" width="46" height="112" rx="5" fill="#3FA7A0"/> <rect x="384" y="296" width="40" height="122" rx="5" fill="#E35A3C"/> <rect x="430" y="310" width="44" height="108" rx="5" fill="#F5C77E"/> <rect x="480" y="294" width="40" height="124" rx="5" fill="#7FB3FF"/> <rect x="526" y="304" width="44" height="114" rx="5" fill="#F4F6FA"/> <rect x="576" y="300" width="40" height="118" rx="5" fill="#E35A3C"/> </g> <rect x="160" y="418" width="560" height="18" fill="#C9A46A"/> <g> <rect x="200" y="470" width="44" height="122" rx="5" fill="#E35A3C"/> <rect x="250" y="480" width="40" height="112" rx="5" fill="#F4F6FA"/> <rect x="296" y="466" width="44" height="126" rx="5" fill="#F5C77E"/> <circle cx="420" cy="530" r="62" fill="#D9DEE6"/> <circle cx="420" cy="530" r="16" fill="#2B2F38"/> <g fill="#2B2F38"> <circle cx="420" cy="494" r="15"/><circle cx="420" cy="566" r="15"/> <circle cx="389" cy="512" r="15"/><circle cx="451" cy="512" r="15"/> <circle cx="389" cy="548" r="15"/><circle cx="451" cy="548" r="15"/> </g> <rect x="500" y="476" width="40" height="116" rx="5" fill="#3FA7A0"/> <rect x="546" y="468" width="44" height="124" rx="5" fill="#F4F6FA"/> <rect x="596" y="482" width="40" height="110" rx="5" fill="#F5C77E"/> <rect x="642" y="472" width="44" height="120" rx="5" fill="#E35A3C"/> </g> <rect x="160" y="592" width="560" height="18" fill="#C9A46A"/> <g> <rect x="236" y="646" width="44" height="120" rx="5" fill="#7FB3FF"/> <rect x="286" y="656" width="40" height="110" rx="5" fill="#F5C77E"/> <rect x="332" y="642" width="44" height="124" rx="5" fill="#F4F6FA"/> <rect x="382" y="652" width="40" height="114" rx="5" fill="#E35A3C"/> <rect x="428" y="644" width="44" height="122" rx="5" fill="#3FA7A0"/> <rect x="478" y="656" width="40" height="110" rx="5" fill="#F4F6FA"/> <rect x="524" y="648" width="44" height="118" rx="5" fill="#F5C77E"/> <rect x="574" y="660" width="40" height="106" rx="5" fill="#7FB3FF"/> </g> <rect x="160" y="766" width="560" height="18" fill="#C9A46A"/> </g> <rect x="752" y="380" width="34" height="70" rx="10" fill="#3A3F4A"/> <rect x="752" y="590" width="34" height="70" rx="10" fill="#3A3F4A"/> <ellipse cx="862" cy="520" rx="118" ry="336" fill="#2B2F38"/> <ellipse cx="856" cy="520" rx="104" ry="318" fill="url(#doorFace)"/> <ellipse cx="856" cy="520" rx="78" ry="250" fill="none" stroke="#4A515E" stroke-width="10"/> <g stroke="#2B2F38" stroke-width="16" stroke-linecap="round"> <line x1="856" y1="420" x2="856" y2="620"/> <line x1="818" y1="452" x2="894" y2="588"/> <line x1="818" y1="588" x2="894" y2="452"/> </g> <ellipse cx="856" cy="520" rx="22" ry="62" fill="#2B2F38"/> <ellipse cx="856" cy="520" rx="10" ry="28" fill="#D9DEE6"/> </svg></div>
+    <div class="tabs" id="tabs"><button class="tab on" data-f data-tab="home">Home</button><button class="tab" data-f data-tab="films">Films</button><button class="tab" data-f data-tab="mylist">My List</button><button class="tab" data-f data-tab="search">Search</button></div>
+    <!-- Floated right, so the account square comes first and the clock sits to its left. -->
+    <button class="acct" id="acct" data-f></button>
+    <span class="clock" id="clockBar"></span>
   </div>
-</div></section>
+  <!-- Outside #pageIn on purpose: a fixed element inside a transformed one is
+       positioned against that element, not the screen. -->
+  <div class="menu" id="menu"></div>
+</section>
+
+<section id="detail" class="screen">
+  <div class="dpanel">
+    <div class="dleft">
+      <h1 id="dTitle"></h1>
+      <div class="fmeta" id="dMeta"></div>
+      <div id="dRow"></div>
+      <div class="dprog" id="dProg"></div>
+      <div class="warn" id="dWarn"></div>
+      <div class="dnote" id="dNote"></div>
+      <div class="facts" id="dFacts"></div>
+    </div>
+    <div class="dright"><div class="dart" id="dArt"><span class="glyph">&#127916;</span></div></div>
+  </div>
+  <div class="dmore" id="dMore"></div>
+</section>
 
 <section id="shelves" class="screen"><div class="col">
   <h1>Add to a collection</h1>
@@ -418,17 +481,12 @@ public static class TvPage
   var CODE_LEN = 6;
   var LS = 'vault.tv.rt';
 
-  var S = { access:null, refresh:null, me:null, items:[], resume:{}, film:null, screen:'signin',
-            memoryOnly:false, collections:[], shelf:null, cols:4 };
-
-  // How many films across. Remembered per television, because it is a property
-  // of how far away the sofa is, not of the account.
-  var COLS = [3, 4, 5, 6];
-  var LS_COLS = 'vault.tv.cols';
-  try {
-    var savedCols = parseInt(localStorage.getItem(LS_COLS), 10);
-    if (COLS.indexOf(savedCols) >= 0) S.cols = savedCols;
-  } catch (e) {}
+  // tab: which of Home, Films, My List and Search is showing. stack: films
+  // opened one from another's page. libPos: where focus was in the library
+  // when a film was opened. dirty: the library needs drawing again on return.
+  var S = { access:null, refresh:null, me:null, items:[], byKey:{}, resume:{}, myList:[], film:null,
+            screen:'signin', memoryOnly:false, collections:[], scanning:false,
+            featured:[], heroIdx:0, tab:'home', query:'', stack:[], libPos:null, dirty:false, playFrom:null };
 
   // What this particular television can decode.
   //
@@ -491,17 +549,20 @@ public static class TvPage
   }
   window.addEventListener('resize', rescale);
 
-  function show(name) {
+  // keep: the caller puts focus somewhere itself (going back to the library
+  // lands on the tile you left, not on the first thing on the screen).
+  function show(name, keep) {
     S.screen = name;
     var all = ['signin','gate','library','detail','shelves','newshelf','player'];
     for (var i = 0; i < all.length; i++) {
       var el = $(all[i]);
       if (all[i] === name) el.className = 'screen on'; else el.className = 'screen';
     }
-    $('clockFixed').style.display = (name === 'library' || name === 'player') ? 'none' : '';
+    // The library carries its own clock in the bar; the detail pane would sit under this one.
+    $('clockFixed').style.display = (name === 'library' || name === 'player' || name === 'detail') ? 'none' : '';
     // Nothing has been chosen on these, so they get the plain dusk.
     if (name === 'signin' || name === 'gate') showWall(null);
-    focusFirst(true);
+    if (!keep) focusFirst(true);
   }
 
   // ---- focus ------------------------------------------------------------
@@ -531,7 +592,10 @@ public static class TvPage
     // active element never leaves <body>, so a television's own spatial
     // navigation and its voice guidance have nothing to work with — and on a
     // set whose browser drives the arrow keys itself, the page never sees them.
-    try { el.focus(); } catch (e) {}
+    // preventScroll is Chromium 64; older sets ignore it and scroll anyway,
+    // which afterFocus then undoes for the boxes moved by transform.
+    try { el.focus({ preventScroll: true }); } catch (e) {}
+    afterFocus(el);
     // scrollIntoView options need Chromium 61; keep the element visible by hand.
     var g = el.parentNode;
     while (g && g !== document.body && g.className.indexOf('grid') < 0) g = g.parentNode;
@@ -564,20 +628,55 @@ public static class TvPage
   function move(dx, dy) {
     var from = current();
     if (!from) { focusFirst(true); return; }
-    var a = from.getBoundingClientRect();
+    if (stripMove(from, dx, dy)) return;
+    // Down from the bar on Home goes into the featured film, never past it
+    // into a row: geometry alone would often pick a tile, since the tabs sit
+    // to the right of the film's buttons.
+    if (dy > 0 && S.screen === 'library' && inside(from, $('nav')) && $('hero') && !document.querySelector('.menu.on')) {
+      var hb = lastAbove.library;
+      if (!hb || hb.offsetParent === null || !inside(hb, $('hero'))) hb = $('hero').querySelector('[data-first]') || $('hero').querySelector('[data-f]');
+      if (hb) { setFocus(hb); return; }
+    }
+    // Measured where things will be, not where they are mid-slide. A quick
+    // second press arrives while the page is still gliding to its new place,
+    // and measured as it stands the bar would seem to sit BELOW a featured
+    // film that is still on its way back down.
+    var drift = pageDrift(), navEl = S.screen === 'library' ? $('nav') : null;
+    function rect(el) {
+      var r = el.getBoundingClientRect();
+      if (!drift || !inside(el, $('pageIn'))) return r;
+      return { left: r.left, top: r.top - drift, width: r.width, height: r.height };
+    }
+    var a = rect(from);
     var ax = a.left + a.width / 2, ay = a.top + a.height / 2;
-    var f = focusables(), best = null, bestScore = Infinity;
+    var f = focusables(), best = null, bestScore = Infinity, level = null, levelScore = Infinity;
     for (var i = 0; i < f.length; i++) {
       if (f[i] === from) continue;
-      var b = f[i].getBoundingClientRect();
+      // Sideways never crosses between the bar and the page. Right off the
+      // end of a row would otherwise find the account button, and Left off
+      // Home would find a tile slid out past the edge of the screen.
+      if (dx && navEl && inside(f[i], navEl) !== inside(from, navEl)) continue;
+      var b = rect(f[i]);
       var ox = b.left + b.width / 2 - ax, oy = b.top + b.height / 2 - ay;
       if (dx && (dx > 0 ? ox <= 1 : ox >= -1)) continue;
+      // and wholly past the edge you are leaving by, so Right off the wide
+      // Clear key is not the 0 key sitting above its right half.
+      if (dx && (dx > 0 ? b.left < a.left + a.width - 2 : b.left + b.width > a.left + 2)) continue;
       if (dy && (dy > 0 ? oy <= 1 : oy >= -1)) continue;
       var along = dx ? Math.abs(ox) : Math.abs(oy);
       var across = dx ? Math.abs(oy) : Math.abs(ox);
       var score = along + across * 3;   // punish sideways drift so a press goes where it pointed
       if (score < bestScore) { bestScore = score; best = f[i]; }
+      // Sideways, something level with where you are beats something nearer
+      // but a row up: Right off the search keypad's Clear goes to the
+      // results, not up to the 0 above it.
+      if (dx && b.top < a.top + a.height && b.top + b.height > a.top && score < levelScore) { levelScore = score; level = f[i]; }
     }
+    if (level) best = level;
+    // Arriving at a row from above it lands at that row's remembered column,
+    // not at whichever tile happens to sit under the button you left.
+    var into = best && stripOf(best);
+    if (into && !stripOf(from)) { focusRow(into.row); return; }
     if (best) setFocus(best);
   }
 
@@ -605,9 +704,9 @@ public static class TvPage
     else if (c === 417 || k === 'MediaFastForward') seekBy(30);
     else if (c === 412 || k === 'MediaRewind') seekBy(-30);
     else if (S.screen === 'signin' && typeText(k, c)) { /* physical keyboard */ }
-    // On the library, the remote's number buttons move the highlight to the
-    // film carrying that number.
-    else if (S.screen === 'library' && jumpDigit(k, c)) { /* handled */ }
+    // On the Search tab, a physical keyboard types into the search.
+    else if (S.screen === 'library' && S.tab === 'search' && !document.querySelector('.menu.on') &&
+             searchKey(k)) { /* handled */ }
     else handled = false;
     if (handled) { e.preventDefault(); e.stopPropagation(); }
   }, true);
@@ -755,11 +854,26 @@ public static class TvPage
     // should take away.
     if (closeMenu()) return;
     if (S.screen === 'player') { stopPlayback(); return; }
-    if (S.screen === 'detail') { show('library'); return; }
+    if (S.screen === 'detail') { closeDetail(); return; }
     if (S.screen === 'shelves') { show('detail'); return; }
     if (S.screen === 'newshelf') { show('shelves'); return; }
-    // Library and sign-in are the floor. Doing nothing is deliberate — letting
-    // Back bubble exits the app entirely on several platforms.
+    if (S.screen === 'library') { libraryBack(); return; }
+    // Sign-in is the floor. Doing nothing is deliberate — letting Back bubble
+    // exits the app entirely on several platforms.
+  }
+
+  // In the library Back walks toward Home's featured film: from another tab
+  // to Home, and from anywhere on Home to the top. Once there it does nothing,
+  // for the same reason as above.
+  function libraryBack() {
+    if (!S.items.length) return;
+    if (S.tab !== 'home') { setTab('home'); return; }
+    var hero = $('hero'), c = current();
+    if (hero && c && !inside(c, hero)) {
+      var f = focusables();
+      for (var i = 0; i < f.length; i++) if (inside(f[i], hero) && f[i].getAttribute('data-first') !== null) { setFocus(f[i]); return; }
+      for (i = 0; i < f.length; i++) if (inside(f[i], hero)) { setFocus(f[i]); return; }
+    }
   }
 
   // ---- server -----------------------------------------------------------
@@ -814,7 +928,9 @@ public static class TvPage
     }
 
     S.access = S.refresh = S.me = null;
-    S.items = []; S.collections = []; S.shelf = null; S.resume = {};
+    stopHero();
+    S.items = []; S.byKey = {}; S.collections = []; S.resume = {}; S.myList = [];
+    S.featured = []; S.tab = 'home'; S.query = ''; S.stack = []; S.libPos = null;
     try { localStorage.removeItem(LS); } catch (e) {}
     entry = ''; renderEntry();
     show('signin');
@@ -912,7 +1028,7 @@ public static class TvPage
   // Approval is decided by the CATALOG, never by refresh: refresh performs no
   // status check, so a blocked account refreshes 200 forever.
   function enter(quiet) {
-    if (!quiet) { show('library'); $('grid').innerHTML = '<div class="center">Loading your library…</div>'; }
+    if (!quiet) { show('library', true); pageMessage('Loading your library…'); }
     renderWho();
     api('/api/v1/catalog').then(function (r) {
       return r.json()['catch'](function () { return {}; }).then(function (j) {
@@ -922,186 +1038,179 @@ public static class TvPage
           return null;
         }
         if (gateTimer) { clearInterval(gateTimer); gateTimer = null; }
-        if (S.screen !== 'library') show('library');
+        if (S.screen !== 'library') show('library', true);
         return j;
       });
     }).then(function (cat) {
       if (!cat) return;
       S.items = cat.items || [];
-      // Shelves ride along with the catalogue, so this is one round trip.
-      // An older relay omits the field entirely; treat that as "none".
-      S.collections = cat.collections || [];
-      // A shelf held from a previous refresh may have been renamed or deleted
-      // on another device. Re-point it by id, and fall back to the whole
-      // library rather than filtering against something that no longer exists.
-      if (S.shelf) {
-        var still = null;
-        for (var c = 0; c < S.collections.length; c++)
-          if (S.collections[c].id === S.shelf.id) { still = S.collections[c]; break; }
-        S.shelf = still;
-      }
-      renderRail();
+      S.byKey = {};
+      for (var i = 0; i < S.items.length; i++) S.byKey[S.items[i].filmKey] = S.items[i];
+      // Shelves and My List ride along with the catalogue, so this is one
+      // round trip. An older relay omits them entirely; treat that as "none".
+      S.collections = (cat.collections || []).slice().sort(function (a, b) { return a.sortOrder - b.sortOrder; });
+      S.myList = cat.myList || [];
+      S.scanning = !!cat.scanning;
       return api('/api/v1/library').then(function (r) { return r.ok ? r.json() : []; })
         ['catch'](function () { return []; })
         .then(function (lib) {
+          S.resume = {};
           for (var i = 0; i < (lib || []).length; i++) S.resume[lib[i].filmKey] = lib[i];
-          renderGrid(cat);
+          // Chosen once per visit, not per redraw, so coming back from a film
+          // does not reshuffle the top of the screen.
+          S.featured = featuredList();
+          S.heroIdx = 0;
+          renderTab(null);
         });
     })['catch'](function () {
       centerMessage('Could not reach the server.', 'Try again', function () { enter(true); });
     });
   }
 
-  // ---- collections ------------------------------------------------------
+  // ---- what to show ------------------------------------------------------
+  // The same decisions the phone app makes (mobile/src/library.ts), so the
+  // two never disagree about what is new or how far through a film you are.
 
-  // The films the chosen shelf holds, or everything. Membership arrives as
-  // FilmKeys and is matched against the catalogue here rather than being
-  // resolved server-side, so one cached /catalog response serves every shelf —
-  // that endpoint mints a signed media token per film on every call, and
-  // re-fetching it per shelf would re-sign the whole library on each keypress.
-  function visibleItems() {
-    if (!S.shelf) return S.items;
-    var keys = {};
-    for (var i = 0; i < S.shelf.items.length; i++) keys[S.shelf.items[i].filmKey] = true;
+  // What to call a film on screen: its tidied title, else the file name.
+  function titleOf(it) { return it.title || it.name; }
+  function byTitle(a, b) {
+    try { return titleOf(a).localeCompare(titleOf(b), undefined, { sensitivity: 'base', numeric: true }); }
+    catch (e) { return titleOf(a).toLowerCase() < titleOf(b).toLowerCase() ? -1 : 1; }
+  }
+  function lastWatched(a, b) {
+    return ((S.resume[b.filmKey] || {}).lastWatchedAt || 0) - ((S.resume[a.filmKey] || {}).lastWatchedAt || 0);
+  }
+  // In progress, or null: barely started and into the credits both count as not.
+  function progressOf(it) {
+    var row = S.resume[it.filmKey];
+    if (!row || !row.resumeMs || !it.durationMs) return null;
+    var frac = row.resumeMs / it.durationMs;
+    if (frac < 0.01 || frac > 0.95) return null;
+    return { frac: frac, row: row };
+  }
+  var DAY = 86400000;
+  function isNew(it) { return new Date().getTime() - it.addedAt < 14 * DAY && !S.resume[it.filmKey]; }
+  function onList(it) { return S.myList.indexOf(it.filmKey) >= 0; }
+  function filmsFor(keys) {
     var out = [];
-    for (var j = 0; j < S.items.length; j++) if (keys[S.items[j].filmKey]) out.push(S.items[j]);
+    for (var i = 0; i < keys.length; i++) if (S.byKey[keys[i]]) out.push(S.byKey[keys[i]]);
     return out;
   }
-
-  // Who is signed in, and the only way to stop being signed in. Without this
-  // the sole signOut control lives on the approval gate, which an approved
-  // account never sees again — so a set stays bound to whoever linked it first,
-  // with no way to switch accounts or hand the television on.
-  function renderWho() {
-    var who = $('who');
-    who.innerHTML = '';
-    if (!S.me) return;
-    // The name IS the button. A caret says it opens onto something, which is
-    // the only way a viewer would know to press it.
-    var b = document.createElement('button');
-    b.className = 'chip';
-    b.setAttribute('data-f', '');
-    b.appendChild(document.createTextNode(S.me.displayName));
-    var caret = document.createElement('span');
-    caret.className = 'caret';
-    caret.innerHTML = '&#9662;';
-    b.appendChild(caret);
-    b.addEventListener('click', function () {
-      openMenu(b, [
-        // Nothing behind it yet, so it is shown and disabled rather than
-        // hidden — the menu keeps its shape when settings arrive.
-        { label: 'Settings', disabled: true },
-        { label: 'Sign out', onSelect: signOut }
-      ]);
-    });
-    who.appendChild(b);
+  function shelfKeys(shelf) {
+    var out = [];
+    for (var i = 0; i < shelf.items.length; i++) out.push(shelf.items[i].filmKey);
+    return out;
   }
-
-  function renderRail() {
-    var rail = $('rail');
-    rail.innerHTML = '';
-    if (!S.collections.length) { rail.className = 'rail'; return; }
-    rail.className = 'rail on';
-
-    function chip(label, shelf) {
-      var b = document.createElement('button');
-      b.className = 'chip' + (S.shelf === shelf ? ' sel' : '');
-      b.setAttribute('data-f', '');
-      b.textContent = label;
-      b.addEventListener('click', function () {
-        S.shelf = shelf;
-        // Redraw both, then put focus back on this chip. renderGrid forces
-        // focus to the first card, which would snatch it away mid-browse and
-        // read as the remote fighting you.
-        renderRail();
-        renderGrid(null, true);
-        var chips = rail.getElementsByClassName('chip');
-        for (var k = 0; k < chips.length; k++)
-          if (chips[k].textContent === label) { setFocus(chips[k]); break; }
-      });
-      return b;
+  function shuffle(a) {
+    for (var i = a.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1)), t = a[i]; a[i] = a[j]; a[j] = t;
     }
-
-    rail.appendChild(chip('All films', null));
-    for (var i = 0; i < S.collections.length; i++) {
-      var c = S.collections[i];
-      rail.appendChild(chip(c.name + '  ' + c.items.length, c));
+    return a;
+  }
+  // The films the featured slot cycles through: new arrivals nobody has
+  // started, then anything never started, shuffled per visit. Only films with
+  // a still, because the slot is mostly picture.
+  function featuredList() {
+    var now = new Date().getTime(), withArt = [], fresh = [], unwatched = [], rest = [], i;
+    for (i = 0; i < S.items.length; i++) if (S.items[i].artUrl) withArt.push(S.items[i]);
+    for (i = 0; i < withArt.length; i++) {
+      var f = withArt[i];
+      if (S.resume[f.filmKey]) rest.push(f);
+      else if (now - f.addedAt < 30 * DAY) fresh.push(f);
+      else unwatched.push(f);
     }
-    rail.appendChild(layoutChip());
+    return shuffle(fresh).concat(shuffle(unwatched)).concat(shuffle(rest)).slice(0, 5);
+  }
+  function runtime(ms) {
+    if (!ms) return '';
+    var min = Math.round(ms / 60000), h = Math.floor(min / 60), m = min % 60;
+    return h ? (m ? h + 'h ' + m + 'm' : h + 'h') : m + 'm';
+  }
+  function is4k(it) { return /2160p|\b4k\b|\buhd\b/i.test(it.name || ''); }
+  // "2014 • 2h 16m  CC  HD". The tags are outlined, so they read as labels
+  // rather than as something to press.
+  function metaHtml(it) {
+    var bits = [];
+    if (it.year) bits.push(String(it.year));
+    if (it.durationMs) bits.push(runtime(it.durationMs));
+    return bits.join('<span class="dot">&bull;</span>') +
+      (it.captionsUrl ? '<span class="tag">CC</span>' : '') +
+      '<span class="tag">' + (is4k(it) ? '4K' : 'HD') + '</span>';
   }
 
-  // A grid of squares drawn to match the layout it will switch to, so the
-  // control shows the current choice rather than naming it. Sits at the right
-  // end of the shelf row, away from the shelves it has nothing to do with.
-  function gridGlyph(cols) {
-    var out = '';
-    for (var r = 0; r < 2; r++) {
-      for (var c = 0; c < cols; c++) out += '<i></i>';
-      out += '<br>';
+  // ---- tabs ---------------------------------------------------------------
+  // Home, Films, My List and Search draw into the one #pageIn under the bar.
+  // `pos` is somewhere to put focus back to after the redraw (capturePos);
+  // `focusTab` leaves it on the tab itself, which is what pressing OK on a tab
+  // should do — the remote stays where the viewer put it.
+  function renderTab(pos, focusTab) {
+    var tabs = $('tabs').getElementsByTagName('button');
+    for (var i = 0; i < tabs.length; i++)
+      tabs[i].className = 'tab' + (tabs[i].getAttribute('data-tab') === S.tab ? ' on' : '');
+    stopHero();
+    setPageY(0);
+    if (!S.items.length) {
+      // A library still being indexed is not a permanent state, so this offers
+      // the re-check that nothing else would ever perform.
+      centerMessage(
+        S.scanning ? 'Still indexing the library…' : 'No films on the server yet.',
+        S.scanning ? 'Check again' : 'Refresh',
+        function () { enter(true); });
+      return;
     }
-    return '<span class="gg gg' + cols + '">' + out + '</span>';
+    if (S.tab === 'films') renderGridTab('Films', S.items.slice().sort(byTitle), 'A–Z', '');
+    else if (S.tab === 'mylist') renderGridTab('My List', filmsFor(S.myList), '',
+      'Nothing saved yet. Open any film and choose My List to keep it here.');
+    else if (S.tab === 'search') renderSearch();
+    else renderHome();
+
+    if (focusTab) {
+      for (var t = 0; t < tabs.length; t++) if (tabs[t].getAttribute('data-tab') === S.tab) setFocus(tabs[t]);
+    } else if (!restorePos(pos)) focusFirst(true);
   }
 
-  function layoutChip() {
-    var b = document.createElement('button');
-    b.className = 'chip layout';
-    b.setAttribute('data-f', '');
-    b.innerHTML = gridGlyph(S.cols);
-    var caret = document.createElement('span');
-    caret.className = 'caret';
-    caret.innerHTML = '&#9662;';
-    b.appendChild(caret);
-    b.addEventListener('click', function () { openLayoutMenu(b); });
-    return b;
+  function setTab(name) {
+    S.tab = name;
+    renderTab(null, true);
   }
 
-  var COL_NOTES = { 3: 'Largest', 4: 'Recommended', 5: 'More at once', 6: 'Most at once' };
-
-  function openLayoutMenu(anchor) {
-    var rows = [];
-    for (var i = 0; i < COLS.length; i++) {
-      (function (n) {
-        rows.push({
-          tile: true,
-          selected: n === S.cols,
-          html: gridGlyph(n),
-          label: n + ' across',
-          sub: COL_NOTES[n],
-          onSelect: function () { setCols(n); }
-        });
-      })(COLS[i]);
+  // Slides the page so the focused row is in view. Up at the featured film
+  // the page is at rest and the bar shows; any lower and the bar fades out.
+  var pageY = 0;
+  function setPageY(y) {
+    pageY = y;
+    var pin = $('pageIn'), tr = 'translate3d(0,' + (-y) + 'px,0)';
+    pin.style.webkitTransform = tr; pin.style.transform = tr;
+    var lib = $('library');
+    if (y > 0) { if (lib.className.indexOf(' down') < 0) lib.className += ' down'; }
+    else lib.className = lib.className.replace(' down', '');
+  }
+  // How far the page still has to travel to where setPageY sent it, while the
+  // slide is in progress; zero at rest and on every other screen.
+  function pageDrift() {
+    if (S.screen !== 'library') return 0;
+    return $('pageIn').getBoundingClientRect().top - $('page').getBoundingClientRect().top + pageY;
+  }
+  function pageScrollFor(el, t) {
+    var y = 0;
+    if (t) {
+      var rows = rowsIn($('pageIn')), ri = rows.indexOf(t.row);
+      // The first row sits under the featured film with the page at rest.
+      // Every row after it is brought up to near the top of the screen, so
+      // the rows still to come are what fills the rest of it.
+      if (ri > 0) y = t.row.getBoundingClientRect().top - $('pageIn').getBoundingClientRect().top - rootPx() * 3;
     }
-    openMenu(anchor, rows);
-  }
-
-  function setCols(n) {
-    S.cols = n;
-    try { localStorage.setItem(LS_COLS, String(n)); } catch (e) {}
-    applyCols();
-    renderRail();
-    renderGrid(null, true);
-    // Put focus back on the control that was just used, not into the grid.
-    var chips = $('rail').getElementsByClassName('layout');
-    if (chips.length) setFocus(chips[0]);
-  }
-
-  function applyCols() {
-    var g = $('grid');
-    g.className = 'grid cols' + S.cols;
+    var max = $('pageIn').offsetHeight - $('page').clientHeight;
+    setPageY(Math.max(0, Math.min(y, max)));
   }
 
   // Every terminal screen in the library must leave at least one thing to
-  // press. Back is deliberately a no-op here — letting it bubble closes the
-  // whole app on webOS and Tizen — so a screen with no [data-f] is a set that
-  // has to be power-cycled to escape. This is the only way to draw one.
+  // press. Back is deliberately a no-op at the floor — letting it bubble
+  // closes the whole app on webOS and Tizen — so a screen with no [data-f] is
+  // a set that has to be power-cycled to escape. The bar is always there, but
+  // the way out should be in front of the viewer, not up in a corner.
   function centerMessage(text, label, fn) {
-    var g = $('grid');
-    g.innerHTML = '';
-    $('gridLabel').textContent = '';
-    var msg = document.createElement('div');
-    msg.className = 'center';
-    msg.textContent = text;
-    g.appendChild(msg);
+    var w = pageMessage(text);
     var b = document.createElement('button');
     b.className = 'btn';
     b.setAttribute('data-f', '');
@@ -1110,7 +1219,7 @@ public static class TvPage
     b.style.margin = '1.6rem auto 0';
     b.textContent = label;
     b.addEventListener('click', fn);
-    g.appendChild(b);
+    w.appendChild(b);
     var out = document.createElement('button');
     out.className = 'btn ghost';
     out.setAttribute('data-f', '');
@@ -1118,108 +1227,481 @@ public static class TvPage
     out.style.margin = '.8rem auto 0';
     out.textContent = 'Sign out of this TV';
     out.addEventListener('click', signOut);
-    g.appendChild(out);
-    focusFirst(true);
+    w.appendChild(out);
+    if (S.screen === 'library') focusFirst(true);
+  }
+  function pageMessage(text) {
+    stopHero();
+    setPageY(0);
+    var pin = $('pageIn');
+    pin.className = '';
+    pin.innerHTML = '';
+    var w = document.createElement('div');
+    w.className = 'gwrap';
+    var msg = document.createElement('div');
+    msg.className = 'center';
+    msg.textContent = text;
+    w.appendChild(msg);
+    pin.appendChild(w);
+    return w;
   }
 
-  function renderGrid(cat, keepFocus) {
-    var g = $('grid');
-    if (!S.items.length) {
-      // A library still being indexed is not a permanent state, so this offers
-      // the re-check that nothing else would ever perform — once the grid is
-      // painted, nothing re-enters enter() on its own.
-      centerMessage(
-        cat && cat.scanning ? 'Still indexing the library…' : 'No films on the server yet.',
-        cat && cat.scanning ? 'Check again' : 'Refresh',
-        function () { enter(true); });
-      return;
+  // ---- home ---------------------------------------------------------------
+  function renderHome() {
+    var pin = $('pageIn');
+    pin.className = 'home';
+    pin.innerHTML = '';
+    if (S.featured.length) {
+      var h = document.createElement('div');
+      h.className = 'hero';
+      h.id = 'hero';
+      h.innerHTML =
+        '<div class="hart" id="heroA"></div><div class="hart" id="heroB"></div><div class="hshade"></div>' +
+        '<div class="hcopy"><div class="kicker" id="hKick"></div><h1 id="hTitle"></h1>' +
+        '<div class="fmeta" id="hMeta"></div><div id="hBtns"></div></div>' +
+        '<div class="hdots" id="hDots"></div>';
+      pin.appendChild(h);
+      heroTop = null;
+      showHero(S.heroIdx);
+    } else {
+      // Nothing with a still to feature: the rows start under the bar.
+      var gap = document.createElement('div');
+      gap.style.height = '9rem';
+      pin.appendChild(gap);
     }
 
-    var items = visibleItems();
-    if (!items.length) {
-      // An empty shelf must still leave something to press. The library screen
-      // deliberately swallows Back — letting it bubble closes the whole app on
-      // webOS and Tizen — so a screen with nothing focusable is a set that has
-      // to be power-cycled.
-      g.innerHTML = '';
-      $('gridLabel').textContent = S.shelf ? S.shelf.name : '';
+    var rows = document.createElement('div');
+    rows.className = 'rows';
+    var inProgress = [], again = [], i;
+    for (i = 0; i < S.items.length; i++) {
+      var it = S.items[i], seen = S.resume[it.filmKey];
+      if (progressOf(it)) inProgress.push(it);
+      else if (seen && seen.watchCount > 0) again.push(it);
+    }
+    addRow(rows, 'cont', 'Continue watching', inProgress.sort(lastWatched));
+    addRow(rows, 'recent', 'Recently added',
+      S.items.slice().sort(function (a, b) { return b.addedAt - a.addedAt; }).slice(0, 20));
+    addRow(rows, 'mylist', 'My List', filmsFor(S.myList));
+    for (i = 0; i < S.collections.length; i++)
+      addRow(rows, 'shelf:' + S.collections[i].id, S.collections[i].name, filmsFor(shelfKeys(S.collections[i])));
+    addRow(rows, 'again', 'Watch again', again.sort(lastWatched));
+    addRow(rows, 'all', 'All films', S.items.slice().sort(byTitle));
+    pin.appendChild(rows);
+    startHero();
+  }
+
+  // A labelled, sideways-scrolling strip of tiles. Rows are told apart by
+  // key rather than position, so the column each one was left at survives a
+  // redraw that adds or removes a row above it.
+  var rowCol = {};
+  function addRow(host, key, label, films) {
+    if (!films.length) return null;
+    var row = document.createElement('div');
+    row.className = 'row';
+    row.setAttribute('data-rowkey', key);
+    var h = document.createElement('h3');
+    h.textContent = label;
+    row.appendChild(h);
+    var strip = document.createElement('div');
+    strip.className = 'strip';
+    var inn = document.createElement('div');
+    inn.className = 'strip-in';
+    for (var i = 0; i < films.length; i++) inn.appendChild(makeTile(films[i], false));
+    strip.appendChild(inn);
+    row.appendChild(strip);
+    host.appendChild(row);
+    return row;
+  }
+
+  // One film: its still, the title written on it, NEW for a recent arrival
+  // nobody has watched, and a thin white bar for how far you got.
+  function makeTile(it, withWall) {
+    var p = progressOf(it);
+    var b = document.createElement('button');
+    b.className = 'tile' + (p ? ' prog' : '');
+    b.setAttribute('data-f', '');
+    b.setAttribute('data-key', it.filmKey);
+    if (withWall && it.artUrl) b.setAttribute('data-art', it.artUrl);
+    b.innerHTML =
+      '<span class="tbox"><span class="tglyph">&#127916;</span><span class="tart"></span><span class="tshade"></span>' +
+      (isNew(it) ? '<span class="tnew">NEW</span>' : '') +
+      (routeFor(it) ? '' : '<span class="tapp">APP ONLY</span>') +
+      '<span class="tt"></span>' +
+      (p ? '<span class="tbar"><i style="width:' + Math.round(p.frac * 100) + '%"></i></span>' : '') +
+      '</span>';
+    b.getElementsByClassName('tt')[0].textContent = titleOf(it);
+    b.addEventListener('click', function () { openDetail(it); });
+    if (it.artUrl) loadArt(b.getElementsByClassName('tart')[0], it.artUrl);
+    return b;
+  }
+
+  // ---- the featured film ----------------------------------------------------
+  var heroTimer = null, heroTop = null;
+  function showHero(i) {
+    var it = S.featured[i];
+    if (!it || !$('hero')) return;
+    S.heroIdx = i;
+    var p = progressOf(it), route = routeFor(it);
+    $('hKick').textContent = p ? 'Continue watching' : isNew(it) ? 'New in your vault' : 'From your vault';
+    $('hTitle').textContent = titleOf(it);
+    $('hMeta').innerHTML = metaHtml(it);
+    var btns = $('hBtns');
+    btns.innerHTML = '';
+    var playB = mkBtn(p ? 'Resume' : 'Play', function () { play(it, p ? p.row.resumeMs : 0); }, true, !route, false, 'play');
+    playB.setAttribute('data-pos', 'heroPlay');
+    btns.appendChild(playB);
+    var info = mkBtn('More info', function () { openDetail(it); }, !route, false, true, 'info');
+    info.setAttribute('data-pos', 'heroInfo');
+    btns.appendChild(info);
+    var dots = '';
+    if (S.featured.length > 1)
+      for (var d = 0; d < S.featured.length; d++) dots += '<i' + (d === i ? ' class="on"' : '') + '></i>';
+    $('hDots').innerHTML = dots;
+
+    // Cross-fade: the new still goes on whichever layer is hidden, and only
+    // once its bytes are here, so the fade is never into an empty frame.
+    withArt(it.artUrl, function (src) {
+      if (S.featured[S.heroIdx] !== it || !$('heroA')) return;
+      var next = heroTop === 'heroA' ? 'heroB' : 'heroA', prev = heroTop;
+      $(next).style.zIndex = 1;
+      if (prev) $(prev).style.zIndex = 0;
+      $(next).style.backgroundImage = 'url("' + src + '")';
+      $(next).className = 'hart on';
+      heroTop = next;
+      // The old still stays fully lit underneath until the new one is opaque
+      // over it. Fading one out while the other fades in dips through black.
+      if (prev) setTimeout(function () { if (heroTop !== prev && $(prev)) $(prev).className = 'hart'; }, 1300);
+    });
+    // Fetch the next one now, so it is ready when its turn comes.
+    var after = S.featured[(i + 1) % S.featured.length];
+    if (after && after.artUrl) withArt(after.artUrl, function () {});
+  }
+  // Every nine seconds — but never while the remote is on the featured film's
+  // own buttons, or Play would change films under the viewer's thumb.
+  function startHero() {
+    stopHero();
+    if (S.featured.length < 2) return;
+    heroTimer = setInterval(function () {
+      if (S.screen !== 'library' || S.tab !== 'home' || !$('hero')) return;
+      if (document.querySelector('.menu.on')) return;
+      var c = current();
+      if (c && inside(c, $('hero'))) return;
+      showHero((S.heroIdx + 1) % S.featured.length);
+    }, 9000);
+  }
+  function stopHero() {
+    if (heroTimer) { clearInterval(heroTimer); heroTimer = null; }
+  }
+
+  // ---- Films and My List --------------------------------------------------
+  function renderGridTab(title, films, note, emptyText) {
+    var pin = $('pageIn');
+    pin.className = '';
+    pin.innerHTML = '';
+    var w = document.createElement('div');
+    w.className = 'gwrap';
+    var head = document.createElement('div');
+    head.className = 'ghead';
+    head.textContent = title;
+    var n = document.createElement('span');
+    n.className = 'n';
+    n.textContent = films.length + (films.length === 1 ? ' film' : ' films') + (note ? '  ·  ' + note : '');
+    head.appendChild(n);
+    w.appendChild(head);
+    var g = document.createElement('div');
+    g.className = 'grid';
+    w.appendChild(g);
+    pin.appendChild(w);
+    if (!films.length) {
       var msg = document.createElement('div');
       msg.className = 'center';
-      msg.textContent = 'Nothing on this shelf yet.';
+      msg.textContent = emptyText;
       g.appendChild(msg);
-      var out = document.createElement('button');
-      out.className = 'btn';
-      out.setAttribute('data-f', '');
-      out.setAttribute('data-first', '');
-      out.style.display = 'block';
-      out.style.margin = '1.6rem auto 0';
-      out.textContent = 'Show all films';
-      out.addEventListener('click', function () {
-        S.shelf = null; renderRail(); renderGrid(null);
-      });
-      g.appendChild(out);
-      if (!keepFocus) focusFirst(true);
+      var b = document.createElement('button');
+      b.className = 'btn';
+      b.setAttribute('data-f', '');
+      b.setAttribute('data-first', '');
+      b.style.display = 'block';
+      b.style.margin = '1.6rem auto 0';
+      b.textContent = 'Browse films';
+      b.addEventListener('click', function () { S.tab = 'films'; renderTab(null); });
+      g.appendChild(b);
       return;
     }
-
-    applyCols();
-    g.innerHTML = '';
-    $('gridLabel').textContent = (S.shelf ? S.shelf.name : 'All films') + '  \u00b7  ' +
-      items.length + (items.length === 1 ? ' film' : ' films');
-    for (var i = 0; i < items.length; i++) {
-      (function (it, idx) {
-        var seen = S.resume[it.filmKey];
-        var pct = (seen && it.durationMs) ? Math.min(100, seen.resumeMs / it.durationMs * 100) : 0;
-        var b = document.createElement('button');
-        b.className = 'card';
-        b.setAttribute('data-f', '');
-        if (it.artUrl) b.setAttribute('data-art', it.artUrl);
-        if (idx === 0) b.setAttribute('data-first', '');
-        b.innerHTML =
-          '<div class="thumb"><span class="glyph">&#127916;</span>' +
-            (routeFor(it) ? '' : '<span class="badge">APP ONLY</span>') +
-            // The number the remote's digits jump to. Position in the list as
-            // shown, so it follows the shelf and the sort rather than being an
-            // id the viewer would have to learn.
-            '<span class="idx">' + (idx + 1) + '</span>' +
-            (pct > 1 ? '<span class="resume"><i style="width:' + pct + '%"></i></span>' : '') +
-          '</div><div class="name"></div><div class="meta">' +
-          (it.durationMs ? fmt(it.durationMs) : '') + '</div>';
-        b.getElementsByClassName('name')[0].textContent = it.name;
-        b.addEventListener('click', function () { openDetail(it); });
-        g.appendChild(b);
-        if (it.artUrl) loadArt(b.getElementsByClassName('thumb')[0], it.artUrl);
-      })(items[i], i);
+    for (var i = 0; i < films.length; i++) {
+      var t = makeTile(films[i], true);
+      if (i === 0) t.setAttribute('data-first', '');
+      g.appendChild(t);
     }
-    if (!keepFocus) focusFirst(true);
+  }
+
+  // ---- search ---------------------------------------------------------------
+  // A keypad rather than the set's own keyboard, which covers half the screen
+  // and behaves differently on every make. Results follow every key, so there
+  // is no Enter to find; an empty search shows the whole library A–Z.
+  var SEARCH_ROWS = ['ABCDEF', 'GHIJKL', 'MNOPQR', 'STUVWX', 'YZ1234', '567890'];
+  function renderSearch() {
+    var pin = $('pageIn');
+    pin.className = '';
+    pin.innerHTML =
+      '<div class="sleft"><div class="sbox" id="sBox"></div><div class="skeys" id="sKeys"></div></div>' +
+      '<div class="sright"><div class="ghead" id="sHead"></div><div class="grid c4" id="sGrid"></div></div>';
+    var html = '';
+    for (var r = 0; r < SEARCH_ROWS.length; r++) {
+      // One block per row, so Up and Down move between rows of keys.
+      html += '<div class="krow">';
+      for (var i = 0; i < SEARCH_ROWS[r].length; i++) {
+        var ch = SEARCH_ROWS[r].charAt(i);
+        html += '<button class="key" data-f' + (r === 0 && i === 0 ? ' data-first' : '') +
+                ' data-pos="k' + ch + '" data-ch="' + ch + '">' + ch + '</button>';
+      }
+      html += '</div>';
+    }
+    html += '<div class="krow">' +
+      '<button class="key act w2" data-f data-pos="ksp" data-act="sp">Space</button>' +
+      '<button class="key act w2" data-f data-pos="kdel" data-act="del">Del</button>' +
+      '<button class="key act w2" data-f data-pos="kclr" data-act="clr">Clear</button></div>';
+    var host = $('sKeys');
+    host.innerHTML = html;
+    var keys = host.getElementsByTagName('button');
+    for (var j = 0; j < keys.length; j++) {
+      (function (b) {
+        b.addEventListener('click', function () {
+          var act = b.getAttribute('data-act');
+          if (act === 'del') S.query = S.query.slice(0, -1);
+          else if (act === 'clr') S.query = '';
+          else if (act === 'sp') { if (S.query.length && S.query.slice(-1) !== ' ') S.query += ' '; }
+          else if (S.query.length < 40) S.query += b.getAttribute('data-ch').toLowerCase();
+          searchChanged();
+        });
+      })(keys[j]);
+    }
+    searchChanged();
+  }
+  // A physical keyboard types into the box too.
+  function searchKey(k) {
+    if (!k || k.length !== 1 || !/[a-z0-9 ]/i.test(k)) return false;
+    if (k === ' ') { if (!S.query.length || S.query.slice(-1) === ' ') return true; }
+    if (S.query.length < 40) S.query += k.toLowerCase();
+    searchChanged();
+    return true;
+  }
+  function searchChanged() {
+    var box = $('sBox');
+    if (!box) return;
+    if (S.query) box.textContent = S.query;
+    else box.innerHTML = '<span class="ph">Search your vault</span>';
+    var q = S.query.replace(/^\s+|\s+$/g, ''), found = [];
+    for (var i = 0; i < S.items.length; i++) {
+      var it = S.items[i];
+      if (!q || titleOf(it).toLowerCase().indexOf(q) >= 0 || it.name.toLowerCase().indexOf(q) >= 0) found.push(it);
+    }
+    found.sort(byTitle);
+    var head = $('sHead');
+    head.textContent = q ? 'Results' : 'All films';
+    var n = document.createElement('span');
+    n.className = 'n';
+    n.textContent = q ? found.length + (found.length === 1 ? ' film' : ' films') : 'A–Z';
+    head.appendChild(n);
+    var g = $('sGrid');
+    g.innerHTML = '';
+    g.scrollTop = 0;
+    if (!found.length) {
+      var msg = document.createElement('div');
+      msg.className = 'center';
+      msg.textContent = 'Nothing in your vault matches “' + q + '”.';
+      g.appendChild(msg);
+    }
+    for (var j = 0; j < found.length; j++) g.appendChild(makeTile(found[j], true));
+  }
+
+  // ---- account ------------------------------------------------------------
+  // Who is signed in, and the only way to stop being signed in. Without it a
+  // set stays bound to whoever linked it first, with no way to switch
+  // accounts or hand the television on.
+  function displayName() { return (S.me && (S.me.displayName || S.me.username)) || ''; }
+  function renderWho() {
+    var n = displayName();
+    $('acct').textContent = n ? n.charAt(0).toUpperCase() : '?';
+  }
+  function openAccount() {
+    openMenu($('acct'), [
+      // Shown and disabled: it says whose library this is.
+      { label: displayName() || 'Signed in', disabled: true },
+      { label: 'Sign out of this TV', onSelect: signOut }
+    ]);
+  }
+
+  // ---- where focus was ------------------------------------------------------
+  // Opening a film and coming back must land on the same tile, in the same
+  // row, with the row and the page where they were. When the library has been
+  // redrawn in between (My List changed, a film was watched) the element is
+  // gone, so it is found again by row and film, then by position.
+  function capturePos() {
+    var el = current();
+    if (!el || S.screen !== 'library') return null;
+    var t = stripOf(el);
+    return {
+      el: el,
+      row: t ? t.row.getAttribute('data-rowkey') : null,
+      idx: t ? t.idx : indexIn(el),
+      key: el.getAttribute('data-key'),
+      pos: el.getAttribute('data-pos') || (el.getAttribute('data-tab') ? 'tab:' + el.getAttribute('data-tab') : null)
+    };
+  }
+  function indexIn(el) {
+    var p = el.parentNode;
+    if (!p) return 0;
+    for (var i = 0; i < p.children.length; i++) if (p.children[i] === el) return i;
+    return 0;
+  }
+  function restorePos(p) {
+    if (!p) return false;
+    var scope = $('library'), cand = null, i, list;
+    if (p.el && p.el.offsetParent !== null && inside(p.el, scope)) cand = p.el;
+    else if (p.row) {
+      var rows = rowsIn(scope);
+      for (i = 0; i < rows.length; i++) if (rows[i].getAttribute('data-rowkey') === p.row) {
+        list = rows[i].getElementsByClassName('strip-in')[0].children;
+        cand = findKey(list, p.key) || list[Math.min(p.idx, list.length - 1)];
+      }
+    } else if (p.key) {
+      var g = scope.getElementsByClassName('grid')[0];
+      list = g ? g.getElementsByClassName('tile') : [];
+      cand = findKey(list, p.key) || (list.length ? list[Math.min(p.idx, list.length - 1)] : null);
+    } else if (p.pos) {
+      var f = focusables();
+      for (i = 0; i < f.length; i++) {
+        var tab = f[i].getAttribute('data-tab');
+        if (f[i].getAttribute('data-pos') === p.pos || (tab && 'tab:' + tab === p.pos)) { cand = f[i]; break; }
+      }
+    }
+    if (!cand) return false;
+    setFocus(cand);
+    return true;
+  }
+  function findKey(list, key) {
+    if (!key) return null;
+    for (var i = 0; i < list.length; i++) if (list[i].getAttribute('data-key') === key) return list[i];
+    return null;
+  }
+  function inside(el, box) {
+    while (el) { if (el === box) return true; el = el.parentNode; }
+    return false;
+  }
+
+  // ---- moving along rows ----------------------------------------------------
+  // Rows are moved through as rows, not by geometry. Left and Right walk the
+  // strip and stop at its ends; Up and Down go to the next row at the column
+  // that row was last left at, which is what makes a long library feel like
+  // shelves rather than a field of tiles.
+  var lastAbove = {};
+  function stripOf(el) {
+    var inn = el && el.parentNode;
+    if (!inn || !inn.className || String(inn.className).indexOf('strip-in') < 0) return null;
+    return { inn: inn, row: inn.parentNode.parentNode, idx: indexIn(el) };
+  }
+  function rowsIn(scope) {
+    var all = scope.getElementsByClassName('row'), out = [];
+    for (var i = 0; i < all.length; i++) if (all[i].offsetParent !== null) out.push(all[i]);
+    return out;
+  }
+  function focusRow(row) {
+    var inn = row.getElementsByClassName('strip-in')[0];
+    var n = inn.children.length;
+    if (!n) return;
+    var col = rowCol[row.getAttribute('data-rowkey')] || 0;
+    setFocus(inn.children[Math.min(col, n - 1)]);
+  }
+  function stripMove(from, dx, dy) {
+    var t = stripOf(from);
+    if (!t) return false;
+    if (dx) {
+      var next = t.inn.children[t.idx + dx];
+      if (next) setFocus(next);
+      return true;
+    }
+    var rows = rowsIn(focusScope()), i = rows.indexOf(t.row) + dy;
+    if (i >= 0 && i < rows.length) { focusRow(rows[i]); return true; }
+    if (dy > 0) return true;   // the last row is the floor
+    // Up out of the top row goes back to the button you came down from.
+    var a = lastAbove[S.screen];
+    // The featured film redraws its buttons each time it changes, so the one
+    // remembered may be gone; its twin is found by name.
+    if (a && a.offsetParent === null && a.getAttribute('data-pos')) {
+      var pos = a.getAttribute('data-pos'), f = focusables();
+      a = null;
+      for (var k = 0; k < f.length; k++) if (f[k].getAttribute('data-pos') === pos) { a = f[k]; break; }
+    }
+    if (!a && S.screen === 'library' && $('hero') && inside(t.row, $('pageIn')))
+      a = $('hero').querySelector('[data-first]') || $('hero').querySelector('[data-f]');
+    if (a && a.offsetParent !== null && inside(a, focusScope())) { setFocus(a); return true; }
+    return false;
+  }
+  // Called by setFocus for everything it lands on.
+  function afterFocus(el) {
+    var t = stripOf(el);
+    if (t) {
+      rowCol[t.row.getAttribute('data-rowkey')] = t.idx;
+      // Native focus scrolls clipped boxes to reveal the element; these are
+      // positioned by transform, so put their scroll back where it belongs.
+      t.inn.parentNode.scrollLeft = 0;
+      scrollStrip(t.inn, el);
+    } else if (!inside(el, $('menu')) && !inside(el, $('nav'))) {
+      // The bar is never what Up out of the rows means: that is the button
+      // just above them, which the bar is reached through.
+      lastAbove[S.screen] = el;
+    }
+    $('page').scrollTop = 0;
+    $('library').scrollTop = 0;
+    if (S.screen === 'library' && S.tab === 'home') pageScrollFor(el, t);
+  }
+  // Keeps the focused tile inside the strip with room for it to grow, moving
+  // only as far as it has to.
+  function scrollStrip(inn, tile) {
+    var room = rootPx() * 5;
+    var view = inn.parentNode.clientWidth - room * 2;
+    var x = inn._x || 0, L = tile.offsetLeft, R = L + tile.offsetWidth;
+    if (L - x < 0) x = L;
+    else if (R - x > view) x = R - view;
+    if (x !== inn._x) {
+      inn._x = x;
+      var tr = 'translate3d(' + (-x) + 'px,0,0)';
+      inn.style.webkitTransform = tr; inn.style.transform = tr;
+    }
   }
 
   // Posters need an Authorization header and an <img> cannot send one, so fetch
   // the bytes and hand the element an object URL instead.
   //
-  // Cached by URL, and deliberately never revoked. Before the collections rail
-  // the grid was drawn about twice in a session, so fetching every poster afresh
-  // each time cost nothing; now a shelf can be picked with the remote and the
-  // grid redraws on a keypress. Without this, every press would re-fetch the
-  // whole library over an authenticated connection and mint a fresh blob for
-  // every card, none ever released — on a television with a few hundred
-  // megabytes to play with, that is a browser that dies after a few minutes of
-  // browsing. One blob per film for the life of the page is the whole cost.
-  var artCache = {};
-  function loadArt(el, url) {
-    var gl = el.getElementsByClassName('glyph')[0];
-    if (artCache[url]) {
-      el.style.backgroundImage = 'url("' + artCache[url] + '")';
-      if (gl) gl.style.display = 'none';
-      return;
-    }
+  // Cached by URL, and deliberately never revoked: Home shows the same film in
+  // several rows and every redraw shows them all again, so fetching afresh
+  // would re-download the library over an authenticated connection on every
+  // visit — on a television with a few hundred megabytes to play with, that is
+  // a browser that dies after a few minutes. One blob per film for the life of
+  // the page is the whole cost. Requests already in flight are shared, so a
+  // film in four rows is still one download.
+  var artCache = {}, artWaiting = {};
+  function withArt(url, cb) {
+    if (!url) return;
+    if (artCache[url]) { cb(artCache[url]); return; }
+    if (artWaiting[url]) { artWaiting[url].push(cb); return; }
+    artWaiting[url] = [cb];
     api(url).then(function (r) { return r.ok ? r.blob() : null; }).then(function (b) {
+      var waiting = artWaiting[url] || [];
+      delete artWaiting[url];
       if (!b) return;
       artCache[url] = URL.createObjectURL(b);
-      el.style.backgroundImage = 'url("' + artCache[url] + '")';
-      if (gl) gl.style.display = 'none';
+      for (var i = 0; i < waiting.length; i++) waiting[i](artCache[url]);
       if (wallWanted === url) showWall(url);
-    })['catch'](function () {});
+    })['catch'](function () { delete artWaiting[url]; });
+  }
+  function loadArt(el, url) {
+    withArt(url, function (src) {
+      el.style.backgroundImage = 'url("' + src + '")';
+      var gl = el.getElementsByClassName('glyph')[0];
+      if (gl) gl.style.display = 'none';
+    });
   }
 
   // ---- the wallpaper ----------------------------------------------------
@@ -1301,23 +1783,23 @@ public static class TvPage
   }
 
   // ---- detail -----------------------------------------------------------
-  function openDetail(it) {
+  // Films opened from "More from your vault" stack up, so Back walks back
+  // through them before returning to the library.
+  function openDetail(it, popping) {
+    if (S.screen === 'library') { S.libPos = capturePos(); S.stack = []; }
+    if (!popping) S.stack.push(it);
     S.film = it;
-    $('dTitle').textContent = it.name;
+    $('dTitle').textContent = titleOf(it);
+    $('dMeta').innerHTML = metaHtml(it);
 
-    // Reuse the cached poster — the grid has already fetched it, so this is
-    // instant and costs no second request.
+    // Reuse the cached still — the tile has already fetched it, so this is
+    // instant and costs no second request. The wall behind the glass is the
+    // same film, softened.
     var art = $('dArt');
     art.style.backgroundImage = '';
     var gl = art.getElementsByClassName('glyph')[0];
     if (gl) gl.style.display = '';
-    if (it.artUrl) { loadArt(art, it.artUrl); showWall(it.artUrl); }
-    var bits = [];
-    if (it.durationMs) bits.push(fmt(it.durationMs));
-    if (it.videoCodec) bits.push(String(it.videoCodec).toUpperCase());
-    if (it.audioCodec) bits.push(String(it.audioCodec).toUpperCase());
-    if (it.sizeBytes) bits.push((it.sizeBytes / 1073741824).toFixed(1) + ' GB');
-    $('dMeta').textContent = bits.join('   ·   ');
+    if (it.artUrl) { loadArt(art, it.artUrl); showWall(it.artUrl); } else showWall(null);
 
     var route = routeFor(it);
     var mkv = it.contentType && it.contentType.indexOf('matroska') >= 0;
@@ -1337,22 +1819,126 @@ public static class TvPage
              String(it.hlsVideoCodec || 'this format').toUpperCase() + ' video.') +
       ' Watch it in the Vault Movies desktop app, which plays anything.';
 
-    var seen = S.resume[it.filmKey];
-    var canResume = !!route && seen && seen.resumeMs > 15000 &&
-                    (!it.durationMs || seen.resumeMs < it.durationMs - 30000);
-    var row = $('dRow'); row.innerHTML = '';
-    if (canResume) row.appendChild(mkBtn('Resume ' + fmt(seen.resumeMs), function () { play(it, seen.resumeMs); }, true));
-    row.appendChild(mkBtn(canResume ? 'Start again' : 'Play', function () { play(it, 0); }, !canResume, !route));
-    // Only worth offering once the catalogue has answered — a shelf needs a
-    // film key to hold, and the server is what supplies it.
-    row.appendChild(mkBtn('Add to Collection', openShelves, false, false, true));
-    row.appendChild(mkBtn('Back', function () { show('library'); }, false, false, true));
+    var p = progressOf(it);
+    var row = $('dRow');
+    row.innerHTML = '';
+    row.appendChild(mkBtn(p ? 'Resume' : 'Play', function () { play(it, p ? p.row.resumeMs : 0); },
+                          true, !route, false, 'play'));
+    if (p && route) row.appendChild(mkBtn('Start over', function () { play(it, 0); }, false, false, true));
+    var listB = mkBtn('My List', function () { toggleList(it, listB); }, !route, false, true);
+    setListLabel(listB, onList(it));
+    row.appendChild(listB);
+    row.appendChild(mkBtn('Add to collection', openShelves, false, false, true));
+
+    // How far through, as on the tile, and what is left in words.
+    var left = p ? Math.max(0, it.durationMs - p.row.resumeMs) : 0;
+    $('dProg').innerHTML = p
+      ? '<span class="bar"><i style="width:' + Math.round(p.frac * 100) + '%"></i></span>' +
+        (left >= 3600000 ? runtime(left) : Math.max(1, Math.round(left / 60000)) + ' min') + ' left'
+      : '';
+    $('dNote').textContent = it.captionsUrl
+      ? 'English captions. Press ▲ during the film to turn them on or off.' : '';
+
+    var seen = S.resume[it.filmKey], shelves = [];
+    for (var i = 0; i < S.collections.length; i++)
+      if (onShelf(S.collections[i], it)) shelves.push(S.collections[i].name);
+    var facts = [
+      ['Watched', seen && seen.watchCount > 0 ? (seen.watchCount === 1 ? 'Once' : seen.watchCount + ' times') : ''],
+      ['On your shelves', shelves.join(', ')],
+      ['Added', it.addedAt ? dateOf(it.addedAt) : ''],
+      ['Format', [it.videoCodec, it.audioCodec].filter(function (s) { return !!s; })
+                   .map(function (s) { return String(s).toUpperCase(); }).join(' · ')],
+      ['File', sizeOf(it.sizeBytes)]
+    ];
+    var fh = $('dFacts');
+    fh.innerHTML = '';
+    for (var f = 0; f < facts.length; f++) {
+      if (!facts[f][1]) continue;
+      var line = document.createElement('div');
+      line.innerHTML = '<span class="k"></span><span class="v"></span>';
+      line.firstChild.textContent = facts[f][0];
+      line.lastChild.textContent = facts[f][1];
+      fh.appendChild(line);
+    }
+
+    // Films on the same shelves first, then whatever else is newest.
+    var same = {}, more = [];
+    for (i = 0; i < S.collections.length; i++) {
+      if (!onShelf(S.collections[i], it)) continue;
+      var films = filmsFor(shelfKeys(S.collections[i]));
+      for (var j = 0; j < films.length; j++)
+        if (films[j].filmKey !== it.filmKey && !same[films[j].filmKey]) { same[films[j].filmKey] = 1; more.push(films[j]); }
+    }
+    var newest = S.items.slice().sort(function (a, b) { return b.addedAt - a.addedAt; });
+    for (i = 0; i < newest.length && more.length < 12; i++)
+      if (newest[i].filmKey !== it.filmKey && !same[newest[i].filmKey]) more.push(newest[i]);
+    var host = $('dMore');
+    host.innerHTML = '';
+    delete rowCol.more;
+    addRow(host, 'more', 'More from your vault', more.slice(0, 12));
+
     show('detail');
   }
-  function mkBtn(label, fn, first, disabled, ghost) {
+
+  function closeDetail() {
+    S.stack.pop();
+    if (S.stack.length) { openDetail(S.stack[S.stack.length - 1], true); return; }
+    backToLibrary();
+  }
+
+  // Back to the tile the film was opened from. If something changed while
+  // away — My List, a shelf, a film watched — the tab is drawn again first so
+  // rows and progress bars are true, and focus is found again in the new one.
+  function backToLibrary() {
+    show('library', true);
+    if (S.dirty) { S.dirty = false; renderTab(S.libPos); return; }
+    if (!restorePos(S.libPos)) focusFirst(true);
+  }
+
+  // My List, from the film's own page. The label changes at once and the
+  // server's answer — the whole list — is then taken as the truth.
+  function setListLabel(b, on) {
+    b.innerHTML = '<span class="ico">' + (on ? '&#10003;' : '+') + '</span>My List';
+  }
+  function toggleList(it, b) {
+    if (b.getAttribute('data-busy')) return;
+    var want = !onList(it);
+    b.setAttribute('data-busy', '1');
+    setListLabel(b, want);
+    api('/api/v1/mylist/' + encodeURIComponent(it.filmKey), { method: want ? 'PUT' : 'DELETE' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (list) {
+        b.removeAttribute('data-busy');
+        if (list && typeof list.length === 'number') { S.myList = list; S.dirty = true; }
+        else $('dNote').textContent = 'The server would not change My List just now.';
+        setListLabel(b, onList(it));
+      })['catch'](function () {
+        b.removeAttribute('data-busy');
+        $('dNote').textContent = 'Could not reach the server.';
+        setListLabel(b, onList(it));
+      });
+  }
+
+  function dateOf(ms) {
+    try { return new Date(ms).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }); }
+    catch (e) { return new Date(ms).toDateString(); }
+  }
+  function sizeOf(b) {
+    if (!b) return '';
+    return b >= 1e9 ? (b / 1e9).toFixed(1) + ' GB' : Math.round(b / 1e6) + ' MB';
+  }
+
+  // icon: 'play' or 'info', drawn in CSS ahead of the label.
+  function mkBtn(label, fn, first, disabled, ghost, icon) {
     var b = document.createElement('button');
     b.className = 'btn' + (ghost ? ' ghost' : '');
     b.textContent = label;
+    if (icon) {
+      var i = document.createElement('span');
+      i.className = icon === 'play' ? 'tri' : 'ii';
+      if (icon === 'info') i.textContent = 'i';
+      b.insertBefore(i, b.firstChild);
+    }
     if (!disabled) { b.setAttribute('data-f',''); if (first) b.setAttribute('data-first',''); }
     b.disabled = !!disabled;
     b.addEventListener('click', fn);
@@ -1433,47 +2019,6 @@ public static class TvPage
     return true;
   }
 
-  // ---- jumping to a film by number --------------------------------------
-  //
-  // Type the number printed in a card's corner and the highlight goes there.
-  // Digits accumulate while they keep coming, so 1 then 4 reaches 14 and a
-  // third digit reaches 142 — the highlight follows every press rather than
-  // waiting, so the search is visibly narrowing as you type. A pause of a
-  // second and a half ends that number; the next digit starts a fresh one.
-  //
-  // It only ever moves the highlight. Opening a film stays a deliberate press
-  // of OK, so a mistyped digit costs nothing but another press.
-
-  var JUMP_GAP = 1500;
-  var jumpBuf = '', jumpTimer = null;
-
-  function jumpDigit(k, c) {
-    var ch = (k && k.length === 1) ? k : String.fromCharCode(c);
-    if (ch < '0' || ch > '9') return false;
-
-    var cards = $('grid').getElementsByClassName('card');
-    if (!cards.length) return false;
-
-    var next = jumpBuf + ch;
-    // A number no film could carry starts again from this digit, rather than
-    // leaving somebody typing into something that can never match.
-    if (parseInt(next, 10) > cards.length) next = ch;
-    jumpBuf = next;
-
-    var n = parseInt(jumpBuf, 10);
-    if (n >= 1 && n <= cards.length) setFocus(cards[n - 1]);
-
-    $('jump').textContent = jumpBuf;
-    $('jump').className = 'jump on';
-
-    clearTimeout(jumpTimer);
-    jumpTimer = setTimeout(function () {
-      jumpBuf = '';
-      $('jump').className = 'jump';
-    }, JUMP_GAP);
-    return true;
-  }
-
   // ---- collections ------------------------------------------------------
   //
   // Shelves can be made and filled from the television, not only the desktop.
@@ -1483,7 +2028,7 @@ public static class TvPage
 
   function openShelves() {
     if (!S.film) return;
-    $('shTitle').textContent = S.film.name;
+    $('shTitle').textContent = titleOf(S.film);
     renderShelves();
     show('shelves');
   }
@@ -1562,11 +2107,11 @@ public static class TvPage
         for (var i = 0; i < S.collections.length; i++)
           if (S.collections[i].id === updated.id) S.collections[i] = updated;
         renderShelves(idx);
-        renderRail();
+        S.dirty = true;   // the library's shelf rows change with it
         // Putting a film on a shelf is a finished errand, so it goes back to
         // the film. Taking one off is usually part of tidying up, so that stays
         // put and the list can be worked through.
-        if (!wasOn) show('detail');
+        if (!wasOn) openDetail(S.film, true);
       })['catch'](function (e) {
         shelfNote('Could not reach the server. ' + (e && e.message ? e.message : ''));
       });
@@ -1655,11 +2200,11 @@ public static class TvPage
                 for (var i = 0; i < S.collections.length; i++)
                   if (S.collections[i].id === updated.id) S.collections[i] = updated;
               }
-              renderRail();
+              S.dirty = true;
               renderShelves();
               // The film is on the new shelf; there is nothing further to do
               // here, so return to it rather than to a list.
-              show('detail');
+              openDetail(S.film, true);
             });
         });
       })['catch'](function () { $('nameErr').textContent = 'Could not reach the server.'; });
@@ -1671,9 +2216,12 @@ public static class TvPage
   var began = false, seekOnLoad = null;
   var prepTimer = null;
   function play(it, startMs) {
+    // Where to come back to when the film is over or Back is pressed.
+    if (S.screen === 'library') { S.libPos = capturePos(); S.stack = []; }
+    S.playFrom = S.screen;
     S.film = it;
     show('player');
-    $('pTitle').textContent = it.name;
+    $('pTitle').textContent = titleOf(it);
     // Relative URLs throughout; the signed token rides in the query string,
     // because a <video> attaches no headers of its own.
     if (routeFor(it) === 'hls') prepare(it, startMs);
@@ -1730,7 +2278,14 @@ public static class TvPage
     };
     v.addEventListener('loadedmetadata', seekOnLoad);
     var p = v.play(); if (p && p['catch']) p['catch'](function () {});
-    try { if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen(); } catch (e) {}
+    // Newer engines answer with a promise that rejects when the browser says
+    // no; caught so the refusal does not surface as an unhandled error.
+    try {
+      if (document.documentElement.requestFullscreen) {
+        var fs = document.documentElement.requestFullscreen();
+        if (fs && fs['catch']) fs['catch'](function () {});
+      }
+    } catch (e) {}
     bumpHud();
     saveTimer = setInterval(function () { pushResume(false); }, 20000);
   }
@@ -1868,8 +2423,15 @@ public static class TvPage
     detachCaptions();
     v.pause(); v.removeAttribute('src'); v.load();
     try { if (document.exitFullscreen && document.fullscreenElement) document.exitFullscreen(); } catch (e) {}
-    show('library');
-    renderGrid(null);
+    returnFromPlayer();
+  }
+
+  // Back where the film was started from: its page, with the progress there
+  // now true, or the library tile it was played from.
+  function returnFromPlayer() {
+    S.dirty = true;
+    if (S.playFrom === 'detail' && S.film) { openDetail(S.film, true); return; }
+    backToLibrary();
   }
 
   // ---- boot -------------------------------------------------------------
@@ -1878,6 +2440,13 @@ public static class TvPage
   setInterval(tickClock, 5000);
   armBackTrap();
   buildKeys(); renderEntry();
+  (function () {
+    var tabs = $('tabs').getElementsByTagName('button');
+    for (var i = 0; i < tabs.length; i++) (function (b) {
+      b.addEventListener('click', function () { setTab(b.getAttribute('data-tab')); });
+    })(tabs[i]);
+    $('acct').addEventListener('click', openAccount);
+  })();
   try { S.refresh = localStorage.getItem(LS); } catch (e) { S.memoryOnly = true; }
   if (S.refresh) refresh().then(function (ok) { if (ok) enter(); else show('signin'); });
   else show('signin');

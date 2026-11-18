@@ -29,7 +29,11 @@ public record CatalogItemDto(string ItemKey, string Name, long SizeBytes, long? 
     string ContentType, string FilmKey, bool WebPlayable, string? VideoCodec, string? AudioCodec,
     string StreamUrl, string? ArtUrl, long AddedAt,
     bool HlsAvailable, string? HlsVideoCodec, string HlsUrl,
-    string? CaptionsUrl = null);
+    string? CaptionsUrl = null,
+    // Display name and release year worked out from the file name, e.g.
+    // "The.Princess.Bride.1987.REMASTERED.1080p..." -> "The Princess Bride", 1987.
+    // Name stays the raw file name; clients show Title when it is there.
+    string? Title = null, int? Year = null);
 
 /// <summary>Where a film's web copy stands. See <see cref="HlsRemuxer"/>.</summary>
 public record HlsStatusDto(string State, int Percent, bool Ready, string? Error, string? PlaylistUrl);
@@ -41,7 +45,7 @@ public record HlsStatusDto(string State, int Percent, bool Ready, string? Error,
 /// whose shape the desktop client mirrors by hand.
 /// </param>
 public record CatalogDto(CatalogItemDto[] Items, bool Scanning, long LastScanAt, bool MediaRootPresent,
-    CollectionDto[] Collections);
+    CollectionDto[] Collections, string[]? MyList = null);
 
 /// <summary>
 /// Signs the short-lived URLs that let a player fetch a film.
@@ -172,6 +176,7 @@ public static class CatalogApi
             var dtos = items.Select(x =>
             {
                 var token = media.Mint(x.ItemKey, uid);
+                var title = FilmTitle.Parse(x.Name);
                 return new CatalogItemDto(x.ItemKey, x.Name, x.SizeBytes, x.DurationMs, x.ContentType,
                     x.FilmKey, x.WebPlayable, x.VideoCodec, x.AudioCodec,
                     $"/media/{x.ItemKey}?t={Uri.EscapeDataString(token)}",
@@ -184,12 +189,14 @@ public static class CatalogApi
                     // captions inside the stream instead; see the master playlist.
                     Captions.Has(x.ItemKey)
                         ? $"/hls/{x.ItemKey}/en.vtt?t={Uri.EscapeDataString(token)}"
-                        : null);
+                        : null,
+                    title.Title, title.Year);
             }).ToArray();
 
             return Results.Ok(new CatalogDto(dtos, scanner.IsScanning, scanner.LastScanAt,
                 Directory.Exists(CatalogScanner.MediaRoot),
-                await CollectionsApi.LoadAllAsync(db, uid)));
+                await CollectionsApi.LoadAllAsync(db, uid),
+                await MyListApi.LoadAsync(db, uid)));
         }).RequireAuthorization();
 
         // Posters go over the ordinary authorised API, because the app fetches

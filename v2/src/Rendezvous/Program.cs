@@ -228,6 +228,14 @@ using (var scope = app.Services.CreateScope())
         );
         CREATE UNIQUE INDEX IF NOT EXISTS "IX_CollectionItems_CollectionId_FilmKey"
             ON "CollectionItems" ("CollectionId", "FilmKey");
+        CREATE TABLE IF NOT EXISTS "MyListItems" (
+            "Id" INTEGER NOT NULL CONSTRAINT "PK_MyListItems" PRIMARY KEY AUTOINCREMENT,
+            "UserId" TEXT NOT NULL,
+            "FilmKey" TEXT NOT NULL,
+            "AddedAt" INTEGER NOT NULL
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS "IX_MyListItems_UserId_FilmKey"
+            ON "MyListItems" ("UserId", "FilmKey");
         """);
 }
 
@@ -238,6 +246,7 @@ app.MapCollectionsApi();
 app.MapUploadApi();
 app.MapLinkApi();
 app.MapAppUpdateApi();
+app.MapMyListApi();
 
 // Throw away any web copy left half-written by a previous run, before anything
 // can start writing a new one. Synchronous and first: it is the one moment when

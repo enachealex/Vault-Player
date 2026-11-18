@@ -101,6 +101,20 @@ public class Collection
 /// every time somebody tidied their folders. FilmKey survives that, and is
 /// already what resume follows for exactly the same reason.
 /// </summary>
+/// <summary>
+/// A film someone saved to "My List" with the + button: a plain bookmark,
+/// separate from their shelves (<see cref="Collection"/>) and their watch state
+/// (<see cref="LibraryItem"/>). One row per (user, film).
+/// </summary>
+public class MyListItem
+{
+    public long Id { get; set; }
+    public string UserId { get; set; } = "";
+    public string FilmKey { get; set; } = "";
+    /// <summary>Unix ms; the list shows newest first.</summary>
+    public long AddedAt { get; set; }
+}
+
 public class CollectionItem
 {
     public long Id { get; set; }
@@ -298,6 +312,7 @@ public class VaultDbContext(DbContextOptions<VaultDbContext> options)
     public DbSet<InviteCode> InviteCodes => Set<InviteCode>();
     public DbSet<Collection> Collections => Set<Collection>();
     public DbSet<CollectionItem> CollectionItems => Set<CollectionItem>();
+    public DbSet<MyListItem> MyListItems => Set<MyListItem>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -322,5 +337,7 @@ public class VaultDbContext(DbContextOptions<VaultDbContext> options)
         // A film appears on a shelf once. The unique pair also makes "add"
         // idempotent, so a double-click cannot produce two identical entries.
         b.Entity<CollectionItem>().HasIndex(x => new { x.CollectionId, x.FilmKey }).IsUnique();
+        // Saving a film twice is a no-op, not a second row.
+        b.Entity<MyListItem>().HasIndex(x => new { x.UserId, x.FilmKey }).IsUnique();
     }
 }

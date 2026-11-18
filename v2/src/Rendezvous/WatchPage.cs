@@ -12,6 +12,11 @@ namespace VideoPlayer.Rendezvous;
 /// the same catalogue, the same signed stream URLs, the same resume sync, so a
 /// film paused on the television carries on here and the other way round.
 ///
+/// Two layouts from one page, split at 900px wide: computers and tablets get
+/// the television's layout (glass tab bar along the top, details as a centred
+/// glass panel); phones get the phone app's (glass tab bar along the bottom,
+/// details as a sheet that slides up).
+///
 /// Same-origin for the same reason as /tv: nothing under /api/v1 sends CORS
 /// headers, so this page only works when this server serves it.
 ///
@@ -60,6 +65,10 @@ public static class WatchPage
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0B0D12">
+<!-- Declared dark, so a browser's "force dark" mode (Chrome and Edge on
+     Android, some desktop settings) leaves the page alone instead of inverting
+     its white buttons. It also gives form controls and scrollbars dark styling. -->
+<meta name="color-scheme" content="dark">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -69,27 +78,32 @@ public static class WatchPage
 <link rel="icon" type="image/png" href="/watch/favicon-64.png">
 <title>Vault Movies</title>
 <style>
-  /* The same smoked glass over film stills as the desktop app and the TV page.
-     Buttons are rounded rectangles, never pills. #005ED9 is focus and nothing
-     else; chosen things and progress are white. */
+  /* Dark smoked glass over film stills, as in the phone and TV apps. Buttons
+     are rounded rectangles, never pills. #005ED9 is keyboard focus and nothing
+     else; chosen things and progress are white. Rust is the logo and the NEW
+     flag only; warm gold is the hero's kicker. */
   :root {
     --bg:#0B0D12; --deep:#06070A;
-    --glass:rgba(255,255,255,.08); --glass-hi:rgba(255,255,255,.16);
-    --line:rgba(255,255,255,.12); --line-hi:rgba(255,255,255,.28);
-    --smoke:rgba(16,18,24,.66); --smoke-hi:rgba(28,31,40,.86);
-    --text:#F4F6FA; --muted:#A6AFBD; --faint:#6F7887;
-    --warm:#F5C77E; --danger:#FF7A7A;
+    --glass:rgba(14,16,22,.45); --glass-strong:rgba(16,18,26,.72);
+    --fill:rgba(255,255,255,.08); --fill-hi:rgba(255,255,255,.16);
+    --line:rgba(255,255,255,.14); --line-hi:rgba(255,255,255,.28);
+    --text:#F4F6FA; --muted:#A6AFBD; --faint:#6F7887; --soft:#D5DAE3;
+    --warm:#F5C77E; --rust:#E35A3C; --danger:#FF7A7A;
     --focus:#005ED9;
-    --radius:12px; --card-radius:10px;
-    --gutter:clamp(16px, 4vw, 56px);
-    --card-w:clamp(168px, 22vw, 300px);
+    --radius:12px; --tile-radius:10px;
+    --gutter:16px;
+    --tile-w:clamp(140px, 38vw, 220px);
+    --tabbar-h:62px;
+    --blur:blur(18px) saturate(150%);
+    color-scheme:dark;
   }
   * { box-sizing:border-box; }
   html { -webkit-text-size-adjust:100%; }
   html, body { margin:0; background:var(--bg); color:var(--text); }
   body {
-    font-family:'Segoe UI', Roboto, system-ui, -apple-system, sans-serif;
+    font-family:'Segoe UI Variable Display', 'Segoe UI', Roboto, system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing:antialiased; min-height:100vh; overflow-x:hidden;
+    -webkit-tap-highlight-color:transparent;
   }
   body.locked { overflow:hidden; }
   button, input { font:inherit; color:inherit; }
@@ -98,25 +112,39 @@ public static class WatchPage
   :focus-visible { outline:3px solid var(--focus); outline-offset:3px; }
   [hidden] { display:none !important; }
 
+  /* Glass where the browser can blur behind it; a darker solid fill where it can't. */
+  .glass { background:var(--glass); border:1px solid var(--line); }
+  .glass-strong { background:var(--glass-strong); border:1px solid var(--line); }
+  @supports ((-webkit-backdrop-filter:blur(1px)) or (backdrop-filter:blur(1px))) {
+    .glass, .glass-strong { -webkit-backdrop-filter:var(--blur); backdrop-filter:var(--blur); }
+  }
+  @supports not ((-webkit-backdrop-filter:blur(1px)) or (backdrop-filter:blur(1px))) {
+    .glass { background:rgba(18,20,28,.88); } .glass-strong { background:rgba(18,20,28,.95); }
+  }
+
   /* ---- shared pieces ---- */
-  .btn { display:inline-flex; align-items:center; justify-content:center; gap:10px;
-         border:1px solid var(--text); background:var(--text); color:var(--bg);
-         border-radius:var(--radius); padding:12px 22px; font-weight:700; font-size:16px;
+  .btn { display:inline-flex; align-items:center; justify-content:center; gap:9px;
+         height:46px; padding:0 22px; border-radius:10px; border:1px solid var(--text);
+         background:var(--text); color:var(--bg); font-weight:700; font-size:16px;
          line-height:1; white-space:nowrap; }
   .btn:hover { background:#fff; }
-  .btn.ghost { background:var(--glass); border-color:var(--line); color:var(--text);
-               -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px); }
-  .btn.ghost:hover { background:var(--glass-hi); border-color:var(--line-hi); }
+  .btn.ghost { background:var(--fill-hi); border-color:rgba(255,255,255,.18); color:var(--text);
+               -webkit-backdrop-filter:var(--blur); backdrop-filter:var(--blur); }
+  .btn.ghost:hover { background:rgba(255,255,255,.24); border-color:var(--line-hi); }
   .btn[disabled] { opacity:.45; cursor:default; }
   .btn .tri { width:0; height:0; border-left:12px solid currentColor;
-              border-top:8px solid transparent; border-bottom:8px solid transparent; }
-  .logo { width:30px; height:30px; border-radius:8px; flex:none;
-          background:linear-gradient(135deg, #E35A3C, #B9381F);
-          display:inline-flex; align-items:center; justify-content:center; }
-  .logo::after { content:''; border-left:9px solid #fff; border-top:6px solid transparent;
-                 border-bottom:6px solid transparent; margin-left:3px; }
+              border-top:7px solid transparent; border-bottom:7px solid transparent; }
+  .btn svg { flex:none; }
+  .iconbtn { width:40px; height:40px; border-radius:10px; display:inline-flex; align-items:center;
+             justify-content:center; padding:0; font-weight:800; font-size:15px; }
+  .logo { width:30px; height:30px; border-radius:8px; flex:none; display:inline-block;
+          background:url('/watch/icon-192.png') center/cover, linear-gradient(135deg, #E35A3C, #B9381F); }
   .err { color:var(--danger); min-height:1.4em; font-size:14px; margin-top:12px; }
   .muted { color:var(--muted); }
+  .tag { display:inline-block; font-size:11px; font-weight:700; letter-spacing:.06em; line-height:1;
+         padding:4px 6px; border-radius:5px; border:1px solid rgba(255,255,255,.35); color:#E7EAF0; }
+  .metaline { display:flex; flex-wrap:wrap; align-items:center; gap:8px; color:var(--soft); font-size:14px; }
+  .metaline .dot { opacity:.5; }
 
   /* ---- sign-in and other centred screens ---- */
   .screen-center { min-height:100vh; display:flex; align-items:center; justify-content:center;
@@ -125,9 +153,8 @@ public static class WatchPage
                      radial-gradient(ellipse 62% 78% at 78% 28%, rgba(122,60,36,.55), rgba(11,13,18,0) 78%),
                      radial-gradient(ellipse 70% 80% at 12% 94%, rgba(26,58,110,.55), rgba(11,13,18,0) 82%),
                      var(--bg); }
-  .panel { width:100%; max-width:400px; padding:32px 28px; border-radius:20px;
-           background:var(--smoke); border:1px solid var(--line);
-           -webkit-backdrop-filter:blur(24px); backdrop-filter:blur(24px); }
+  .panel { width:100%; max-width:400px; padding:32px 28px; border-radius:20px; }
+  .panel .logo { width:40px; height:40px; border-radius:10px; }
   .panel h1 { font-size:24px; margin:18px 0 6px; }
   .panel p { margin:0 0 20px; color:var(--muted); line-height:1.5; font-size:15px; }
   .field { display:block; margin:0 0 14px; }
@@ -141,138 +168,191 @@ public static class WatchPage
 
   /* ---- top bar ---- */
   #top { position:fixed; z-index:20; left:0; right:0; top:0;
-         display:flex; align-items:center; gap:18px;
-         padding:calc(12px + env(safe-area-inset-top)) var(--gutter) 12px;
-         background:linear-gradient(rgba(6,7,10,.85), rgba(6,7,10,0));
-         transition:background .25s; }
-  #top.solid { background:rgba(11,13,18,.78); border-bottom:1px solid var(--line);
-               -webkit-backdrop-filter:blur(18px); backdrop-filter:blur(18px); }
-  #top .brand { display:flex; align-items:center; gap:10px; font-weight:800; font-size:19px;
+         display:flex; align-items:center; gap:10px;
+         padding:calc(10px + env(safe-area-inset-top)) var(--gutter) 10px;
+         background:linear-gradient(rgba(6,7,10,.7), rgba(6,7,10,0));
+         transition:background .25s, box-shadow .25s; }
+  /* The hairline is a shadow, not a border: a transparent border would show
+     a repeat of the gradient's darkest row along the bottom edge. */
+  #top.solid { background:rgba(11,13,18,.72); box-shadow:0 1px 0 var(--line);
+               -webkit-backdrop-filter:var(--blur); backdrop-filter:var(--blur); }
+  #top .brand { display:flex; align-items:center; gap:10px; font-weight:800; font-size:20px;
                 letter-spacing:.2px; background:none; border:none; padding:4px; border-radius:8px; }
   #top .spacer { flex:1; }
-  .search { position:relative; width:min(320px, 42vw); }
-  .search input { width:100%; padding:10px 12px 10px 36px; border-radius:var(--radius);
-                  background:rgba(0,0,0,.4); border:1px solid var(--line); font-size:15px; }
-  .search input:focus { border-color:var(--focus); }
-  .search svg { position:absolute; left:11px; top:50%; transform:translateY(-50%); opacity:.7; }
+  #tabs { display:none; gap:6px; padding:5px; border-radius:12px; }
+  #tabs button { border:none; background:none; padding:8px 16px; border-radius:8px; font-weight:600;
+                 font-size:15px; color:#C9CFD9; }
+  #tabs button:hover { color:#fff; background:rgba(255,255,255,.08); }
+  #tabs button[aria-current="page"] { background:var(--fill-hi); color:#fff; }
   .who { position:relative; }
-  .who > button { display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:var(--radius);
-                  background:var(--glass); border:1px solid var(--line); }
-  .avatar { width:28px; height:28px; border-radius:7px; background:#2A3242; display:inline-flex;
-            align-items:center; justify-content:center; font-weight:800; font-size:14px; }
-  .who .name { max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:14px; }
-  .menu { position:absolute; right:0; top:calc(100% + 8px); min-width:200px; padding:6px;
-          background:var(--smoke-hi); border:1px solid var(--line); border-radius:var(--radius);
-          -webkit-backdrop-filter:blur(20px); backdrop-filter:blur(20px);
-          box-shadow:0 18px 40px rgba(0,0,0,.5); }
+  .menu { position:absolute; right:0; top:calc(100% + 8px); min-width:220px; padding:6px;
+          border-radius:var(--radius); box-shadow:0 18px 40px rgba(0,0,0,.5); }
   .menu .lbl { padding:8px 10px 6px; font-size:12px; color:var(--faint); }
   .menu button { display:block; width:100%; text-align:left; padding:10px; border:none;
                  background:none; border-radius:8px; font-size:15px; }
-  .menu button:hover { background:var(--glass-hi); }
+  .menu button:hover { background:var(--fill-hi); }
+
+  /* ---- bottom tab bar (phones) ---- */
+  #tabbar { position:fixed; z-index:20; left:12px; right:12px; bottom:calc(10px + env(safe-area-inset-bottom));
+            height:var(--tabbar-h); border-radius:18px; display:flex; justify-content:space-around; align-items:stretch;
+            background:rgba(20,22,30,.62); box-shadow:0 10px 30px rgba(0,0,0,.45); }
+  @supports not ((-webkit-backdrop-filter:blur(1px)) or (backdrop-filter:blur(1px))) {
+    #tabbar { background:rgba(20,22,30,.95); }
+  }
+  #tabbar button { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;
+                   border:none; background:none; font-size:11px; color:var(--muted); border-radius:14px; padding:0; }
+  #tabbar button svg { width:22px; height:22px; }
+  #tabbar button[aria-current="page"] { color:#fff; }
+  #tabbar button:focus-visible { outline-offset:-3px; }
 
   /* ---- hero ---- */
-  #hero { position:relative; min-height:min(78vh, 760px); display:flex; align-items:flex-end;
-          padding:120px var(--gutter) clamp(36px, 7vh, 80px); overflow:hidden; }
+  #hero { position:relative; height:max(480px, 72vh); height:max(480px, 72svh); overflow:hidden;
+          display:flex; align-items:flex-end; justify-content:center; padding:0 var(--gutter) 20px; }
   #hero .bg { position:absolute; inset:0; background-size:cover; background-position:center 30%;
-              opacity:0; transition:opacity .8s; }
+              opacity:0; transition:opacity 1.2s ease; }
   #hero .bg.on { opacity:1; }
   #hero::after { content:''; position:absolute; inset:0; pointer-events:none;
-                 background:
-                   linear-gradient(90deg, rgba(11,13,18,.92) 0%, rgba(11,13,18,.55) 42%, rgba(11,13,18,0) 75%),
-                   linear-gradient(180deg, rgba(11,13,18,0) 55%, var(--bg) 100%); }
-  #hero .inner { position:relative; z-index:1; max-width:620px; }
-  #hero .kicker { font-size:13px; letter-spacing:1.6px; text-transform:uppercase; color:var(--warm);
-                  font-weight:700; margin-bottom:10px; }
-  #hero h1 { font-size:clamp(32px, 6vw, 64px); line-height:1.02; margin:0 0 14px; font-weight:800;
-             text-shadow:0 2px 24px rgba(0,0,0,.5); }
-  #hero .meta { color:var(--muted); font-size:15px; margin-bottom:18px; }
-  #hero .bar { height:4px; width:min(320px, 70%); background:rgba(255,255,255,.22); border-radius:2px;
-               margin:-6px 0 20px; overflow:hidden; }
-  #hero .bar i { display:block; height:100%; background:#fff; }
-  #hero .actions { display:flex; flex-wrap:wrap; gap:12px; }
+                 background:linear-gradient(180deg, rgba(11,13,18,.55) 0%, rgba(11,13,18,0) 22%,
+                   rgba(11,13,18,0) 45%, rgba(11,13,18,.85) 78%, var(--bg) 100%); }
+  #hero .inner { position:relative; z-index:1; width:100%; max-width:560px; text-align:center;
+                 transition:opacity .35s ease; }
+  #hero .inner.fading { opacity:0; }
+  #hero .kicker { font-size:11px; font-weight:800; letter-spacing:.18em; text-transform:uppercase;
+                  color:var(--warm); margin-bottom:10px; }
+  #hero h1 { font-size:clamp(30px, 9vw, 40px); line-height:1.05; margin:0; font-weight:800;
+             letter-spacing:-.01em; text-shadow:0 2px 18px rgba(0,0,0,.6); }
+  #hero .metaline { justify-content:center; font-size:13px; margin:10px 0 16px; }
+  #hero .actions { display:flex; gap:10px; }
+  #hero .actions .btn { flex:1; padding:0 12px; }
+  #dots { position:relative; z-index:1; display:flex; gap:6px; justify-content:center; margin-top:14px; }
+  #dots button { width:8px; height:8px; padding:0; border:none; border-radius:2px;
+                 background:rgba(255,255,255,.35); transition:background .3s; }
+  #dots button[aria-current="true"] { background:#fff; }
+  /* A larger hit area than the dot itself, for thumbs. */
+  #dots button { position:relative; }
+  #dots button::before { content:''; position:absolute; inset:-8px -3px; }
+  @media (prefers-reduced-motion: reduce) {
+    #hero .bg, #hero .inner { transition:none; }
+  }
 
   /* ---- rows ---- */
-  main { position:relative; z-index:1; padding-bottom:64px; }
-  .shelf { margin:0 0 34px; }
-  .shelf h2 { font-size:clamp(17px, 1.8vw, 21px); margin:0 0 12px; padding:0 var(--gutter); font-weight:700; }
-  .shelf h2 .count { color:var(--faint); font-weight:600; font-size:.8em; margin-left:8px; }
+  main { position:relative; padding-bottom:calc(var(--tabbar-h) + 40px + env(safe-area-inset-bottom)); }
+  #rows { position:relative; z-index:2; padding-top:8px; }
+  .shelf { margin:0 0 18px; }
+  .shelf h2 { font-size:17px; margin:0 0 2px; padding:0 var(--gutter); font-weight:700; }
+  .shelf h2 .count, .pageh .count { color:var(--faint); font-weight:600; font-size:.8em; margin-left:8px; }
   .lane { position:relative; }
-  .track { display:grid; grid-auto-flow:column; grid-auto-columns:var(--card-w); gap:12px;
+  .track { display:grid; grid-auto-flow:column; grid-auto-columns:var(--tile-w); gap:10px;
            overflow-x:auto; overscroll-behavior-x:contain; scroll-snap-type:x mandatory;
-           scroll-padding:0 var(--gutter); padding:6px var(--gutter) 10px; scrollbar-width:none; }
+           scroll-padding:0 var(--gutter); padding:10px var(--gutter) 12px; scrollbar-width:none; }
   .track::-webkit-scrollbar { display:none; }
   .track > * { scroll-snap-align:start; }
-  .nav { position:absolute; top:6px; bottom:44px; width:calc(var(--gutter) - 6px); min-width:36px;
-         border:none; background:rgba(11,13,18,.6); color:#fff; font-size:30px; z-index:2;
-         opacity:0; transition:opacity .2s; display:flex; align-items:center; justify-content:center; }
-  .nav.prev { left:0; border-radius:0 var(--radius) var(--radius) 0; }
-  .nav.next { right:0; border-radius:var(--radius) 0 0 var(--radius); }
-  .lane:hover .nav:not([disabled]), .nav:focus-visible { opacity:1; }
+  .nav { position:absolute; top:10px; bottom:12px; width:calc(var(--gutter) - 4px); min-width:36px;
+         border:none; background:rgba(11,13,18,.62); color:#fff; z-index:3;
+         opacity:0; transition:opacity .2s; display:flex; align-items:center; justify-content:center; padding:0; }
+  .nav svg { width:22px; height:22px; }
+  .nav.prev { left:0; border-radius:0 10px 10px 0; }
+  .nav.next { right:0; border-radius:10px 0 0 10px; }
+  .lane:hover .nav:not([disabled]) { opacity:1; }
   .nav[disabled] { pointer-events:none; }
   @media (hover:none) { .nav { display:none; } }
 
-  /* Fixed-width columns, so a small library's cards stay the size of the
-     cards in the rows above instead of stretching across the page. */
-  .grid { display:grid; grid-template-columns:repeat(auto-fill, var(--card-w));
-          gap:22px 12px; padding:6px var(--gutter); }
+  /* ---- a film tile: the still, its title written on it ---- */
+  .tile { position:relative; display:block; width:100%; aspect-ratio:16/9; padding:0; margin:0;
+          border-radius:var(--tile-radius); overflow:hidden; text-align:left;
+          background:linear-gradient(135deg, #1B2130, #12151D); border:1px solid rgba(255,255,255,.06);
+          transition:transform .2s ease, box-shadow .2s ease, border-color .2s; }
+  .tile img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover;
+              opacity:0; transition:opacity .4s; }
+  .tile img.on { opacity:1; }
+  .tile::after { content:''; position:absolute; inset:0; pointer-events:none;
+                 background:linear-gradient(180deg, rgba(0,0,0,0) 42%, rgba(0,0,0,.8)); }
+  .tile .t { position:absolute; left:9px; right:9px; bottom:8px; z-index:1; font-weight:700; font-size:13px;
+             line-height:1.2; text-shadow:0 1px 3px #000; display:-webkit-box; -webkit-line-clamp:2;
+             -webkit-box-orient:vertical; overflow:hidden; }
+  .tile.has-prog .t { bottom:17px; }
+  .tile .flag { position:absolute; top:7px; left:7px; z-index:1; background:var(--rust); color:#fff;
+                font-size:10px; font-weight:800; letter-spacing:.08em; line-height:1; padding:4px 6px; border-radius:5px; }
+  .tile .app { position:absolute; top:7px; right:7px; z-index:1; font-size:10.5px; font-weight:700; line-height:1;
+               padding:4px 6px; border-radius:5px; background:rgba(11,13,18,.82); border:1px solid var(--line);
+               color:var(--warm); }
+  .tile .prog { position:absolute; left:9px; right:9px; bottom:7px; height:3px; border-radius:2px;
+                background:rgba(255,255,255,.25); z-index:1; overflow:hidden; }
+  .tile .prog i { display:block; height:100%; background:#fff; border-radius:2px; }
+  @media (hover:hover) {
+    .tile:hover { transform:translateY(-4px) scale(1.04); border-color:var(--line-hi);
+                  box-shadow:0 14px 30px rgba(0,0,0,.55); z-index:1; }
+  }
+  .tile:focus-visible { outline:3px solid var(--focus); outline-offset:3px; transform:scale(1.04); z-index:1;
+                        box-shadow:0 14px 30px rgba(0,0,0,.55); }
 
-  /* ---- a film card ---- */
-  .card { display:block; width:100%; padding:0; border:none; background:none; text-align:left; }
-  .thumb { position:relative; aspect-ratio:16/9; border-radius:var(--card-radius); overflow:hidden;
-           background:linear-gradient(135deg, #1B2130, #12151D); border:1px solid var(--line);
-           transition:transform .2s, border-color .2s, box-shadow .2s; }
-  .card:hover .thumb { transform:translateY(-3px) scale(1.03); border-color:var(--line-hi);
-                       box-shadow:0 14px 30px rgba(0,0,0,.55); }
-  .card:focus-visible { outline:none; }
-  .card:focus-visible .thumb { outline:3px solid var(--focus); outline-offset:2px; }
-  .thumb img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover;
-               opacity:0; transition:opacity .4s; }
-  .thumb img.on { opacity:1; }
-  .thumb .ph { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
-               padding:10px; text-align:center; font-weight:800; font-size:15px; color:var(--muted); }
-  .thumb .play { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
-                 background:rgba(0,0,0,.35); opacity:0; transition:opacity .2s; }
-  .thumb .play::after { content:''; width:0; height:0; border-left:22px solid #fff;
-                        border-top:14px solid transparent; border-bottom:14px solid transparent; margin-left:6px;
-                        filter:drop-shadow(0 2px 8px rgba(0,0,0,.6)); }
-  .card:hover .thumb .play { opacity:1; }
-  .thumb .prog { position:absolute; left:0; right:0; bottom:0; height:4px; background:rgba(255,255,255,.25); }
-  .thumb .prog i { display:block; height:100%; background:#fff; }
-  .badge { position:absolute; top:8px; left:8px; padding:4px 7px; border-radius:6px; font-size:11px;
-           font-weight:700; background:rgba(11,13,18,.82); border:1px solid var(--line); color:var(--warm); }
-  .badge.new { color:#fff; border-color:rgba(255,255,255,.5); }
-  .cap { padding:8px 2px 0; }
-  .cap .t { display:block; font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .cap .m { display:block; font-size:12.5px; color:var(--faint); margin-top:2px; }
+  /* Columns no narrower than a row's tile; spare width goes to the tiles. */
+  .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(var(--tile-w), 1fr));
+          gap:14px 10px; padding:8px var(--gutter); }
 
-  .empty { padding:24px var(--gutter); color:var(--muted); line-height:1.6; }
-  .notice { margin:0 var(--gutter) 24px; padding:12px 16px; border-radius:var(--radius);
-            background:var(--glass); border:1px solid var(--line); color:var(--muted); font-size:14px; }
-  #results h2 { padding-top:96px; }
+  /* ---- pages other than Home ---- */
+  #page { padding-top:calc(70px + env(safe-area-inset-top)); }
+  .pageh { font-size:26px; font-weight:800; margin:6px 0 12px; padding:0 var(--gutter); }
+  .searchbox { position:relative; display:block; margin:0 var(--gutter) 14px; max-width:640px; }
+  .searchbox input { width:100%; height:48px; padding:0 14px 0 42px; border-radius:var(--radius); font-size:16px;
+                     background:rgba(255,255,255,.06); border:1px solid var(--line); }
+  .searchbox input:focus { border-color:var(--focus); box-shadow:0 0 0 1px var(--focus); }
+  .searchbox input::-webkit-search-cancel-button { filter:invert(1); }
+  .searchbox svg { position:absolute; left:14px; top:50%; transform:translateY(-50%); opacity:.7; pointer-events:none; }
+  .sub { font-size:15px; font-weight:700; color:var(--muted); padding:0 var(--gutter); margin:4px 0 0; }
+  .sub .count { color:var(--faint); font-weight:600; margin-left:6px; }
+  .empty { padding:18px var(--gutter); color:var(--muted); line-height:1.6; max-width:560px; }
+  .notice { margin:0 var(--gutter) 18px; padding:12px 16px; border-radius:var(--radius);
+            background:var(--fill); border:1px solid var(--line); color:var(--muted); font-size:14px; }
+  .acct { margin:8px var(--gutter); max-width:480px; padding:22px; border-radius:16px; }
+  .acct .who-row { display:flex; align-items:center; gap:14px; margin-bottom:18px; }
+  .acct .big { width:52px; height:52px; border-radius:12px; background:#2A3242; display:flex; align-items:center;
+               justify-content:center; font-weight:800; font-size:22px; }
+  .acct .nm { font-weight:700; font-size:18px; }
+  .acct .btn { width:100%; margin-top:10px; }
 
   /* ---- film details ---- */
-  #detail { position:fixed; inset:0; z-index:40; display:flex; align-items:flex-start; justify-content:center;
-            overflow-y:auto; padding:5vh 16px; background:rgba(4,5,8,.72);
-            -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); }
-  #detail .sheet { position:relative; width:100%; max-width:860px; border-radius:16px; overflow:hidden;
-                   background:var(--smoke-hi); border:1px solid var(--line); box-shadow:0 30px 80px rgba(0,0,0,.6); }
-  #detail .art { position:relative; aspect-ratio:16/9; background:#12151D center/cover no-repeat; }
+  #detail { position:fixed; inset:0; z-index:40; }
+  #detail .dbg { position:absolute; inset:-60px; background:#0B0D12 center/cover no-repeat;
+                 filter:blur(28px) brightness(.42) saturate(1.2); opacity:0; transition:opacity .3s; }
+  #detail.open .dbg { opacity:1; }
+  #detail .dscroll { position:absolute; inset:0; overflow-y:auto; overscroll-behavior:contain;
+                     -webkit-overflow-scrolling:touch; }
+  #detail .sheet { position:relative; min-height:100%; transform:translateY(100%);
+                   transition:transform .32s cubic-bezier(.2,.8,.2,1); }
+  #detail.open .sheet { transform:none; }
+  /* The still fades out at the bottom (a mask, not a colour), so it melts into
+     whatever glass is beneath it without a seam. */
+  #detail .art { position:relative; aspect-ratio:16/9; background:center/cover no-repeat;
+                 -webkit-mask-image:linear-gradient(180deg, #000 55%, transparent 100%);
+                 mask-image:linear-gradient(180deg, #000 55%, transparent 100%); }
   #detail .art::after { content:''; position:absolute; inset:0;
-                        background:linear-gradient(180deg, rgba(0,0,0,0) 45%, rgba(28,31,40,1) 100%); }
-  #detail .close { position:absolute; top:12px; right:12px; z-index:2; width:40px; height:40px;
-                   border-radius:10px; border:1px solid var(--line); background:rgba(11,13,18,.7);
-                   font-size:22px; line-height:1; }
-  #detail .body { position:relative; padding:0 clamp(18px, 4vw, 40px) 32px; margin-top:-70px; z-index:1; }
-  #detail h2 { font-size:clamp(26px, 4vw, 40px); margin:0 0 10px; }
-  #detail .meta { color:var(--muted); font-size:15px; display:flex; flex-wrap:wrap; gap:6px 16px; margin-bottom:16px; }
-  #detail .bar { height:4px; max-width:360px; background:rgba(255,255,255,.22); border-radius:2px; overflow:hidden; margin-bottom:6px; }
-  #detail .bar i { display:block; height:100%; background:#fff; }
-  #detail .left { font-size:13px; color:var(--muted); margin-bottom:18px; }
-  #detail .actions { display:flex; flex-wrap:wrap; gap:12px; margin-bottom:18px; }
-  #detail .warn { color:var(--warm); font-size:14px; line-height:1.5; margin:0 0 16px; }
-  #detail .facts { display:grid; grid-template-columns:auto 1fr; gap:6px 18px; font-size:14px; margin:8px 0 0; }
+                        background:linear-gradient(180deg, rgba(0,0,0,.35), rgba(0,0,0,0) 30%); }
+  #detail .close { position:absolute; top:calc(12px + env(safe-area-inset-top)); right:12px; z-index:3; }
+  #detail .body { position:relative; z-index:2; margin-top:-36px; padding:22px 18px calc(32px + env(safe-area-inset-bottom));
+                  border-radius:22px 22px 0 0; border-width:1px 0 0;
+                  min-height:calc(100vh - 56.25vw + 36px); }
+  #detail h2 { font-size:26px; font-weight:800; line-height:1.1; margin:0; }
+  #detail .metaline { font-size:13px; margin:8px 0 16px; }
+  #detail .actions { display:flex; flex-direction:column; gap:10px; }
+  #detail .actions .btn { width:100%; height:48px; }
+  #detail .resume { display:flex; align-items:center; gap:10px; font-size:12.5px; color:var(--muted); margin:2px 0 4px; }
+  #detail .resume .bar { flex:1; height:4px; border-radius:2px; background:rgba(255,255,255,.18); overflow:hidden; }
+  #detail .resume .bar i { display:block; height:100%; background:#fff; border-radius:2px; }
+  #detail .acts { display:flex; justify-content:space-around; gap:8px; margin:16px 0 14px; }
+  #detail .act { display:flex; flex-direction:column; align-items:center; gap:6px; min-width:86px; padding:8px 10px;
+                 border:none; background:none; border-radius:10px; color:var(--muted); font-size:12px; }
+  #detail button.act:hover { background:var(--fill); color:var(--text); }
+  #detail .act svg { width:24px; height:24px; color:#fff; }
+  #detail .act .note { color:var(--faint); font-size:11px; margin-top:-3px; }
+  #detail .warn { color:var(--warm); font-size:14px; line-height:1.5; margin:0 0 14px; }
+  #detail .facts { display:grid; grid-template-columns:auto 1fr; gap:6px 18px; font-size:14px; margin:4px 0 22px; }
   #detail .facts dt { color:var(--faint); }
   #detail .facts dd { margin:0; color:var(--muted); }
+  #detail h3 { font-size:15px; margin:0 0 10px; }
+  #detail .more { display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; }
+  #detail .more .tile .t { font-size:12px; }
+  @media (prefers-reduced-motion: reduce) { #detail .sheet, #detail .dbg { transition:none; } }
 
   /* ---- install tip ---- */
   #installTip { position:fixed; inset:0; z-index:50; display:flex; align-items:center; justify-content:center;
@@ -299,16 +379,58 @@ public static class WatchPage
           border-top-color:#fff; animation:spin 1s linear infinite; margin-bottom:20px; }
   @keyframes spin { to { transform:rotate(360deg); } }
 
-  @media (max-width:640px) {
-    :root { --card-w:42vw; }
-    #top { gap:10px; }
-    #top .brand span { display:none; }
-    .search { flex:1; width:auto; }
-    .who .name { display:none; }
-    #hero { min-height:64vh; padding-top:100px; }
-    #hero .meta { font-size:14px; }
-    .btn { padding:12px 16px; font-size:15px; }
-    .cap .t { font-size:13px; }
+  /* ==== wide screens: the television's layout ==== */
+  @media (min-width:900px) {
+    :root { --gutter:clamp(32px, 3.75vw, 64px); --tile-w:clamp(180px, 16.5vw, 300px); }
+    #top { padding-top:calc(18px + env(safe-area-inset-top)); padding-bottom:14px; gap:14px; }
+    #top .brand .logo { width:36px; height:36px; border-radius:9px; }
+    #tabs { display:flex; }
+    #searchIcon { display:none; }
+    #tabbar { display:none; }
+    main { padding-bottom:64px; }
+
+    #hero { height:clamp(560px, 90vh, 940px); justify-content:flex-start; align-items:flex-end;
+            padding:0 var(--gutter) calc(24vh + 36px); }
+    #hero::after { background:
+      linear-gradient(90deg, rgba(11,13,18,.92) 0%, rgba(11,13,18,.55) 38%, rgba(11,13,18,0) 65%),
+      linear-gradient(180deg, rgba(11,13,18,.5) 0%, rgba(11,13,18,0) 18%, rgba(11,13,18,0) 42%,
+                      rgba(11,13,18,.88) 74%, var(--bg) 100%); }
+    #hero .inner { text-align:left; max-width:620px; }
+    #hero .kicker { font-size:12px; letter-spacing:.2em; margin-bottom:14px; }
+    #hero h1 { font-size:clamp(44px, 4.4vw, 68px); line-height:1; letter-spacing:-.015em;
+               text-shadow:0 3px 24px rgba(0,0,0,.55); }
+    #hero .metaline { justify-content:flex-start; font-size:15px; margin:16px 0 22px; }
+    #hero .actions .btn { flex:none; height:50px; padding:0 26px; font-size:17px; }
+    #dots { justify-content:flex-start; margin-top:22px; }
+    #rows { margin-top:-24vh; padding-top:0; }
+    .shelf { margin-bottom:22px; }
+    .shelf h2 { font-size:clamp(18px, 1.5vw, 22px); }
+    .track { gap:14px; padding:12px var(--gutter) 14px; }
+    .nav { top:12px; bottom:14px; }
+    .tile .t { font-size:14px; left:11px; right:11px; bottom:9px; }
+    .tile.has-prog .t { bottom:19px; }
+    .tile .prog { left:11px; right:11px; bottom:8px; }
+    .grid { gap:22px 14px; }
+    #page { padding-top:calc(96px + env(safe-area-inset-top)); }
+    .pageh { font-size:32px; }
+
+    /* Details: a centred glass panel instead of a sheet from the bottom. */
+    #detail .dscroll { display:flex; justify-content:center; align-items:flex-start; padding:6vh 24px; }
+    #detail .sheet { width:100%; max-width:880px; min-height:0; border-radius:18px; overflow:hidden;
+                     background:var(--glass-strong); border:1px solid var(--line);
+                     -webkit-backdrop-filter:var(--blur); backdrop-filter:var(--blur);
+                     box-shadow:0 30px 80px rgba(0,0,0,.6); transform:translateY(18px) scale(.98); opacity:0;
+                     transition:transform .25s ease, opacity .25s ease; }
+    #detail.open .sheet { transform:none; opacity:1; }
+    #detail .close { top:14px; right:14px; }
+    #detail .body { margin-top:-110px; min-height:0; padding:0 40px 36px; border:none; border-radius:0;
+                    background:none; -webkit-backdrop-filter:none; backdrop-filter:none; }
+    #detail h2 { font-size:clamp(30px, 3vw, 40px); }
+    #detail .metaline { font-size:15px; margin:12px 0 20px; }
+    #detail .actions { flex-direction:row; flex-wrap:wrap; }
+    #detail .actions .btn { width:auto; min-width:180px; height:50px; }
+    #detail .resume { order:3; flex-basis:100%; max-width:420px; margin-top:2px; }
+    #detail .acts { justify-content:flex-start; gap:12px; margin:18px 0 18px -10px; }
   }
 </style>
 </head>
@@ -316,7 +438,7 @@ public static class WatchPage
 
 <!-- ---- sign in ---- -->
 <section id="signin" class="screen-center" hidden>
-  <form class="panel" id="signinForm" autocomplete="on">
+  <form class="panel glass-strong" id="signinForm" autocomplete="on">
     <span class="logo" aria-hidden="true"></span>
     <h1>Vault Movies</h1>
     <p>Sign in with your Vault account to watch your library.</p>
@@ -331,7 +453,7 @@ public static class WatchPage
 
 <!-- ---- one-off messages: waiting for approval, server unreachable ---- -->
 <section id="message" class="screen-center" hidden>
-  <div class="panel">
+  <div class="panel glass-strong">
     <span class="logo" aria-hidden="true"></span>
     <h1 id="msgTitle"></h1>
     <p id="msgText"></p>
@@ -339,20 +461,24 @@ public static class WatchPage
   </div>
 </section>
 
-<!-- ---- home ---- -->
+<!-- ---- the app ---- -->
 <div id="app" hidden>
   <header id="top">
     <button class="brand" id="brand" title="Home"><span class="logo" aria-hidden="true"></span><span>Vault</span></button>
+    <nav id="tabs" class="glass" aria-label="Sections">
+      <button data-view="home">Home</button>
+      <button data-view="films">Films</button>
+      <button data-view="mylist">My List</button>
+      <button data-view="search">Search</button>
+    </nav>
     <div class="spacer"></div>
-    <label class="search">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
-           aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-      <input id="q" type="search" placeholder="Search your films" aria-label="Search your films" autocomplete="off">
-    </label>
+    <button class="iconbtn glass" id="searchIcon" aria-label="Search">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+           aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg></button>
     <div class="who">
-      <button id="whoBtn" aria-haspopup="true" aria-expanded="false">
-        <span class="avatar" id="avatar"></span><span class="name" id="whoName"></span></button>
-      <div class="menu" id="whoMenu" hidden>
+      <button class="iconbtn glass" id="whoBtn" aria-haspopup="true" aria-expanded="false" aria-label="Account">
+        <span id="avatar"></span></button>
+      <div class="menu glass-strong" id="whoMenu" hidden>
         <div class="lbl" id="whoLbl"></div>
         <button id="installBtn" hidden>Install app</button>
         <button id="reloadBtn">Refresh library</button>
@@ -361,42 +487,66 @@ public static class WatchPage
     </div>
   </header>
 
-  <section id="hero" hidden>
-    <div class="bg" id="heroBg"></div>
-    <div class="inner">
-      <div class="kicker" id="heroKicker"></div>
-      <h1 id="heroTitle"></h1>
-      <div class="meta" id="heroMeta"></div>
-      <div class="bar" id="heroBar" hidden><i></i></div>
-      <div class="actions" id="heroActions"></div>
-    </div>
-  </section>
-
   <main>
-    <div id="home"></div>
-    <div id="results" hidden></div>
+    <section id="hero" hidden aria-roledescription="carousel" aria-label="Featured films">
+      <div class="bg" id="heroBgA"></div>
+      <div class="bg" id="heroBgB"></div>
+      <div class="inner" id="heroInner">
+        <div class="kicker" id="heroKicker"></div>
+        <h1 id="heroTitle"></h1>
+        <div class="metaline" id="heroMeta"></div>
+        <div class="actions" id="heroActions"></div>
+        <div id="dots" role="group" aria-label="Choose a featured film"></div>
+      </div>
+    </section>
+    <div id="rows"></div>
+
+    <div id="page" hidden>
+      <h1 class="pageh" id="pageTitle"></h1>
+      <label class="searchbox" id="searchBox" hidden>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+             aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+        <input id="q" type="search" placeholder="Titles in your vault" aria-label="Search your films"
+               autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search">
+      </label>
+      <div id="pageBody"></div>
+    </div>
   </main>
+
+  <nav id="tabbar" class="glass" aria-label="Sections">
+    <button data-view="home"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Home</button>
+    <button data-view="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>Search</button>
+    <button data-view="mylist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>My List</button>
+    <button data-view="account"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg>Account</button>
+  </nav>
 </div>
 
 <!-- ---- film details ---- -->
 <div id="detail" hidden role="dialog" aria-modal="true" aria-labelledby="dTitle">
-  <div class="sheet">
-    <button class="close" id="dClose" aria-label="Close">&times;</button>
-    <div class="art" id="dArt"></div>
-    <div class="body">
-      <h2 id="dTitle"></h2>
-      <div class="meta" id="dMeta"></div>
-      <div id="dProg"></div>
-      <p class="warn" id="dWarn" hidden></p>
-      <div class="actions" id="dActions"></div>
-      <dl class="facts" id="dFacts"></dl>
+  <div class="dbg" id="dBg"></div>
+  <div class="dscroll" id="dScroll">
+    <div class="sheet" id="dSheet">
+      <div class="art" id="dArt">
+        <button class="iconbtn glass close" id="dClose" aria-label="Close">
+          <svg width="16" height="16" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.6" aria-hidden="true">
+            <path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </div>
+      <div class="body glass-strong">
+        <h2 id="dTitle"></h2>
+        <div class="metaline" id="dMeta"></div>
+        <p class="warn" id="dWarn" hidden></p>
+        <div class="actions" id="dActions"></div>
+        <div class="acts" id="dActs"></div>
+        <dl class="facts" id="dFacts"></dl>
+        <div id="dMore"></div>
+      </div>
     </div>
   </div>
 </div>
 
 <!-- ---- how to install on an iPhone (Safari has no install prompt a page can open) ---- -->
 <div id="installTip" hidden role="dialog" aria-modal="true" aria-labelledby="tipTitle">
-  <div class="panel">
+  <div class="panel glass-strong">
     <span class="logo" aria-hidden="true"></span>
     <h1 id="tipTitle">Put Vault on your home screen</h1>
     <ol class="steps">
@@ -434,15 +584,19 @@ public static class WatchPage
   // Pinned, and fetched only when a film needs it: Safari plays HLS itself,
   // and a film that is already a web file needs nothing at all.
   const HLS_JS = 'https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.17/hls.min.js';
+  const HERO_MS = 9000;
 
   const S = {
     access: null, refresh: null, expiresAt: 0, me: null,
-    items: [], byFilmKey: new Map(), resume: {}, collections: [],
+    items: [], byFilmKey: new Map(), resume: {}, collections: [], myList: [],
+    view: 'home',
     film: null, hls: null, started: false, saveTimer: null, prepTimer: null,
-    heroFilm: null,
+    feat: [], featIdx: 0, heroLayer: 0, detailFilm: null,
   };
   const $ = id => document.getElementById(id);
   const v = $('v');
+  const wide = matchMedia('(min-width:900px)');
+  const calm = matchMedia('(prefers-reduced-motion: reduce)');
 
   // ---- small helpers ---------------------------------------------------
 
@@ -452,6 +606,21 @@ public static class WatchPage
     if (text != null) e.textContent = text;
     return e;
   }
+  function svg(markup, size) {
+    const s = size || 24;
+    const span = el('span');
+    span.innerHTML = `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${markup}</svg>`;
+    return span.firstElementChild;
+  }
+  const ICON = {
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+    cc: '<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M10 10.5a2 2 0 1 0 0 3M16 10.5a2 2 0 1 0 0 3"/>',
+    info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+    left: '<path d="M15 5l-7 7 7 7"/>',
+    right: '<path d="M9 5l7 7-7 7"/>',
+  };
   function clock(ms) {
     const s = Math.max(0, Math.floor(ms / 1000));
     const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), sec = s % 60;
@@ -463,6 +632,11 @@ public static class WatchPage
     const min = Math.round(ms / 60000);
     const h = Math.floor(min / 60), m = min % 60;
     return h ? (m ? `${h}h ${m}m` : `${h}h`) : `${m}m`;
+  }
+  // "48 min left", "1h 12m left": the rest of a film, said the way people say it.
+  function leftText(ms) {
+    const min = Math.max(1, Math.round(ms / 60000));
+    return (min < 60 ? `${min} min` : runtime(ms)) + ' left';
   }
   function size(b) {
     if (!b) return '';
@@ -551,7 +725,8 @@ public static class WatchPage
 
   function signOut(expired) {
     if (!$('player').hidden) stopPlayback(false);
-    closeDetail();
+    closeDetail(true);
+    stopHero();
     const rt = S.refresh;
     S.access = S.refresh = S.me = null; S.expiresAt = 0;
     try { localStorage.removeItem(LS_RT); } catch {}
@@ -612,6 +787,7 @@ public static class WatchPage
     S.items = cat.items || [];
     S.byFilmKey = new Map(S.items.map(it => [it.filmKey, it]));
     S.collections = (cat.collections || []).slice().sort((a, b) => a.sortOrder - b.sortOrder);
+    S.myList = cat.myList || [];
     S.scanning = !!cat.scanning;
     S.mediaRootPresent = cat.mediaRootPresent !== false;
 
@@ -623,16 +799,22 @@ public static class WatchPage
     } catch {}
 
     show('app');
-    renderHome();
+    S.feat = featuredList();
+    S.featIdx = 0;
+    setView(S.view, { keepScroll:true });
   }
 
   function renderWho() {
     const me = S.me || {};
     const name = me.displayName || me.username || '';
     $('avatar').textContent = (name[0] || '?').toUpperCase();
-    $('whoName').textContent = name;
     $('whoLbl').textContent = 'Signed in as ' + (me.username || name) + (me.isOwner ? ' · owner' : '');
   }
+
+  // What to call a film on screen: its tidied title, else the file name.
+  const titleOf = it => it.title || it.name;
+  const byTitle = (a, b) => titleOf(a).localeCompare(titleOf(b), undefined, { sensitivity:'base', numeric:true });
+  const lastWatched = (a, b) => ((S.resume[b.filmKey] || {}).lastWatchedAt || 0) - ((S.resume[a.filmKey] || {}).lastWatchedAt || 0);
 
   // Where a film's progress stands, or null if it has none worth showing.
   function progressOf(it) {
@@ -643,26 +825,81 @@ public static class WatchPage
     return { frac, row };
   }
 
-  function continueList() {
-    return S.items.filter(progressOf)
-      .sort((a, b) => (S.resume[b.filmKey].lastWatchedAt || 0) - (S.resume[a.filmKey].lastWatchedAt || 0));
+  const continueList = () => S.items.filter(progressOf).sort(lastWatched);
+  const recentList = () => S.items.slice().sort((a, b) => b.addedAt - a.addedAt);
+  const allList = () => S.items.slice().sort(byTitle);
+  const watchAgainList = () => S.items.filter(it => (S.resume[it.filmKey] || {}).watchCount > 0 && !progressOf(it)).sort(lastWatched);
+  const shelfFilms = c => c.items.map(e => S.byFilmKey.get(e.filmKey)).filter(Boolean);
+  const myListFilms = () => S.myList.map(k => S.byFilmKey.get(k)).filter(Boolean);
+  const onList = it => S.myList.includes(it.filmKey);
+  const DAY = 24 * 3600 * 1000;
+  const isNew = it => Date.now() - it.addedAt < 14 * DAY && !S.resume[it.filmKey];
+  const is4k = it => /2160p|\b4k\b|\buhd\b/i.test(it.name);
+  function searchList(q) {
+    const needle = q.trim().toLocaleLowerCase();
+    if (!needle) return allList();
+    return S.items.filter(it => titleOf(it).toLocaleLowerCase().includes(needle) ||
+      it.name.toLocaleLowerCase().includes(needle)).sort(byTitle);
   }
-  function recentList() {
-    return S.items.slice().sort((a, b) => b.addedAt - a.addedAt);
+
+  // The films the featured slot cycles through: new arrivals first, then films
+  // this account has never started, shuffled per visit so the top of the
+  // screen is not the same film every time. Films with no still are skipped,
+  // since the slot is mostly picture. Same choice as the phone app.
+  function featuredList(count = 5) {
+    const withArt = S.items.filter(it => it.artUrl);
+    const fresh = withArt.filter(it => Date.now() - it.addedAt < 30 * DAY && !S.resume[it.filmKey]);
+    const unwatched = withArt.filter(it => !S.resume[it.filmKey] && !fresh.includes(it));
+    const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+    const picks = [...shuffle(fresh), ...shuffle(unwatched)];
+    if (picks.length < count) picks.push(...shuffle(withArt.filter(it => !picks.includes(it))));
+    const out = picks.slice(0, count);
+    if (!out.length && S.items.length) out.push(recentList()[0]);
+    return out;
   }
-  function watchAgainList() {
-    return S.items.filter(it => (S.resume[it.filmKey] || {}).watchCount > 0 && !progressOf(it))
-      .sort((a, b) => (S.resume[b.filmKey].lastWatchedAt || 0) - (S.resume[a.filmKey].lastWatchedAt || 0));
+
+  // "2025 • 3h 17m • CC HD"
+  function metaLine(box, it) {
+    box.innerHTML = '';
+    const parts = [it.year ? String(it.year) : '', runtime(it.durationMs)].filter(Boolean);
+    parts.forEach((p, i) => {
+      if (i) box.appendChild(el('span', 'dot', '•'));
+      box.appendChild(el('span', null, p));
+    });
+    if (parts.length) box.appendChild(el('span', 'dot', '•'));
+    if (it.captionsUrl) { const t = el('span', 'tag', 'CC'); t.title = 'English captions'; box.appendChild(t); }
+    box.appendChild(el('span', 'tag', is4k(it) ? '4K' : 'HD'));
   }
-  const WEEK = 7 * 24 * 3600 * 1000;
-  function isNew(it) { return Date.now() - it.addedAt < 2 * WEEK && !S.resume[it.filmKey]; }
+
+  // ---- views ---------------------------------------------------------------
+
+  const VIEWS = { home:'Home', films:'Films', mylist:'My List', search:'Search', account:'Account' };
+
+  function setView(view, opts = {}) {
+    if (!VIEWS[view]) view = 'home';
+    // Account is a page on phones only; on a wide screen it is the menu up top.
+    if (view === 'account' && wide.matches) view = 'home';
+    S.view = view;
+    for (const b of document.querySelectorAll('#tabs button, #tabbar button')) {
+      if (b.dataset.view === view) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+    }
+    render();
+    if (!opts.keepScroll) window.scrollTo(0, 0);
+    syncTop();
+    if (view === 'search' && opts.focus !== false) $('q').focus({ preventScroll:true });
+  }
+
+  function render() {
+    const home = S.view === 'home';
+    $('rows').hidden = !home;
+    $('page').hidden = home;
+    if (home) { renderHome(); startHero(); }
+    else { stopHero(); $('hero').hidden = true; renderPage(); }
+  }
 
   function renderHome() {
-    const home = $('home');
-    home.innerHTML = '';
-    const q = $('q').value.trim();
-    if (q) { renderResults(q); return; }
-    $('results').hidden = true; home.hidden = false;
+    const rows = $('rows');
+    rows.innerHTML = '';
 
     if (!S.items.length) {
       $('hero').hidden = true;
@@ -672,90 +909,101 @@ public static class WatchPage
         ? 'The server can’t see its film folder right now. If the media drive was just unplugged or remounted, check it and refresh.'
         : S.scanning ? 'Your library is still being indexed. Films appear here as they are found — refresh in a minute.'
         : 'No films on the server yet. Add some to its film folder and they’ll show up here.';
-      home.appendChild(box);
+      rows.appendChild(box);
       return;
     }
 
-    renderHero();
-    if (S.scanning) home.appendChild(el('div', 'notice', 'Still indexing the server — some films may not be here yet.'));
-
-    const cont = continueList();
-    if (cont.length) home.appendChild(shelf('Continue watching', cont, { progress:true }));
-    home.appendChild(shelf('Recently added', recentList().slice(0, 24)));
-    for (const c of S.collections) {
-      const films = c.items.map(e => S.byFilmKey.get(e.filmKey)).filter(Boolean);
-      if (films.length) home.appendChild(shelf(c.name, films));
-    }
-    const again = watchAgainList();
-    if (again.length) home.appendChild(shelf('Watch again', again));
-
-    const all = S.items.slice().sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity:'base', numeric:true }));
-    const sec = el('section', 'shelf');
-    const h = el('h2', null, 'All films');
-    h.appendChild(el('span', 'count', String(all.length)));
-    sec.appendChild(h);
-    const grid = el('div', 'grid');
-    for (const it of all) grid.appendChild(card(it, { progress:true }));
-    sec.appendChild(grid);
-    home.appendChild(sec);
-  }
-
-  function renderHero() {
-    // The film you were last in the middle of; otherwise the newest arrival.
-    const cont = continueList();
-    const it = cont[0] || recentList()[0];
-    S.heroFilm = it;
-    const p = progressOf(it);
     $('hero').hidden = false;
-    $('heroKicker').textContent = p ? 'Continue watching' : (isNew(it) ? 'New on your server' : 'Featured');
-    $('heroTitle').textContent = it.name;
-    $('heroMeta').textContent = [runtime(it.durationMs), playLabel(it)].filter(Boolean).join('  ·  ');
-    $('heroBar').hidden = !p;
-    if (p) $('heroBar').firstElementChild.style.width = (p.frac * 100).toFixed(1) + '%';
+    if (S.scanning) rows.appendChild(el('div', 'notice', 'Still indexing the server — some films may not be here yet.'));
 
-    const acts = $('heroActions'); acts.innerHTML = '';
-    acts.appendChild(playButton(it));
-    const more = el('button', 'btn ghost', 'More info');
-    more.addEventListener('click', () => openDetail(it));
-    acts.appendChild(more);
-
-    const bg = $('heroBg');
-    bg.classList.remove('on');
-    if (it.artUrl) art(it.artUrl).then(u => {
-      if (u && S.heroFilm === it) { bg.style.backgroundImage = `url("${u}")`; bg.classList.add('on'); }
-    });
+    const add = (title, films) => { if (films.length) rows.appendChild(shelf(title, films)); };
+    add('Continue watching', continueList());
+    add('Recently added', recentList().slice(0, 24));
+    add('My List', myListFilms());
+    for (const c of S.collections) add(c.name, shelfFilms(c));
+    add('Watch again', watchAgainList());
+    add('All films', allList());
   }
 
-  function playLabel(it) {
-    const route = routeFor(it);
-    if (!route) return 'Plays in the desktop app';
-    return '';
+  function renderPage() {
+    const view = S.view;
+    $('pageTitle').textContent = VIEWS[view];
+    $('searchBox').hidden = view !== 'search';
+    const body = $('pageBody');
+    body.innerHTML = '';
+    if (view === 'films') {
+      $('pageTitle').appendChild(el('span', 'count', String(S.items.length)));
+      body.appendChild(grid(allList()));
+    } else if (view === 'mylist') {
+      const films = myListFilms();
+      if (films.length) body.appendChild(grid(films));
+      else body.appendChild(el('div', 'empty', 'Nothing saved yet. Open any film and choose My List to keep it here.'));
+    } else if (view === 'search') {
+      renderResults();
+    } else if (view === 'account') {
+      body.appendChild(accountPanel());
+    }
   }
 
-  function playButton(it, opts = {}) {
-    const p = progressOf(it);
-    const route = routeFor(it);
-    const b = el('button', 'btn');
-    b.appendChild(el('span', 'tri'));
-    b.appendChild(document.createTextNode(p && !opts.fromStart ? 'Resume ' + clock(p.row.resumeMs) : 'Play'));
-    if (!route) { b.disabled = true; b.title = 'This browser can’t play this film'; }
-    b.addEventListener('click', () => play(it, p && !opts.fromStart ? p.row.resumeMs : 0));
-    return b;
+  function renderResults() {
+    const body = $('pageBody');
+    body.innerHTML = '';
+    const q = $('q').value.trim();
+    const hits = searchList(q);
+    const h = el('h2', 'sub', q ? `Results for “${q}”` : 'All films, A–Z');
+    h.appendChild(el('span', 'count', String(hits.length)));
+    body.appendChild(h);
+    if (!hits.length) body.appendChild(el('div', 'empty', 'Nothing in your library matches that.'));
+    else body.appendChild(grid(hits));
   }
 
-  function shelf(title, films, opts = {}) {
+  function accountPanel() {
+    const me = S.me || {};
+    const name = me.displayName || me.username || '';
+    const box = el('div', 'acct glass');
+    const row = el('div', 'who-row');
+    row.appendChild(el('div', 'big', (name[0] || '?').toUpperCase()));
+    const txt = el('div');
+    txt.appendChild(el('div', 'nm', name));
+    txt.appendChild(el('div', 'muted', 'Signed in as ' + (me.username || name) + (me.isOwner ? ' · owner' : '')));
+    row.appendChild(txt);
+    box.appendChild(row);
+    const btn = (label, fn) => { const b = el('button', 'btn ghost', label); b.addEventListener('click', fn); box.appendChild(b); };
+    if (!$('installBtn').hidden) btn('Install app', install);
+    btn('Refresh library', () => enter());
+    btn('Sign out', () => signOut(false));
+    return box;
+  }
+
+  let searchTimer = null;
+  $('q').addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => { if (S.view === 'search') renderResults(); }, 120);
+  });
+  $('q').addEventListener('keydown', e => {
+    if (e.key === 'Escape' && $('q').value) { e.stopPropagation(); $('q').value = ''; renderResults(); }
+  });
+  for (const b of document.querySelectorAll('#tabs button, #tabbar button'))
+    b.addEventListener('click', () => setView(b.dataset.view));
+  $('brand').addEventListener('click', () => setView('home'));
+  $('searchIcon').addEventListener('click', () => setView('search'));
+
+  // ---- rows and tiles --------------------------------------------------------
+
+  function shelf(title, films) {
     const sec = el('section', 'shelf');
-    const h = el('h2', null, title);
-    sec.appendChild(h);
+    sec.appendChild(el('h2', null, title));
     const lane = el('div', 'lane');
     const track = el('div', 'track');
-    for (const it of films) track.appendChild(card(it, opts));
-    const prev = el('button', 'nav prev', '‹');
-    const next = el('button', 'nav next', '›');
+    for (const it of films) track.appendChild(tile(it));
+    const prev = el('button', 'nav prev');
+    const next = el('button', 'nav next');
+    prev.appendChild(svg(ICON.left)); next.appendChild(svg(ICON.right));
     prev.setAttribute('aria-label', 'Scroll ' + title + ' left');
     next.setAttribute('aria-label', 'Scroll ' + title + ' right');
+    // Keyboard users move tile by tile with Tab, so the arrows are for mice only.
     prev.tabIndex = next.tabIndex = -1;
-    const page = dir => track.scrollBy({ left: dir * track.clientWidth * 0.9, behavior:'smooth' });
+    const page = dir => track.scrollBy({ left: dir * track.clientWidth * 0.85, behavior:'smooth' });
     prev.addEventListener('click', () => page(-1));
     next.addEventListener('click', () => page(1));
     const sync = () => {
@@ -769,68 +1017,132 @@ public static class WatchPage
     return sec;
   }
 
-  function card(it, opts = {}) {
-    const b = el('button', 'card');
-    b.setAttribute('aria-label', it.name);
-    const th = el('div', 'thumb');
-    th.appendChild(el('span', 'ph', it.name));
+  function grid(films) {
+    const g = el('div', 'grid');
+    for (const it of films) g.appendChild(tile(it));
+    return g;
+  }
+
+  function tile(it) {
+    const b = el('button', 'tile');
+    const p = progressOf(it);
+    b.setAttribute('aria-label', titleOf(it) + (it.year ? `, ${it.year}` : '') + (p ? `, ${leftText(it.durationMs - p.row.resumeMs)}` : ''));
     if (it.artUrl) {
       const img = el('img');
       img.alt = '';
       img.dataset.art = it.artUrl;
-      th.appendChild(img);
+      b.appendChild(img);
       lazy.observe(img);
     }
-    th.appendChild(el('span', 'play'));
-    if (!routeFor(it)) th.appendChild(el('span', 'badge', 'App only'));
-    else if (isNew(it)) th.appendChild(el('span', 'badge new', 'New'));
-    const p = opts.progress && progressOf(it);
+    if (!routeFor(it)) b.appendChild(el('span', 'app', 'App only'));
+    if (isNew(it)) b.appendChild(el('span', 'flag', 'NEW'));
+    b.appendChild(el('span', 't', titleOf(it)));
     if (p) {
-      const bar = el('div', 'prog'); const i = el('i');
+      b.classList.add('has-prog');
+      const bar = el('span', 'prog'); const i = el('i');
       i.style.width = (p.frac * 100).toFixed(1) + '%';
-      bar.appendChild(i); th.appendChild(bar);
+      bar.appendChild(i); b.appendChild(bar);
     }
-    b.appendChild(th);
-    const cap = el('div', 'cap');
-    cap.appendChild(el('span', 't', it.name));
-    cap.appendChild(el('span', 'm', p
-      ? clock(it.durationMs - p.row.resumeMs) + ' left'
-      : runtime(it.durationMs)));
-    b.appendChild(cap);
     b.addEventListener('click', () => openDetail(it));
     return b;
   }
 
-  function renderResults(q) {
-    $('hero').hidden = true;
-    $('home').hidden = true;
-    const box = $('results');
-    box.hidden = false; box.innerHTML = '';
-    const needle = q.toLocaleLowerCase();
-    const hits = S.items.filter(it => it.name.toLocaleLowerCase().includes(needle))
-      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity:'base', numeric:true }));
-    const sec = el('section', 'shelf');
-    const h = el('h2', null, `Results for “${q}”`);
-    h.appendChild(el('span', 'count', String(hits.length)));
-    sec.appendChild(h);
-    if (!hits.length) sec.appendChild(el('div', 'empty', 'Nothing in your library matches that.'));
-    else {
-      const grid = el('div', 'grid');
-      for (const it of hits) grid.appendChild(card(it, { progress:true }));
-      sec.appendChild(grid);
-    }
-    box.appendChild(sec);
+  // ---- the featured film -------------------------------------------------------
+  //
+  // Two picture layers take turns, so the next still fades in over the last
+  // one instead of the hero going dark between films. The next film's still is
+  // fetched before the swap starts.
+
+  let heroTimer = null;
+  function startHero() {
+    if (!S.feat.length) S.feat = featuredList();
+    if (!S.feat.length) return;
+    if (S.featIdx >= S.feat.length) S.featIdx = 0;
+    showFeatured(S.featIdx, true);
+    renderDots();
+    clearInterval(heroTimer);
+    // Reduced motion: no automatic rotation; the dots still change the film.
+    if (S.feat.length > 1 && !calm.matches) heroTimer = setInterval(heroTick, HERO_MS);
+  }
+  function stopHero() { clearInterval(heroTimer); heroTimer = null; }
+  function heroTick() {
+    // Held still while anything is on top of it, while a key or the pointer
+    // is in it (so a button never changes under a click), or while hidden.
+    if (S.view !== 'home' || !$('detail').hidden || !$('player').hidden || document.hidden) return;
+    if ($('hero').contains(document.activeElement) && document.activeElement !== document.body) return;
+    if ($('heroInner').matches(':hover')) return;
+    showFeatured((S.featIdx + 1) % S.feat.length, false);
   }
 
-  let searchTimer = null;
-  $('q').addEventListener('input', () => {
-    clearTimeout(searchTimer);
-    searchTimer = setTimeout(() => { renderHome(); if (!$('q').value) window.scrollTo(0, 0); }, 120);
-  });
-  $('q').addEventListener('keydown', e => {
-    if (e.key === 'Escape') { $('q').value = ''; renderHome(); $('q').blur(); }
-  });
-  $('brand').addEventListener('click', () => { $('q').value = ''; renderHome(); window.scrollTo({ top:0, behavior:'smooth' }); });
+  function showFeatured(i, instant) {
+    const it = S.feat[i];
+    if (!it) return;
+    S.featIdx = i;
+    const inner = $('heroInner');
+    const fill = () => { fillHero(it); inner.classList.remove('fading'); };
+    if (instant || calm.matches) fill();
+    else { inner.classList.add('fading'); setTimeout(() => { if (S.feat[S.featIdx] === it) fill(); }, 350); }
+    for (const [n, d] of [...$('dots').children].entries()) d.setAttribute('aria-current', String(n === i));
+
+    const layers = [$('heroBgA'), $('heroBgB')];
+    if (!it.artUrl) { layers.forEach(l => l.classList.remove('on')); return; }
+    art(it.artUrl).then(u => {
+      if (!u || S.feat[S.featIdx] !== it) return;
+      const cur = layers[S.heroLayer];
+      // Already showing this still (the first film again, or a re-render): leave it.
+      if (cur.classList.contains('on') && cur.dataset.film === it.filmKey) return;
+      const nextLayer = instant && !cur.classList.contains('on') ? cur : layers[1 - S.heroLayer];
+      nextLayer.style.backgroundImage = `url("${u}")`;
+      nextLayer.dataset.film = it.filmKey;
+      nextLayer.classList.add('on');
+      for (const l of layers) if (l !== nextLayer) l.classList.remove('on');
+      S.heroLayer = layers.indexOf(nextLayer);
+    });
+  }
+
+  function fillHero(it) {
+    const p = progressOf(it);
+    $('heroKicker').textContent = p ? 'Continue watching' : isNew(it) ? 'New in your vault' : 'From your vault';
+    $('heroTitle').textContent = titleOf(it);
+    metaLine($('heroMeta'), it);
+    const acts = $('heroActions'); acts.innerHTML = '';
+    acts.appendChild(playButton(it));
+    const more = el('button', 'btn ghost');
+    more.appendChild(svg(ICON.info, 20));
+    more.appendChild(document.createTextNode('More info'));
+    more.addEventListener('click', () => openDetail(it));
+    acts.appendChild(more);
+  }
+
+  function renderDots() {
+    const box = $('dots');
+    box.innerHTML = '';
+    box.hidden = S.feat.length < 2;
+    S.feat.forEach((it, n) => {
+      const d = el('button');
+      d.setAttribute('aria-label', `Featured film ${n + 1} of ${S.feat.length}: ${titleOf(it)}`);
+      d.setAttribute('aria-current', String(n === S.featIdx));
+      d.addEventListener('click', () => { if (n !== S.featIdx) showFeatured(n, false); restartHeroTimer(); });
+      box.appendChild(d);
+    });
+  }
+  // A chosen film gets its full nine seconds.
+  function restartHeroTimer() {
+    if (!heroTimer) return;
+    clearInterval(heroTimer);
+    heroTimer = setInterval(heroTick, HERO_MS);
+  }
+
+  function playButton(it, opts = {}) {
+    const p = progressOf(it);
+    const route = routeFor(it);
+    const b = el('button', 'btn');
+    b.appendChild(el('span', 'tri'));
+    b.appendChild(document.createTextNode(p && !opts.fromStart ? 'Resume' : 'Play'));
+    if (!route) { b.disabled = true; b.title = 'This browser can’t play this film'; }
+    b.addEventListener('click', () => play(it, p && !opts.fromStart ? p.row.resumeMs : 0));
+    return b;
+  }
 
   // ---- posters -------------------------------------------------------------
   // They need the bearer header, which an <img src> cannot send, so each is
@@ -853,11 +1165,7 @@ public static class WatchPage
       lazy.unobserve(img);
       art(img.dataset.art).then(u => {
         if (!u) return;
-        img.onload = () => {
-          img.classList.add('on');
-          const ph = img.parentNode && img.parentNode.querySelector('.ph');
-          if (ph) setTimeout(() => { ph.hidden = true; }, 400);   // after the fade, not during it
-        };
+        img.onload = () => img.classList.add('on');
         img.src = u;
       });
     }
@@ -865,68 +1173,117 @@ public static class WatchPage
 
   // ---- details ---------------------------------------------------------------
 
-  let detailReturn = null;
+  let detailReturn = null, detailHide = null;
   function openDetail(it) {
-    detailReturn = document.activeElement;
+    if ($('detail').hidden) detailReturn = document.activeElement;
     S.detailFilm = it;
-    $('dTitle').textContent = it.name;
-    const meta = $('dMeta'); meta.innerHTML = '';
-    for (const m of [runtime(it.durationMs), dateOf(it.addedAt) && 'Added ' + dateOf(it.addedAt)])
-      if (m) meta.appendChild(el('span', null, m));
-    const seen = S.resume[it.filmKey];
-    if (seen && seen.watchCount > 0) meta.appendChild(el('span', null,
-      seen.watchCount === 1 ? 'Watched once' : `Watched ${seen.watchCount} times`));
+    fillDetail(it);
+    clearTimeout(detailHide);
+    const d = $('detail');
+    const wasOpen = !d.hidden && d.classList.contains('open');
+    d.hidden = false;
+    $('dScroll').scrollTop = 0;
+    document.body.classList.add('locked');
+    if (!wasOpen) { void d.offsetWidth; d.classList.add('open'); }   // reflow first, so it animates in
+    const first = $('dActions').querySelector('button:not([disabled])') || $('dClose');
+    first.focus({ preventScroll:true });
+  }
 
-    const prog = $('dProg'); prog.innerHTML = '';
-    const p = progressOf(it);
-    if (p) {
-      const bar = el('div', 'bar'); const i = el('i');
-      i.style.width = (p.frac * 100).toFixed(1) + '%';
-      bar.appendChild(i); prog.appendChild(bar);
-      prog.appendChild(el('div', 'left', clock(it.durationMs - p.row.resumeMs) + ' left'));
-    }
+  function fillDetail(it) {
+    $('dTitle').textContent = titleOf(it);
+    metaLine($('dMeta'), it);
 
     const route = routeFor(it);
     $('dWarn').hidden = !!route;
     $('dWarn').textContent = route ? '' :
       'This browser can’t decode this film’s video. It plays in the Vault Movies desktop app, and on most phones and TVs.';
 
+    const p = progressOf(it);
     const acts = $('dActions'); acts.innerHTML = '';
     acts.appendChild(playButton(it));
-    if (p && route) {
-      const again = el('button', 'btn ghost', 'Start from the beginning');
-      again.addEventListener('click', () => play(it, 0));
-      acts.appendChild(again);
+    if (p) {
+      // Under Resume on a phone; under both buttons on a wide screen (see .resume).
+      const line = el('div', 'resume');
+      const bar = el('div', 'bar'); const i = el('i');
+      i.style.width = (p.frac * 100).toFixed(1) + '%';
+      bar.appendChild(i);
+      line.append(bar, el('span', null, leftText(it.durationMs - p.row.resumeMs)));
+      acts.appendChild(line);
+      if (route) {
+        const again = el('button', 'btn ghost', 'Start over');
+        again.addEventListener('click', () => play(it, 0));
+        acts.appendChild(again);
+      }
+    }
+
+    // The row of small actions: My List, and a note when there are captions.
+    const row = $('dActs'); row.innerHTML = '';
+    const mine = el('button', 'act');
+    const paintMine = () => {
+      const on = onList(it);
+      mine.innerHTML = '';
+      mine.appendChild(svg(on ? ICON.check : ICON.plus));
+      mine.appendChild(el('span', null, 'My List'));
+      mine.setAttribute('aria-pressed', String(on));
+      mine.setAttribute('aria-label', on ? 'Remove from My List' : 'Add to My List');
+    };
+    paintMine();
+    mine.addEventListener('click', () => toggleMyList(it, paintMine));
+    row.appendChild(mine);
+    if (it.captionsUrl) {
+      const cc = el('div', 'act');
+      cc.appendChild(svg(ICON.cc));
+      cc.appendChild(el('span', null, 'Captions'));
+      cc.appendChild(el('span', 'note', 'English'));
+      row.appendChild(cc);
     }
 
     const facts = $('dFacts'); facts.innerHTML = '';
+    const seen = S.resume[it.filmKey];
     const shelves = S.collections.filter(c => c.items.some(e => e.filmKey === it.filmKey)).map(c => c.name);
     const rows = [
-      ['On your shelves', shelves.join(', ')],
-      ['Video', [it.videoCodec && it.videoCodec.toUpperCase(), it.audioCodec && it.audioCodec.toUpperCase()].filter(Boolean).join(' · ')],
-      ['File', size(it.sizeBytes)],
+      ['Watched', seen && seen.watchCount > 0 ? (seen.watchCount === 1 ? 'Once' : `${seen.watchCount} times`) : ''],
+      ['Shelves', shelves.join(', ')],
+      ['Added', it.addedAt ? dateOf(it.addedAt) : ''],
+      ['Format', [it.videoCodec, it.audioCodec].filter(Boolean).map(s => s.toUpperCase()).join(' · ')],
+      ['File size', size(it.sizeBytes)],
     ];
     for (const [k, val] of rows) if (val) { facts.appendChild(el('dt', null, k)); facts.appendChild(el('dd', null, val)); }
 
-    const a = $('dArt');
-    a.style.backgroundImage = '';
-    if (it.artUrl) art(it.artUrl).then(u => { if (u && S.detailFilm === it) a.style.backgroundImage = `url("${u}")`; });
+    // More from your vault: films that share a shelf with this one, then the newest.
+    const more = $('dMore'); more.innerHTML = '';
+    const picks = [];
+    for (const c of S.collections) if (c.items.some(e => e.filmKey === it.filmKey))
+      for (const f of shelfFilms(c)) if (f !== it && !picks.includes(f)) picks.push(f);
+    for (const f of recentList()) if (f !== it && !picks.includes(f)) picks.push(f);
+    if (picks.length) {
+      more.appendChild(el('h3', null, 'More from your vault'));
+      const g = el('div', 'more');
+      for (const f of picks.slice(0, 6)) g.appendChild(tile(f));
+      more.appendChild(g);
+    }
 
-    $('detail').hidden = false;
-    $('detail').scrollTop = 0;
-    document.body.classList.add('locked');
-    const first = acts.querySelector('button:not([disabled])') || $('dClose');
-    first.focus({ preventScroll:true });
+    const a = $('dArt'), bg = $('dBg');
+    a.style.backgroundImage = bg.style.backgroundImage = '';
+    if (it.artUrl) art(it.artUrl).then(u => {
+      if (u && S.detailFilm === it) a.style.backgroundImage = bg.style.backgroundImage = `url("${u}")`;
+    });
   }
-  function closeDetail() {
-    if ($('detail').hidden) return;
-    $('detail').hidden = true;
+
+  function closeDetail(now) {
+    const d = $('detail');
+    if (d.hidden) return;
+    d.classList.remove('open');
     S.detailFilm = null;
     document.body.classList.remove('locked');
+    clearTimeout(detailHide);
+    if (now || calm.matches) d.hidden = true;
+    else detailHide = setTimeout(() => { d.hidden = true; }, 320);
     if (detailReturn && document.contains(detailReturn)) detailReturn.focus({ preventScroll:true });
   }
-  $('dClose').addEventListener('click', closeDetail);
-  $('detail').addEventListener('click', e => { if (e.target === $('detail')) closeDetail(); });
+  $('dClose').addEventListener('click', () => closeDetail());
+  // A click on the blurred backdrop, outside the panel, closes it (wide screens).
+  $('dScroll').addEventListener('click', e => { if (e.target === $('dScroll')) closeDetail(); });
   // Keep Tab inside the sheet while it is open.
   $('detail').addEventListener('keydown', e => {
     if (e.key !== 'Tab') return;
@@ -937,16 +1294,53 @@ public static class WatchPage
     else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
   });
 
+  // Saved at once on screen, then on the server; the server's answer (the
+  // whole list) is the truth. A failure puts the button back as it was.
+  async function toggleMyList(it, repaint) {
+    const was = onList(it);
+    const before = S.myList.slice();
+    S.myList = was ? S.myList.filter(k => k !== it.filmKey) : [it.filmKey, ...S.myList];
+    repaint();
+    try {
+      const r = await api('/api/v1/mylist/' + encodeURIComponent(it.filmKey), { method: was ? 'DELETE' : 'PUT' });
+      if (!r.ok) throw new Error('mylist ' + r.status);
+      const list = await r.json().catch(() => null);
+      if (Array.isArray(list)) S.myList = list;
+    } catch (e) {
+      if (e.message === 'signed-out') return;
+      S.myList = before;
+    }
+    repaint();
+    refreshBehind();
+  }
+
+  // The page under the details sheet catches up (My List row, progress bars)
+  // without restarting the featured film.
+  function refreshBehind() {
+    if (S.view === 'home') { renderHome(); const it = S.feat[S.featIdx]; if (it) fillHero(it); }
+    else if (S.view !== 'search') renderPage();
+    else renderResults();
+  }
+
   // ---- account menu ------------------------------------------------------------
 
   function setMenu(open) {
     $('whoMenu').hidden = !open;
     $('whoBtn').setAttribute('aria-expanded', String(open));
   }
-  $('whoBtn').addEventListener('click', e => { e.stopPropagation(); setMenu($('whoMenu').hidden); });
+  $('whoBtn').addEventListener('click', e => {
+    e.stopPropagation();
+    if (!wide.matches) { setView('account'); return; }
+    setMenu($('whoMenu').hidden);
+  });
   document.addEventListener('click', e => { if (!e.target.closest('.who')) setMenu(false); });
   $('signoutBtn').addEventListener('click', () => { setMenu(false); signOut(false); });
   $('reloadBtn').addEventListener('click', () => { setMenu(false); enter(); });
+  // Turning a phone into a tablet-sized window, or back, moves Account between page and menu.
+  wide.addEventListener('change', () => {
+    setMenu(false);
+    if (!$('app').hidden && S.view === 'account' && wide.matches) setView('home');
+  });
 
   // ---- installing as an app ------------------------------------------------------
   // Already installed (opened from the home screen): nothing to offer.
@@ -963,23 +1357,26 @@ public static class WatchPage
     if (!standalone) $('installBtn').hidden = false;
   });
   window.addEventListener('appinstalled', () => { installPrompt = null; $('installBtn').hidden = true; });
-  $('installBtn').addEventListener('click', async () => {
+  async function install() {
     setMenu(false);
     if (installPrompt) {
       const p = installPrompt; installPrompt = null;
       p.prompt();
       try { const { outcome } = await p.userChoice; if (outcome === 'accepted') $('installBtn').hidden = true; } catch {}
+      if (S.view === 'account') renderPage();
       return;
     }
     $('installTip').hidden = false;
     $('tipClose').focus();
-  });
+  }
+  $('installBtn').addEventListener('click', install);
   $('tipClose').addEventListener('click', () => { $('installTip').hidden = true; });
   $('installTip').addEventListener('click', e => { if (e.target === $('installTip')) $('installTip').hidden = true; });
 
-  window.addEventListener('scroll', () => {
-    $('top').classList.toggle('solid', window.scrollY > 40);
-  }, { passive:true });
+  // The top bar turns to glass once anything scrolls under it; pages other
+  // than Home have no hero behind it, so it is glass from the start there.
+  function syncTop() { $('top').classList.toggle('solid', window.scrollY > 40 || S.view !== 'home'); }
+  window.addEventListener('scroll', syncTop, { passive:true });
 
   // ---- what this browser can play --------------------------------------------
   //
@@ -1025,9 +1422,10 @@ public static class WatchPage
   function play(it, startMs) {
     const route = routeFor(it);
     if (!route) return;
-    closeDetail();
+    closeDetail(true);
+    stopHero();
     S.film = it; S.started = false;
-    $('pTitle').textContent = it.name;
+    $('pTitle').textContent = titleOf(it);
     $('player').hidden = false;
     document.body.classList.add('locked');
     bumpTop();
@@ -1097,6 +1495,14 @@ public static class WatchPage
       hls.loadSource(src);
       hls.attachMedia(v);
     } else {
+      // A plain file carries no caption track the browser can see, so the
+      // server's WebVTT copy is added beside it (off until chosen in the
+      // player's own menu). HLS streams list their captions themselves.
+      if (route === 'direct' && it.captionsUrl) {
+        const tr = el('track');
+        tr.kind = 'subtitles'; tr.srclang = 'en'; tr.label = 'English'; tr.src = it.captionsUrl;
+        v.appendChild(tr);
+      }
       v.src = src;
       if (startMs > 0) {
         const seek = () => { try { v.currentTime = startMs / 1000; } catch {} };
@@ -1144,18 +1550,56 @@ public static class WatchPage
   v.addEventListener('pause', () => { if (!v.ended) pushResume(false); bumpTop(); });
   v.addEventListener('ended', () => { pushResume(true); stopPlayback(true); });
 
+  // ---- captions on or off, as last chosen --------------------------------
+  // Whatever the viewer last picked in the player's captions menu holds for
+  // the next film and the next visit. A film's tracks turn up as it loads
+  // (a <track> for a plain file, the stream's own for HLS), so the choice is
+  // applied as each one is added. Changes this code makes itself are not
+  // mistaken for the viewer's choice.
+  const CC_KEY = 'vault.watch.captions';
+  let ccApplying = false;
+  function ccWanted() { try { return localStorage.getItem(CC_KEY); } catch { return null; } }
+  function subtitleTracks() {
+    return Array.from(v.textTracks).filter(t => t.kind === 'subtitles' || t.kind === 'captions');
+  }
+  function applyCaptionsChoice() {
+    const want = ccWanted();
+    if (want !== 'on' && want !== 'off') return;   // never chosen: leave the film's default
+    const tracks = subtitleTracks();
+    if (!tracks.length) return;
+    const pick = want === 'on'
+      ? (tracks.find(t => /^en/i.test(t.language || '') || /english/i.test(t.label || '')) || tracks[0])
+      : null;
+    ccApplying = true;
+    for (const t of tracks) {
+      const mode = t === pick ? 'showing' : 'disabled';
+      if (t.mode !== mode) t.mode = mode;
+    }
+    // The resulting 'change' events fire asynchronously; stand down after them.
+    setTimeout(() => { ccApplying = false; }, 0);
+  }
+  v.textTracks.addEventListener('addtrack', () => setTimeout(applyCaptionsChoice, 0));
+  v.textTracks.addEventListener('change', () => {
+    if (ccApplying || !S.film) return;
+    const on = subtitleTracks().some(t => t.mode === 'showing');
+    try { localStorage.setItem(CC_KEY, on ? 'on' : 'off'); } catch {}
+  });
+
   function stopPlayback(alreadySaved) {
     clearTimeout(S.prepTimer); S.prepTimer = null;
     clearInterval(S.saveTimer); S.saveTimer = null;
     if (!alreadySaved) pushResume(false);
     if (S.hls) { try { S.hls.destroy(); } catch {} S.hls = null; }
-    v.pause(); v.removeAttribute('src'); v.load();
+    v.pause(); v.removeAttribute('src');
+    for (const t of v.querySelectorAll('track')) t.remove();
+    v.load();
     S.film = null; S.started = false;
     $('prep').hidden = true;
     $('player').hidden = true;
     document.body.classList.remove('locked');
     try { if (document.fullscreenElement) document.exitFullscreen(); } catch {}
-    if (!$('app').hidden) renderHome();   // progress bars and "Continue watching" move
+    // Progress bars and "Continue watching" move; the featured film stays put.
+    if (!$('app').hidden) { refreshBehind(); if (S.view === 'home') startHero(); }
   }
   $('pBack').addEventListener('click', () => stopPlayback(false));
 
@@ -1187,7 +1631,10 @@ public static class WatchPage
     }
     if (e.key === 'Escape' && !$('installTip').hidden) { $('installTip').hidden = true; return; }
     if (e.key === 'Escape' && !$('detail').hidden) { closeDetail(); return; }
-    if (e.key === '/' && !$('app').hidden && document.activeElement !== $('q')) { e.preventDefault(); $('q').focus(); }
+    if (e.key === 'Escape' && !$('whoMenu').hidden) { setMenu(false); $('whoBtn').focus(); return; }
+    if (e.key === '/' && !$('app').hidden && $('detail').hidden && document.activeElement !== $('q')) {
+      e.preventDefault(); setView('search');
+    }
   });
 
   // ---- start ---------------------------------------------------------------
