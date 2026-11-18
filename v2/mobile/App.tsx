@@ -7,7 +7,7 @@ import { ActivityIndicator, Alert, AppState, BackHandler, StyleSheet, Text, View
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { type Film, type Library, type ResumeRow, loadLibrary } from './src/library';
+import { type Film, type Library, type ResumeRow, loadLibrary, setOnList } from './src/library';
 import { restore, session, signOut, useSession } from './src/session';
 import { C } from './src/theme';
 import { Btn, Logo } from './src/ui';
@@ -100,6 +100,14 @@ export default function App() {
     });
   }, []);
 
+  // My List changes show at once; the server's answer then settles the list.
+  const toggleList = useCallback((film: Film, on: boolean) => {
+    setLib(l => l && ({
+      ...l, myList: on ? [film.filmKey, ...l.myList.filter(k => k !== film.filmKey)] : l.myList.filter(k => k !== film.filmKey),
+    }));
+    setOnList(film.filmKey, on).then(list => { if (list) setLib(l => l && { ...l, myList: list }); });
+  }, []);
+
   const play = (film: Film, startMs: number) => {
     if (lib && Date.now() - lib.fetchedAt > 10 * 60 * 60 * 1000) {
       // Tokens in this catalogue are nearly spent: refresh first, then play.
@@ -155,7 +163,8 @@ export default function App() {
         {stack.map((sc, i) => (
           <View key={i} style={StyleSheet.absoluteFill}>
             {sc.name === 'detail' && (
-              <DetailScreen film={sc.film} lib={lib} onBack={() => setStack(s => s.slice(0, i))} onPlay={play} />
+              <DetailScreen key={sc.film.itemKey} film={sc.film} lib={lib} onBack={() => setStack(s => s.slice(0, i))} onPlay={play}
+                onOpen={f => setStack(s => [...s, { name: 'detail', film: f }])} onToggleList={toggleList} />
             )}
             {sc.name === 'player' && (
               <PlayerScreen film={sc.film} startMs={sc.startMs} prevRow={lib.resume[sc.film.filmKey]}

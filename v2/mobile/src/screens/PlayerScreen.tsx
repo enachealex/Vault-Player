@@ -17,10 +17,24 @@ import * as ScreenOrientation from 'expo-screen-orientation';
 import { NavigationBar } from 'expo-navigation-bar';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { type Film, type ResumeRow, pushResume, routeFor } from '../library';
+import * as SecureStore from 'expo-secure-store';
+import { type Film, type ResumeRow, pushResume, routeFor, titleOf } from '../library';
 import { abs, api } from '../session';
 import { C } from '../theme';
 import { Btn } from '../ui';
+
+// Captions on or off is remembered across films and app launches: whoever
+// turned them on for one film wants them for the next. Read once at launch;
+// kept in memory after that so a new film doesn't wait on storage.
+const CC_KEY = 'vault.captions';
+let captionsWanted: boolean | null = null;
+const captionsPref = SecureStore.getItemAsync(CC_KEY)
+  .then(v => { if (captionsWanted === null) captionsWanted = v === 'on'; })
+  .catch(() => { if (captionsWanted === null) captionsWanted = false; });
+function rememberCaptions(on: boolean) {
+  captionsWanted = on;
+  SecureStore.setItemAsync(CC_KEY, on ? 'on' : 'off').catch(() => {});
+}
 
 type Phase =
   | { kind: 'loading' }
@@ -81,7 +95,7 @@ export function PlayerScreen({ film, startMs, prevRow, onExit, onSaved }: {
   }
 
   function playDirect() {
-    load({ uri: abs(film.streamUrl), contentType: 'progressive', metadata: { title: film.name } });
+    load({ uri: abs(film.streamUrl), contentType: 'progressive', metadata: { title: titleOf(film) } });
   }
 
   function prepareHls() {
@@ -107,7 +121,7 @@ export function PlayerScreen({ film, startMs, prevRow, onExit, onSaved }: {
         // treats as live and would open at its far end; the seek on ready
         // below puts it where it belongs, even when that is the very start.
         if (pendingSeek.current === null) pendingSeek.current = 0;
-        load({ uri: abs(j.playlistUrl), contentType: 'hls', metadata: { title: film.name } });
+        load({ uri: abs(j.playlistUrl), contentType: 'hls', metadata: { title: titleOf(film) } });
         return;
       }
       setPhase({ kind: 'preparing', percent: j.percent || 0 });
@@ -150,18 +164,28 @@ export function PlayerScreen({ film, startMs, prevRow, onExit, onSaved }: {
         text: (error?.message ? error.message + '\n\n' : '') + 'This film may only play in the Vault Movies desktop app.' });
     }
   });
-  useEventListener(player, 'sourceLoad', ({ availableSubtitleTracks }) =>
-    setSubtitleTracks(availableSubtitleTracks ?? []));
+  // When a film's caption tracks appear, put captions where they were left.
+  function tracksArrived(tracks: SubtitleTrack[]) {
+    setSubtitleTracks(tracks);
+    if (!tracks.length) return;
+    captionsPref.then(() => {
+      if (captionsWanted) {
+        if (!player.subtitleTrack) player.subtitleTrack = pickTrack(tracks);
+      } else if (player.subtitleTrack) {
+        player.subtitleTrack = null;
+      }
+    });
+  }
+  useEventListener(player, 'sourceLoad', ({ availableSubtitleTracks }) => tracksArrived(availableSubtitleTracks ?? []));
   useEventListener(player, 'availableSubtitleTracksChange', ({ availableSubtitleTracks }) =>
-    setSubtitleTracks(availableSubtitleTracks ?? []));
+    tracksArrived(availableSubtitleTracks ?? []));
   // Follows the native controls too, which can switch captions on their own.
   useEventListener(player, 'subtitleTrackChange', ({ subtitleTrack }) => setCaptionsOn(!!subtitleTrack));
 
   function toggleCaptions() {
     bumpChrome();
-    if (captionsOn) { player.subtitleTrack = null; return; }
-    const english = subtitleTracks.find(t => t.language?.toLowerCase().startsWith('en'));
-    player.subtitleTrack = english ?? subtitleTracks[0] ?? null;
+    rememberCaptions(!captionsOn);
+    player.subtitleTrack = captionsOn ? null : pickTrack(subtitleTracks);
   }
 
   useEventListener(player, 'playingChange', ({ isPlaying }) => {
@@ -252,7 +276,7 @@ export function PlayerScreen({ film, startMs, prevRow, onExit, onSaved }: {
           <Pressable onPress={onExit} style={styles.back} hitSlop={8} accessibilityLabel="Back">
             <Ionicons name="chevron-back" size={22} color={C.text} />
           </Pressable>
-          <Text style={styles.title} numberOfLines={1}>{film.name}</Text>
+          <Text style={styles.title} numberOfLines={1}>{titleOf(film)}</Text>
           {subtitleTracks.length > 0 && (
             <Pressable onPress={toggleCaptions} style={[styles.back, captionsOn && styles.ccOn]} hitSlop={8}
               accessibilityRole="switch" accessibilityState={{ checked: captionsOn }}
@@ -281,3 +305,8 @@ const styles = StyleSheet.create({
   title: { color: C.text, fontSize: 16, fontWeight: '700', flexShrink: 1, flexGrow: 1,
     textShadowColor: 'rgba(0,0,0,0.8)', textShadowRadius: 6 },
 });
+
+/** English first, else the first track there is. */
+function pickTrack(tracks: SubtitleTrack[]): SubtitleTrack | null {
+  return tracks.find(t => t.language?.toLowerCase().startsWith('en')) ?? tracks[0] ?? null;
+}

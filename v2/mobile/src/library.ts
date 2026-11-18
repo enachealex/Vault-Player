@@ -22,6 +22,9 @@ export type Film = {
   hlsUrl: string;
   /** WebVTT English captions, when the film has text captions. */
   captionsUrl?: string | null;
+  /** Tidy title and release year from the file name (server 2026-11+). */
+  title?: string | null;
+  year?: number | null;
 };
 
 export type Shelf = {
@@ -46,6 +49,8 @@ export type Library = {
   byFilmKey: Map<string, Film>;
   shelves: Shelf[];
   resume: Record<string, ResumeRow>;
+  /** Film keys saved to My List, newest first. */
+  myList: string[];
   scanning: boolean;
   mediaRootPresent: boolean;
   fetchedAt: number;
@@ -84,11 +89,20 @@ export async function loadLibrary(): Promise<LoadResult> {
       byFilmKey: new Map(films.map(f => [f.filmKey, f])),
       shelves: ((j.collections || []) as Shelf[]).slice().sort((a, b) => a.sortOrder - b.sortOrder),
       resume,
+      myList: Array.isArray(j.myList) ? j.myList : [],
       scanning: !!j.scanning,
       mediaRootPresent: j.mediaRootPresent !== false,
       fetchedAt: Date.now(),
     },
   };
+}
+
+/** Add a film to My List or take it off. Answers with the whole list, or null. */
+export async function setOnList(filmKey: string, on: boolean): Promise<string[] | null> {
+  try {
+    const r = await api('/api/v1/mylist/' + encodeURIComponent(filmKey), { method: on ? 'PUT' : 'DELETE' });
+    return r.ok ? ((await r.json()) as string[]) : null;
+  } catch { return null; }
 }
 
 /** Push one film's position; the server merges and answers with the truth. */
@@ -109,8 +123,11 @@ export function progressOf(lib: Library, f: Film): { frac: number; row: ResumeRo
   return { frac, row };
 }
 
+/** What to call a film on screen: its tidied title, else the file name. */
+export const titleOf = (f: Film) => f.title || f.name;
+
 const byName = (a: Film, b: Film) =>
-  a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true });
+  titleOf(a).localeCompare(titleOf(b), undefined, { sensitivity: 'base', numeric: true });
 const lastWatched = (lib: Library) => (a: Film, b: Film) =>
   (lib.resume[b.filmKey]?.lastWatchedAt || 0) - (lib.resume[a.filmKey]?.lastWatchedAt || 0);
 
@@ -123,8 +140,28 @@ export const shelfFilms = (lib: Library, s: Shelf) =>
   s.items.map(e => lib.byFilmKey.get(e.filmKey)).filter((f): f is Film => !!f);
 export const search = (lib: Library, q: string) => {
   const needle = q.trim().toLocaleLowerCase();
-  return lib.films.filter(f => f.name.toLocaleLowerCase().includes(needle)).sort(byName);
+  return lib.films.filter(f =>
+    titleOf(f).toLocaleLowerCase().includes(needle) || f.name.toLocaleLowerCase().includes(needle)).sort(byName);
 };
+export const myListFilms = (lib: Library) =>
+  lib.myList.map(k => lib.byFilmKey.get(k)).filter((f): f is Film => !!f);
+export const onList = (lib: Library, f: Film) => lib.myList.includes(f.filmKey);
+
+/**
+ * The films the big featured slot cycles through: new arrivals first, then
+ * films this account has never started, shuffled per visit so the top of the
+ * screen is not the same film every time. Films with no still are skipped,
+ * since the slot is mostly picture.
+ */
+export function featuredList(lib: Library, count = 5): Film[] {
+  const withArt = lib.films.filter(f => f.artUrl);
+  const fresh = withArt.filter(f => Date.now() - f.addedAt < 30 * 24 * 3600 * 1000 && !lib.resume[f.filmKey]);
+  const unwatched = withArt.filter(f => !lib.resume[f.filmKey] && !fresh.includes(f));
+  const shuffle = <T,>(a: T[]) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const picks = [...shuffle(fresh), ...shuffle(unwatched)];
+  if (picks.length < count) picks.push(...shuffle(withArt.filter(f => !picks.includes(f))));
+  return picks.slice(0, count);
+}
 
 const TWO_WEEKS = 14 * 24 * 3600 * 1000;
 export const isNew = (lib: Library, f: Film) => Date.now() - f.addedAt < TWO_WEEKS && !lib.resume[f.filmKey];
