@@ -57,27 +57,109 @@ public static class UiSnapshot
 
         Try("home", () => Save(frame, Path.Combine(outDir, "home.png")));
 
+        // Under a test profile (VAULT_PROFILE_DIR), pull the account's watch
+        // state first, as a normal launch does, so the rows show films under
+        // way. Not against the real profile: a snapshot should not talk to the
+        // viewer's own server on their behalf.
+        if (Environment.GetEnvironmentVariable("VAULT_PROFILE_DIR") is { Length: > 0 }
+            && Services.AppServices.Account.IsSignedIn)
+        {
+            var sync = Services.AppServices.Account.SyncAsync();
+            for (var waited = 0; !sync.IsCompleted && waited < 50; waited++) Pump(TimeSpan.FromMilliseconds(200));
+        }
+
         var library = new LibraryView();
         Try("library", () =>
         {
             shell.Navigate(library);
-            // The folder scan and the server catalogue both land later; give
-            // them a moment so the picture is of a library, not a spinner.
-            Pump(TimeSpan.FromSeconds(6));
+            // The folder scan, the server catalogue and its stills all land
+            // later; give them a moment so the picture is of a library, not a
+            // spinner.
+            Pump(TimeSpan.FromSeconds(8));
             var still = FirstStill(library);
             if (still is not null) shell.Ambient.Show(still, animate: false);
             Save(frame, Path.Combine(outDir, "library.png"));
         });
 
         // IsMouseOver cannot be set from outside, so the lift a hover gives a
-        // card is applied by hand to the first card of each row. A scroll edge
-        // that clips it shows up here as a missing top border.
+        // tile is applied by hand to the first tile of the first row. A scroll
+        // edge that clips it shows up here as a missing top edge.
         Try("library-hover", () =>
         {
-            foreach (var list in new[] { library.ContinueList, library.MovieList })
-                if (FirstDescendant<Button>(list) is { } card) card.RenderTransform = new TranslateTransform(0, -4);
+            if (FirstDescendant<Button>(library.RowsList) is { } tile)
+                tile.RenderTransform = new ScaleTransform(1.04, 1.04);
             Save(frame, Path.Combine(outDir, "library-hover.png"));
+            if (FirstDescendant<Button>(library.RowsList) is { } back) back.RenderTransform = new ScaleTransform();
         });
+
+        // Further down the Home page: the rows under the featured film.
+        Try("library-rows", () =>
+        {
+            library.HomePage.ScrollToVerticalOffset(420);
+            // Once to lay the page out at its new offset (which is what fades
+            // the shade in behind the tab bar), once to draw it.
+            Save(frame, Path.Combine(outDir, "library-rows.png"));
+            Save(frame, Path.Combine(outDir, "library-rows.png"));
+            library.HomePage.ScrollToTop();
+        });
+
+        foreach (var (page, file) in new[] { ("films", "library-films"), ("mylist", "library-mylist") })
+            Try(file, () =>
+            {
+                library.ShowPage(page);
+                Save(frame, Path.Combine(outDir, file + ".png"));
+            });
+
+        Try("library-search", () =>
+        {
+            library.ShowPage("search");
+            library.SetSearch("rush");
+            Save(frame, Path.Combine(outDir, "library-search.png"));
+            library.SetSearch("");
+            Save(frame, Path.Combine(outDir, "library-search-empty-query.png"));
+        });
+
+        // The details sheet, for a film under way when there is one, so the
+        // Resume line and Start over are in the picture.
+        Try("library-details", () =>
+        {
+            library.ShowPage("home");
+            var films = (library.RowsList.ItemsSource as IEnumerable<BrowseRow>)?
+                .SelectMany(r => r.Items).Where(m => !m.IsShortcut).ToList() ?? new List<MovieItem>();
+            var film = films.FirstOrDefault(m => m.ResumeMs > 0 && m.Thumbnail is not null)
+                       ?? films.FirstOrDefault(m => m.Thumbnail is not null) ?? films.FirstOrDefault();
+            if (film is null) throw new InvalidOperationException("no films to open");
+            library.OpenDetails(film);
+            Save(frame, Path.Combine(outDir, "library-details.png"));
+            // A local file, for how the sheet degrades without catalogue facts.
+            if (films.FirstOrDefault(m => m.Kind == MovieKind.Local) is { } local)
+            {
+                library.OpenDetails(local);
+                Save(frame, Path.Combine(outDir, "library-details-local.png"));
+            }
+        });
+
+        // Under a test profile, save a film to My List and take it off again
+        // through the client, leaving the test account as it was.
+        if (Environment.GetEnvironmentVariable("VAULT_PROFILE_DIR") is { Length: > 0 }
+            && Services.AppServices.Account.IsSignedIn)
+        {
+            Try("mylist-roundtrip", () =>
+            {
+                var catalog = Services.AppServices.Catalog;
+                var film = catalog.Items.FirstOrDefault(m => !catalog.IsOnMyList(m.FilmKey))
+                           ?? throw new InvalidOperationException("every film is already on the list");
+                bool Wait(System.Threading.Tasks.Task<bool> t)
+                {
+                    for (var i = 0; !t.IsCompleted && i < 50; i++) Pump(TimeSpan.FromMilliseconds(100));
+                    return t.IsCompletedSuccessfully && t.Result;
+                }
+                if (!Wait(catalog.SetOnMyListAsync(film.FilmKey, true)) || !catalog.IsOnMyList(film.FilmKey))
+                    throw new InvalidOperationException("add failed: " + catalog.LastError);
+                if (!Wait(catalog.SetOnMyListAsync(film.FilmKey, false)) || catalog.IsOnMyList(film.FilmKey))
+                    throw new InvalidOperationException("remove failed: " + catalog.LastError);
+            });
+        }
 
         Try("home-with-film", () =>
         {

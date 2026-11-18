@@ -21,9 +21,7 @@ public static class ThumbnailService
 {
     private static readonly SemaphoreSlim Gate = new(3);
 
-    private static string CacheDir =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "VideoPlayerV2", "thumbs");
+    private static string CacheDir => Path.Combine(Settings.DataDir, "thumbs");
 
     /// <summary>Best available ffmpeg.exe: next to the app, or the repo tools folder (dev).</summary>
     public static string? FindFfmpeg()

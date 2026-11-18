@@ -43,6 +43,69 @@ public class MovieItem : INotifyPropertyChanged
     /// <summary>Poster URL on the server, fetched with the account token. Server items only.</summary>
     public string? ArtUrl { get; init; }
 
+    // ---- What the catalogue knows that a file name does not -----------------
+    //
+    // Settable rather than init-only: a local copy of a server film keeps its
+    // own path and thumbnail (it plays off the disk) but borrows these from the
+    // catalogue entry it replaces, so it still reads "The Princess Bride, 1987"
+    // instead of the release group's file name.
+
+    /// <summary>Tidy title from the server ("The Princess Bride"); null for local files.</summary>
+    public string? Title { get; set; }
+
+    /// <summary>Release year from the server, when the file name carried one.</summary>
+    public int? Year { get; set; }
+
+    /// <summary>When the film arrived on the server (unix ms); 0 when unknown, as for local files.</summary>
+    public long AddedAt { get; set; }
+
+    /// <summary>English captions on the server, when the film has text captions.</summary>
+    public string? CaptionsUrl { get; set; }
+
+    /// <summary>Codecs as the server probed them ("h264", "aac"); null for local files.</summary>
+    public string? VideoCodec { get; set; }
+    public string? AudioCodec { get; set; }
+
+    /// <summary>What to call the film on screen: the tidy title, else the file name.</summary>
+    public string DisplayTitle => string.IsNullOrWhiteSpace(Title) ? Name : Title!;
+
+    public bool HasCaptions => !string.IsNullOrEmpty(CaptionsUrl);
+
+    /// <summary>
+    /// "4K" when the file name says so, otherwise "HD". The catalogue has no
+    /// resolution field, and release names are reliable about 2160p in a way
+    /// they are not about anything lower. Streaming shortcuts have neither.
+    /// </summary>
+    public string? QualityTag => IsShortcut
+        ? null
+        : System.Text.RegularExpressions.Regex.IsMatch(System.IO.Path.GetFileName(Path) + " " + Name,
+            @"2160p|4k|uhd", System.Text.RegularExpressions.RegexOptions.IgnoreCase) ? "4K" : "HD";
+
+    /// <summary>"2h 17m", or empty when the runtime is not known yet.</summary>
+    public string RuntimeText
+    {
+        get
+        {
+            if (DurationMs is not > 0) return "";
+            var min = (int)Math.Round(DurationMs.Value / 60000.0);
+            int h = min / 60, m = min % 60;
+            return h > 0 ? (m > 0 ? $"{h}h {m}m" : $"{h}h") : $"{m}m";
+        }
+    }
+
+    /// <summary>
+    /// Arrived in the last fortnight and not started yet: the rust NEW flag.
+    /// Local files have no arrival date, so they are never flagged.
+    /// </summary>
+    public bool IsNew =>
+        AddedAt > 0 && ResumeMs <= 0 && WatchCount == 0
+        && DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - AddedAt < 14L * 24 * 3600 * 1000;
+
+    public Visibility NewFlagVisibility => IsNew ? Visibility.Visible : Visibility.Collapsed;
+
+    /// <summary>Whether a tile draws its progress bar: started, and not finished.</summary>
+    public Visibility ProgressVisibility => ProgressFraction > 0 ? Visibility.Visible : Visibility.Collapsed;
+
     /// <summary>
     /// Cross-machine identity: filename + exact byte size. The same rip in a
     /// different folder on another PC produces the same key, which is how synced
@@ -93,7 +156,8 @@ public class MovieItem : INotifyPropertyChanged
         set
         {
             _durationMs = value;
-            Notify(nameof(DurationMs), nameof(MetaText), nameof(ProgressFraction), nameof(ResumeText));
+            Notify(nameof(DurationMs), nameof(MetaText), nameof(ProgressFraction), nameof(ResumeText),
+                nameof(RuntimeText), nameof(ProgressVisibility));
         }
     }
 
@@ -105,7 +169,8 @@ public class MovieItem : INotifyPropertyChanged
         set
         {
             _resumeMs = value;
-            Notify(nameof(ResumeMs), nameof(ProgressFraction), nameof(ResumeText));
+            Notify(nameof(ResumeMs), nameof(ProgressFraction), nameof(ResumeText),
+                nameof(ProgressVisibility), nameof(IsNew), nameof(NewFlagVisibility));
         }
     }
 
@@ -117,7 +182,8 @@ public class MovieItem : INotifyPropertyChanged
         set
         {
             _watchCount = value;
-            Notify(nameof(WatchCount), nameof(WatchBadgeText), nameof(WatchBadgeVisibility), nameof(WatchTooltip));
+            Notify(nameof(WatchCount), nameof(WatchBadgeText), nameof(WatchBadgeVisibility), nameof(WatchTooltip),
+                nameof(IsNew), nameof(NewFlagVisibility));
         }
     }
 

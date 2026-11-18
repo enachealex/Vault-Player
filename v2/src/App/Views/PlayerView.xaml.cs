@@ -71,8 +71,8 @@ public partial class PlayerView : UserControl, IDisposable
         _index = Math.Max(0, ((List<MovieItem>)_playlist.ToList()).FindIndex(m => m.Path == movie.Path));
         // Guests get the room identity from the shared-screen badge instead.
         TitleText.Text = party is null || party is { IsHost: false }
-            ? movie.Name
-            : $"{movie.Name} — Watch Party {party.RoomCode}";
+            ? movie.DisplayTitle
+            : $"{movie.DisplayTitle} — Watch Party {party.RoomCode}";
         Loaded += OnLoaded;
     }
 
@@ -119,10 +119,14 @@ public partial class PlayerView : UserControl, IDisposable
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
         if (_player is not null) return; // Loaded can re-fire
-        MainWindow.Instance.SetTitleContext(_movie.Name);
+        MainWindow.Instance.SetTitleContext(_movie.DisplayTitle);
         _player = new MediaPlayer(AppServices.LibVlc);
         Video.MediaPlayer = _player;
         _player.EndReached += (_, _) => Dispatcher.BeginInvoke(OnEnded);
+        // Fill is a crop to the video area's shape, so it follows every resize
+        // (entering fullscreen, dragging the window edge, snapping).
+        Video.SizeChanged += (_, _) => { if (AppServices.Settings.FillVideo) ApplyFill(); };
+        ApplyFill();
         // So a device change from Settings can reach this film while it plays.
         AppServices.Audio.Attach(_player);
 
@@ -195,7 +199,7 @@ public partial class PlayerView : UserControl, IDisposable
             // The paused card shows who is in the room, so the roster has to be
             // tracked here as well as in the lobby.
             PausedRoster.ItemsSource = _partyRoster;
-            PausedTitle.Text = _movie.Name;
+            PausedTitle.Text = _movie.DisplayTitle;
             PausedCode.Text = _party.RoomCode;
             _party.RosterChanged += members => Dispatcher.Invoke(() =>
             {
@@ -465,6 +469,8 @@ public partial class PlayerView : UserControl, IDisposable
         if (_player is null) return;
         _player.Stop();
         _player.SetRenderer((AppServices.Cast.Active as VlcTarget)?.Item!);
+        _subsPrefPending = true;
+        _subsPrefFirstDone = false;
 
         using var media = new Media(AppServices.LibVlc, _movie.Path,
             IsRemoteSource ? FromType.FromLocation : FromType.FromPath);
@@ -483,6 +489,13 @@ public partial class PlayerView : UserControl, IDisposable
         // Play — so route it here, not at player creation.
         AppServices.Audio.ApplyTo(_player);
         if (!IsRemoteSource) AddSidecarSubtitles();
+        // A Vault film's English captions, offered as a subtitle track but not
+        // switched on: the viewer chooses them, as with a sidecar file.
+        else if (_movie.CaptionsUrl is { Length: > 0 } captions)
+        {
+            try { _player.AddSlave(MediaSlaveType.Subtitle, captions, false); }
+            catch { /* captions are a nicety; the film plays without them */ }
+        }
     }
 
     /// <summary>Sidecar .srt/.vtt/.ass next to the movie become selectable subtitle tracks.</summary>
@@ -808,7 +821,16 @@ public partial class PlayerView : UserControl, IDisposable
         var style = new MenuItem { Header = "Caption style…" };
         style.Click += (_, _) => OpenCaptionStyle();
         ShowTrackMenu(SubsBtn, _player.SpuDescription, _player.Spu,
-            id => _player.SetSpu(id), extra: style);
+            id =>
+            {
+                _player.SetSpu(id);
+                // Remembered for the next film; and this film is now the
+                // viewer's choice, so the start-of-film setting stands down.
+                _subsPrefPending = false;
+                var s = AppServices.Settings;
+                s.SubtitlesOn = id != -1;
+                s.Save();
+            }, extra: style);
     }
 
     private void OpenCaptionStyle()
@@ -828,9 +850,47 @@ public partial class PlayerView : UserControl, IDisposable
         if (_player is null) return;
         _restoreSpu = _player.Spu;   // -1 = off; applied once after the reload
         StartPlayback(Math.Max(0, _player.Time));
+        _subsPrefPending = false;    // the reload keeps the current track instead
     }
 
     private int? _restoreSpu;
+
+    // ---- Subtitles on or off, as last chosen ------------------------------
+    //
+    // A new film's subtitle tracks arrive in stages: the file's own as it
+    // opens, a sidecar .srt or the server's captions a moment later. So the
+    // remembered choice is applied when tracks first appear and once more
+    // after a second and a half of playback, unless the viewer picks a track
+    // in between.
+
+    private bool _subsPrefPending;
+    private bool _subsPrefFirstDone;
+
+    private void ApplySubtitlePreference()
+    {
+        if (!_subsPrefPending || _player is null || _restoreSpu is not null) return;
+        var want = AppServices.Settings.SubtitlesOn;
+        if (want is null) { _subsPrefPending = false; return; }
+        var tracks = _player.SpuDescription.Where(t => t.Id != -1).ToArray();
+        if (tracks.Length == 0) return;
+
+        var late = _player.Time >= 1500;
+        if (_subsPrefFirstDone && !late) return;
+        if (want == false)
+        {
+            if (_player.Spu != -1) _player.SetSpu(-1);
+        }
+        else if (_player.Spu == -1 || late)
+        {
+            var english = tracks.FirstOrDefault(t => t.Name is { } n &&
+                System.Text.RegularExpressions.Regex.IsMatch(n, @"english|\beng\b|\[en\]", System.Text.RegularExpressions.RegexOptions.IgnoreCase));
+            var pick = english.Name is null ? tracks[0] : english;
+            // Leave a track the film itself chose alone when it is already English.
+            if (_player.Spu == -1 || (english.Name is not null && _player.Spu != english.Id)) _player.SetSpu(pick.Id);
+        }
+        _subsPrefFirstDone = true;
+        if (late) _subsPrefPending = false;
+    }
 
     private void ShowTrackMenu(Button anchor, TrackDescription[] tracks, int currentId,
         Action<int> select, MenuItem? extra = null)
@@ -1336,6 +1396,42 @@ public partial class PlayerView : UserControl, IDisposable
         _fullscreen = false;
     }
 
+    // ---- Fill ----------------------------------------------------------------
+    //
+    // libVLC normally fits the whole picture inside the window and letterboxes
+    // the rest. Fill crops the picture to the window's own proportions first,
+    // so the fitted result covers every pixel: no black bars, at the cost of
+    // the edges that don't fit. The crop is a ratio, which libVLC applies in
+    // display terms, so anamorphic DVDs crop correctly too.
+
+    private void FillBtn_Click(object sender, RoutedEventArgs e) => ToggleFill();
+
+    private void ToggleFill()
+    {
+        var s = AppServices.Settings;
+        s.FillVideo = !s.FillVideo;
+        s.Save();
+        ApplyFill();
+        NoteActivity();
+    }
+
+    private void ApplyFill()
+    {
+        var on = AppServices.Settings.FillVideo;
+        FillGlyph.Text = on ? "" : "";   // fit-page when on (what pressing does), crop when off
+        FillBtn.ToolTip = on
+            ? "Fit: show the whole picture again, with black bars where it doesn't match the screen (Z)"
+            : "Fill: zoom the picture edge to edge, trimming what doesn't fit, with no black bars (Z)";
+        if (_player is null) return;
+        var w = (int)Math.Round(Video.ActualWidth);
+        var h = (int)Math.Round(Video.ActualHeight);
+        try
+        {
+            _player.CropGeometry = on && w > 0 && h > 0 ? $"{w}:{h}" : null;
+        }
+        catch { /* the player is being torn down */ }
+    }
+
     // ---- Keyboard shortcuts ------------------------------------------------
 
     private void OnKeyDown(object sender, KeyEventArgs e)
@@ -1358,6 +1454,7 @@ public partial class PlayerView : UserControl, IDisposable
             case Key.Down: VolumeSlider.Value = Math.Max(0, VolumeSlider.Value - 10); break;
             case Key.M: MuteBtn_Click(this, null!); break;
             case Key.F or Key.F11: ToggleFullscreen(); break;
+            case Key.Z: ToggleFill(); break;
             case Key.N: NextBtn_Click(this, null!); break;
             case Key.P: PrevBtn_Click(this, null!); break;
 
@@ -1568,6 +1665,7 @@ public partial class PlayerView : UserControl, IDisposable
         PlayGlyph.Text = _player.IsPlaying ? "\uE769" : "\uE768";
         PlayBtn.ToolTip = _player.IsPlaying ? "Pause (Space)" : "Play (Space)";
 
+        ApplySubtitlePreference();
         // Re-select the subtitle track that was on before a caption-style reload,
         // once the tracks exist again. One-shot: clears itself when done.
         if (_restoreSpu is { } wantSpu && _player.SpuDescription.Length > 0)

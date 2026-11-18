@@ -172,9 +172,33 @@ public class Settings
     /// </summary>
     public bool AlwaysOnTop { get; set; }
 
-    private static string FilePath =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "VideoPlayerV2", "settings.json");
+    /// <summary>
+    /// Fill: zoom the picture until it covers the whole video area, edge to
+    /// edge, trimming whatever does not fit (the sides of a widescreen film on
+    /// a 4:3 window, the top and bottom of a 4:3 DVD on a 16:9 screen) instead
+    /// of showing black bars. Remembered, like a TV's zoom setting.
+    /// </summary>
+    public bool FillVideo { get; set; }
+
+    /// <summary>
+    /// Whether subtitles were on when the viewer last chose (from the subtitle
+    /// menu or C). Each new film starts the same way. Null until they first
+    /// choose, which leaves each film's own default alone.
+    /// </summary>
+    public bool? SubtitlesOn { get; set; }
+
+    /// <summary>
+    /// Where settings and the image caches live. VAULT_PROFILE_DIR points a
+    /// test run at a profile of its own — a different server, account and
+    /// folder — so checking a change against a test library never touches the
+    /// viewer's real settings or fills their caches with test stills.
+    /// </summary>
+    public static string DataDir =>
+        Environment.GetEnvironmentVariable("VAULT_PROFILE_DIR") is { Length: > 0 } dir
+            ? dir
+            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "VideoPlayerV2");
+
+    private static string FilePath => Path.Combine(DataDir, "settings.json");
 
     private static string BackupPath => FilePath + ".bak";
 

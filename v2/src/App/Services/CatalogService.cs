@@ -37,11 +37,15 @@ public record CollectionDto(long Id, string Name, string? ArtFilmKey, int SortOr
 public class CatalogService(AccountService account)
 {
     // Wire shapes, matching the backend's /api/v1/catalog DTOs.
+    // The trailing fields are newer than the rest and optional on purpose: an
+    // older server leaves them out, and the film then shows its file name with
+    // no year, exactly as before.
     private record CatalogItemDto(string ItemKey, string Name, long SizeBytes, long? DurationMs,
         string ContentType, string FilmKey, bool WebPlayable, string? VideoCodec, string? AudioCodec,
-        string StreamUrl, string? ArtUrl, long AddedAt);
+        string StreamUrl, string? ArtUrl, long AddedAt,
+        string? CaptionsUrl = null, string? Title = null, int? Year = null);
     private record CatalogDto(CatalogItemDto[] Items, bool Scanning, long LastScanAt, bool MediaRootPresent,
-        CollectionDto[]? Collections);
+        CollectionDto[]? Collections, string[]? MyList = null);
 
     private static readonly JsonSerializerOptions Json = new()
     {
@@ -62,6 +66,15 @@ public class CatalogService(AccountService account)
     /// </summary>
     public IReadOnlyList<CollectionDto> Collections { get; private set; } = Array.Empty<CollectionDto>();
 
+    /// <summary>
+    /// Film keys saved to My List, newest first. Empty when signed out, and
+    /// against a server too old to keep one (it simply omits the field).
+    /// </summary>
+    public IReadOnlyList<string> MyList { get; private set; } = Array.Empty<string>();
+
+    /// <summary>Whether a film is on My List. Matched on FilmKey, like shelves.</summary>
+    public bool IsOnMyList(string filmKey) => MyList.Contains(filmKey, StringComparer.Ordinal);
+
     /// <summary>Whether the server is mid-scan; the UI says so rather than claiming an empty library.</summary>
     public bool ServerScanning { get; private set; }
 
@@ -80,6 +93,7 @@ public class CatalogService(AccountService account)
         LastError = null;
         if (!account.IsSignedIn)
         {
+            MyList = Array.Empty<string>();
             Items = Array.Empty<MovieItem>();
             return Items;
         }
@@ -124,6 +138,7 @@ public class CatalogService(AccountService account)
 
             ServerScanning = dto.Scanning;
             Collections = dto.Collections ?? Array.Empty<CollectionDto>();
+            MyList = dto.MyList ?? Array.Empty<string>();
             Items = dto.Items.Select(x => new MovieItem
             {
                 Name = x.Name,
@@ -136,6 +151,12 @@ public class CatalogService(AccountService account)
                 ServerFilmKey = x.FilmKey,
                 ArtUrl = x.ArtUrl is null ? null : account.BaseUrl + x.ArtUrl,
                 DurationMs = x.DurationMs,
+                Title = x.Title,
+                Year = x.Year,
+                AddedAt = x.AddedAt,
+                VideoCodec = x.VideoCodec,
+                AudioCodec = x.AudioCodec,
+                CaptionsUrl = x.CaptionsUrl is null ? null : account.BaseUrl + x.CaptionsUrl,
             }).ToList();
 
             Changed?.Invoke();
@@ -214,9 +235,7 @@ public class CatalogService(AccountService account)
         }
     }
 
-    private static string CacheDir =>
-        System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "VideoPlayerV2", "vault-art");
+    private static string CacheDir => System.IO.Path.Combine(Settings.DataDir, "vault-art");
 
     /// <summary>
     /// Decode to a frozen bitmap so it can cross to the UI thread, with OnLoad
@@ -231,6 +250,46 @@ public class CatalogService(AccountService account)
         image.EndInit();
         image.Freeze();
         return image;
+    }
+
+    // ---- My List -----------------------------------------------------------
+
+    /// <summary>
+    /// Save a film to My List, or take it off. The server answers with the
+    /// whole list, which replaces ours, so a change made on the phone a minute
+    /// ago is not undone by this one. Returns false and sets
+    /// <see cref="LastError"/> on failure; the list is then left as it was.
+    /// </summary>
+    public async Task<bool> SetOnMyListAsync(string filmKey, bool on, CancellationToken ct = default)
+    {
+        LastError = null;
+        var token = await account.AccessTokenAsync();
+        if (token is null) { LastError = "You're signed out."; return false; }
+        try
+        {
+            // The key holds "|" and spaces, so it has to be escaped to survive
+            // as one path segment.
+            using var req = new HttpRequestMessage(on ? HttpMethod.Put : HttpMethod.Delete,
+                $"{account.BaseUrl}/api/v1/mylist/{Uri.EscapeDataString(filmKey)}");
+            req.Headers.Authorization = new("Bearer", token);
+            var resp = await _http.SendAsync(req, ct);
+            if (!resp.IsSuccessStatusCode)
+            {
+                // A server that knows the route explains a 404 ("that film is
+                // not on this server"); one that predates My List says nothing.
+                var why = await ReasonAsync(resp, ct);
+                LastError = resp.StatusCode == System.Net.HttpStatusCode.NotFound && why.StartsWith("The server refused")
+                    ? "This server is too old to keep a list. Update it and try again."
+                    : why;
+                return false;
+            }
+
+            var list = await resp.Content.ReadFromJsonAsync<string[]>(Json, ct);
+            if (list is null) { LastError = "The server returned an unexpected response."; return false; }
+            MyList = list;
+            return true;
+        }
+        catch (Exception ex) { LastError = ex.Message; return false; }
     }
 
     // ---- Shelves -----------------------------------------------------------

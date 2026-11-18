@@ -112,6 +112,17 @@
     <CornerRadius x:Key="ButtonRadius">10</CornerRadius>
     <CornerRadius x:Key="ButtonFocusRadius">13</CornerRadius>
     <CornerRadius x:Key="ChipRadius">7</CornerRadius>
+    <!-- Film stills in the browse rows and grids, and their focus ring (the
+         radius plus the ring's 4px offset, as with buttons). -->
+    <CornerRadius x:Key="TileRadius">10</CornerRadius>
+    <CornerRadius x:Key="TileFocusRadius">14</CornerRadius>
+    <!-- The small outlined tags in a meta line (CC, HD, 4K) and the NEW flag. -->
+    <CornerRadius x:Key="TagRadius">5</CornerRadius>
+    <!-- The tab strip's pane, and the details sheet. -->
+    <CornerRadius x:Key="BarRadius">12</CornerRadius>
+    <CornerRadius x:Key="SheetRadius">18</CornerRadius>
+    <!-- The featured film's position marks: short bars, squared off. -->
+    <CornerRadius x:Key="IndicatorRadius">1</CornerRadius>
 
     <!-- ==================== Text roles ==================== -->
     <!-- The big page title, as on a television's home screen. -->
@@ -1097,6 +1108,279 @@
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+    </Style>
+
+    <!-- ==================== Browse (library home) ====================
+         The film library as a television home screen: a featured film filling
+         the top, glass tabs over it, and rows of 16:9 stills that scroll
+         sideways. Shared by every page of the library and the details sheet,
+         and kept in step with the TV page and the phone app. -->
+
+    <!-- Glass over a picture: dark and see-through, with a hairline edge. The
+         bar is the lighter of the two, because it floats over the brightest
+         part of the featured still; the sheet carries body text, so it is
+         denser. -->
+    <SolidColorBrush x:Key="GlassBarBrush" Color="#730E1016" />
+    <SolidColorBrush x:Key="GlassSheetBrush" Color="#B810121A" />
+    <SolidColorBrush x:Key="GlassLineBrush" Color="#24FFFFFF" />
+    <!-- A glass button's own pane, a step lighter than a ghost button so it
+         holds up beside the solid white Play button on a busy still. -->
+    <SolidColorBrush x:Key="GlassButtonBrush" Color="#29FFFFFF" />
+    <SolidColorBrush x:Key="GlassButtonHoverBrush" Color="#3DFFFFFF" />
+    <SolidColorBrush x:Key="GlassButtonLineBrush" Color="#2EFFFFFF" />
+    <!-- The NEW flag. Rust is otherwise the logo's alone. -->
+    <SolidColorBrush x:Key="RustBrush" Color="#E35A3C" />
+    <!-- Unselected tab text: brighter than muted, since it sits on a picture. -->
+    <SolidColorBrush x:Key="TabTextBrush" Color="#C9CFD9" />
+    <!-- Behind a still that has not arrived yet. -->
+    <SolidColorBrush x:Key="TileWellBrush" Color="#151821" />
+    <!-- The thin progress line on a tile, and its track. White, not accent:
+         blue means "where the keyboard is", and only that. -->
+    <SolidColorBrush x:Key="TileProgressBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="TileProgressTrackBrush" Color="#40FFFFFF" />
+    <!-- The details sheet's backdrop: the still, blurred, under this. -->
+    <SolidColorBrush x:Key="SheetDimBrush" Color="#B30B0D12" />
+    <!-- The featured film's position marks: this one, and the others. -->
+    <SolidColorBrush x:Key="IndicatorOnBrush" Color="#F4F6FA" />
+    <SolidColorBrush x:Key="IndicatorOffBrush" Color="#59FFFFFF" />
+
+    <!-- The shade a tile's title is written on: clear at the top, dark at the foot. -->
+    <LinearGradientBrush x:Key="TileShadeBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#00000000" Offset="0.4" />
+        <GradientStop Color="#C7000000" Offset="1" />
+    </LinearGradientBrush>
+    <!-- The featured still's two shades: from the left, where the title sits,
+         and up from the foot, where the first row overlaps it. -->
+    <LinearGradientBrush x:Key="HeroLeftShadeBrush" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="#EB0B0D12" Offset="0" />
+        <GradientStop Color="#8C0B0D12" Offset="0.38" />
+        <GradientStop Color="#000B0D12" Offset="0.66" />
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="HeroBottomShadeBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#800B0D12" Offset="0" />
+        <GradientStop Color="#000B0D12" Offset="0.2" />
+        <GradientStop Color="#000B0D12" Offset="0.45" />
+        <GradientStop Color="#B30B0D12" Offset="0.8" />
+        <GradientStop Color="#D90B0D12" Offset="1" />
+    </LinearGradientBrush>
+    <!-- And the whole featured picture fades out at its foot, over the ambient still. -->
+    <LinearGradientBrush x:Key="HeroFadeMaskBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#FF000000" Offset="0.6" />
+        <GradientStop Color="#00000000" Offset="1" />
+    </LinearGradientBrush>
+    <!-- The sharp still at the head of the details sheet melts into the sheet. -->
+    <LinearGradientBrush x:Key="SheetStillMaskBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#FF000000" Offset="0.55" />
+        <GradientStop Color="#00000000" Offset="1" />
+    </LinearGradientBrush>
+
+    <Style x:Key="StillTileFocusVisual">
+        <Setter Property="Control.Template">
+            <Setter.Value>
+                <ControlTemplate>
+                    <Border Margin="-4" CornerRadius="{StaticResource TileFocusRadius}" BorderThickness="3"
+                            BorderBrush="{StaticResource AccentBrush}" SnapsToDevicePixels="True" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- A film as a 16:9 still. The content (picture, title, flags) is the
+         caller's; this is the frame, and the lift: pointing at a tile or
+         reaching it with the keyboard grows it a little and outlines it, the
+         way a television marks the tile it is on. Size it with Width/Height. -->
+    <Style x:Key="StillTile" TargetType="Button">
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Width" Value="240" />
+        <Setter Property="Height" Value="135" />
+        <Setter Property="Margin" Value="0,0,12,0" />
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource StillTileFocusVisual}" />
+        <Setter Property="RenderTransformOrigin" Value="0.5,0.5" />
+        <Setter Property="RenderTransform">
+            <Setter.Value>
+                <ScaleTransform />
+            </Setter.Value>
+        </Setter>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Grid>
+                        <Border x:Name="Bd" Background="{StaticResource TileWellBrush}"
+                                CornerRadius="{StaticResource TileRadius}">
+                            <ContentPresenter />
+                        </Border>
+                        <!-- The edge, drawn over the picture so the still cannot hide it. -->
+                        <Border x:Name="Edge" CornerRadius="{StaticResource TileRadius}" BorderThickness="1"
+                                BorderBrush="#10FFFFFF" IsHitTestVisible="False" />
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Edge" Property="BorderBrush" Value="#E6FFFFFF" />
+                            <Setter TargetName="Edge" Property="BorderThickness" Value="2" />
+                            <Setter TargetName="Bd" Property="Effect">
+                                <Setter.Value>
+                                    <DropShadowEffect BlurRadius="28" ShadowDepth="10" Opacity="0.55" Color="Black" />
+                                </Setter.Value>
+                            </Setter>
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
+                                                         To="1.04" Duration="0:0:0.16" />
+                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
+                                                         To="1.04" Duration="0:0:0.16" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
+                                                         To="1" Duration="0:0:0.16" />
+                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
+                                                         To="1" Duration="0:0:0.16" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
+                        </Trigger>
+                        <!-- Keyboard focus grows the tile too; the ring itself is the focus visual. -->
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter Property="RenderTransform">
+                                <Setter.Value>
+                                    <ScaleTransform ScaleX="1.04" ScaleY="1.04" />
+                                </Setter.Value>
+                            </Setter>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- The tab strip's buttons. A RadioButton, so exactly one page is chosen
+         and arrow keys move along the strip. Chosen is a lighter pane, never
+         blue: blue is the keyboard's alone. -->
+    <Style x:Key="NavTab" TargetType="RadioButton">
+        <Setter Property="Foreground" Value="{StaticResource TabTextBrush}" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Padding" Value="15,7" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource ButtonFocusVisual}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RadioButton">
+                    <Border x:Name="Bd" Background="Transparent" CornerRadius="{StaticResource ChipRadius}"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource SurfaceBrush}" />
+                            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource GlassButtonBrush}" />
+                            <Setter Property="Foreground" Value="White" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- "More info", "Start over": a pane of glass the size of the Play button beside it. -->
+    <Style x:Key="GlassButton" TargetType="Button" BasedOn="{StaticResource GhostButton}">
+        <Setter Property="Background" Value="{StaticResource GlassButtonBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource GlassButtonLineBrush}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
+    <!-- The two big buttons under the featured film's title. -->
+    <Style x:Key="HeroPrimaryButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+        <Setter Property="FontSize" Value="16" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Padding" Value="24,12" />
+    </Style>
+    <Style x:Key="HeroGlassButton" TargetType="Button" BasedOn="{StaticResource GlassButton}">
+        <Setter Property="FontSize" Value="16" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Padding" Value="22,12" />
+    </Style>
+
+    <!-- The arrows at either end of a row, shown while the pointer is on it. -->
+    <Style x:Key="RowArrow" TargetType="Button" BasedOn="{StaticResource GhostButton}">
+        <Setter Property="Width" Value="40" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Background" Value="{StaticResource GlassSheetBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource GlassLineBrush}" />
+        <Setter Property="FontFamily" Value="{StaticResource IconFont}" />
+        <Setter Property="FontSize" Value="16" />
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="Visibility" Value="Collapsed" />
+    </Style>
+
+    <!-- "NEW IN YOUR VAULT": warm gold capitals over the featured title. The
+         text is set in capitals by the caller; the body face has no small caps. -->
+    <Style x:Key="Kicker" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Foreground" Value="{StaticResource AccentWarmBrush}" />
+        <Setter Property="Margin" Value="0,0,0,12" />
+    </Style>
+    <Style x:Key="HeroTitle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="48" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+        <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+        <Setter Property="LineHeight" Value="52" />
+        <Setter Property="Effect">
+            <Setter.Value>
+                <DropShadowEffect BlurRadius="24" ShadowDepth="2" Opacity="0.6" Color="Black" />
+            </Setter.Value>
+        </Setter>
+    </Style>
+    <!-- A row's heading, white and bold as on a television. -->
+    <Style x:Key="RowHeader" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="18" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+        <Setter Property="Margin" Value="0,0,0,8" />
+    </Style>
+    <!-- CC / HD / 4K in a meta line. -->
+    <Style x:Key="MetaTag" TargetType="Border">
+        <Setter Property="BorderBrush" Value="#59FFFFFF" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{StaticResource TagRadius}" />
+        <Setter Property="Padding" Value="5,1" />
+        <Setter Property="Margin" Value="0,0,6,0" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style x:Key="MetaTagText" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Foreground" Value="#E7EAF0" />
+    </Style>
+    <!-- The rust NEW flag in a tile's corner. -->
+    <Style x:Key="NewFlag" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource RustBrush}" />
+        <Setter Property="CornerRadius" Value="{StaticResource TagRadius}" />
+        <Setter Property="Padding" Value="6,2" />
+        <Setter Property="Margin" Value="8" />
+        <Setter Property="HorizontalAlignment" Value="Left" />
+        <Setter Property="VerticalAlignment" Value="Top" />
+    </Style>
+    <!-- A thin bar on a tile's foot: how far through the film you are. -->
+    <Style x:Key="TileProgress" TargetType="ProgressBar" BasedOn="{StaticResource {x:Type ProgressBar}}">
+        <Setter Property="Height" Value="3" />
+        <Setter Property="Maximum" Value="1" />
+        <Setter Property="VerticalAlignment" Value="Bottom" />
+        <Setter Property="Margin" Value="10,0,10,7" />
+        <Setter Property="Foreground" Value="{StaticResource TileProgressBrush}" />
+        <Setter Property="Background" Value="{StaticResource TileProgressTrackBrush}" />
+        <Setter Property="IsHitTestVisible" Value="False" />
     </Style>
 
     <!-- ==================== Window caption buttons ====================

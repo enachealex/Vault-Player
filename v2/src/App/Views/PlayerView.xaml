@@ -201,6 +201,8 @@
                             <TextBlock Text="Next / previous film" Style="{StaticResource ShortcutWhat}" />
                             <TextBlock Text="F / F11" Style="{StaticResource ShortcutKey}" />
                             <TextBlock Text="Fullscreen" Style="{StaticResource ShortcutWhat}" />
+                            <TextBlock Text="Z" Style="{StaticResource ShortcutKey}" />
+                            <TextBlock Text="Fill the picture / fit it" Style="{StaticResource ShortcutWhat}" />
                             <TextBlock Text="Ctrl+T" Style="{StaticResource ShortcutKey}" />
                             <TextBlock Text="Keep window on top" Style="{StaticResource ShortcutWhat}" />
                             <TextBlock Text="Esc" Style="{StaticResource ShortcutKey}" />
@@ -432,7 +434,11 @@
                                         </StackPanel>
                                     </Border>
                                 </Popup>
-                                <Button x:Name="FullscreenBtn" ToolTip="Fill the screen (F, or double-click the middle of the picture)" Style="{StaticResource BarButton}"
+                                <Button x:Name="FillBtn" ToolTip="Fill: zoom the picture edge to edge, trimming what doesn't fit, with no black bars (Z)" Style="{StaticResource BarButton}"
+                                        Click="FillBtn_Click" AutomationProperties.Name="Fill the picture">
+                                    <TextBlock x:Name="FillGlyph" Text="&#xE7A8;" FontFamily="{StaticResource IconFont}" FontSize="14" />
+                                </Button>
+                                <Button x:Name="FullscreenBtn" ToolTip="Fullscreen (F, or double-click the middle of the picture)" Style="{StaticResource BarButton}"
                                         Click="FullscreenBtn_Click" AutomationProperties.Name="Fullscreen">
                                     <TextBlock x:Name="FullscreenGlyph" Text="&#xE740;" FontFamily="{StaticResource IconFont}" FontSize="14" />
                                 </Button>
