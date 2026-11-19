@@ -26,12 +26,21 @@ public static partial class FilmTitle
     [GeneratedRegex(@"\b(2160p|1080p|1080i|720p|576p|480p|4k|uhd|hdr|hdr10|dv|bluray|blu-ray|bdrip|brrip|web-?dl|webrip|web|hdrip|dvdrip|dvd|hdtv|remux|x264|x265|h\.?264|h\.?265|hevc|avc|xvid|aac|ac3|dts|ddp?5\.1|atmos|remastered|extended|unrated|uncut|proper|repack|imax|directors\.?cut|amzn|nf|dsnp|hmax)\b", RegexOptions.IgnoreCase)]
     private static partial Regex TagRx();
 
+    // Plex's edition tag: "Miracle on 34th Street (1947) {edition-Colorized}".
+    [GeneratedRegex(@"\{edition-([^}]+)\}", RegexOptions.IgnoreCase)]
+    private static partial Regex EditionRx();
+
     [GeneratedRegex(@"\s{2,}")]
     private static partial Regex Spaces();
 
     public static Result Parse(string name)
     {
         var s = name ?? "";
+        // An edition (Colorized, Director's Cut) is named in the title so two
+        // copies of one film read differently: "Miracle on 34th Street (Colorized)".
+        var ed = EditionRx().Match(s);
+        var edition = ed.Success ? ed.Groups[1].Value.Trim() : null;
+        if (ed.Success) s = s.Remove(ed.Index, ed.Length);
         // Dots and underscores stand in for spaces in release names. Only when
         // the name has no real spaces, so "Mr. Smith" keeps its full stop.
         if (!s.Contains(' ')) s = s.Replace('.', ' ').Replace('_', ' ');
@@ -57,6 +66,6 @@ public static partial class FilmTitle
 
         var title = Spaces().Replace(s[..cut], " ").Trim(' ', '-', '(', '[', ',');
         if (title.Length == 0) return new Result(name ?? "", year);
-        return new Result(title, year);
+        return new Result(edition is { Length: > 0 } ? $"{title} ({edition})" : title, year);
     }
 }
